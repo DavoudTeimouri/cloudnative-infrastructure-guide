@@ -1,0 +1,19 @@
+---
+- name: Apply Base Linux OS Optimization
+  hosts: all
+  become: yes
+  tasks:
+    - name: Update apt cache and install base utilities
+      apt:
+        update_cache: yes
+        name:
+          - curl
+          - git
+          - jq
+          - htop
+          - net-tools
+        state: present
+
+    - name: Set Timezone to UTC
+      timezone:
+        name: UTC
