@@ -151,7 +151,6 @@ For Kubernetes >= 1.32, the recommended 4.x LTS kernel is 4.19; any 5.x or 6.x i
 
 | Component | Version | Pinned | Official source | Status | Notes |
 |---|---|---|---|---|---|
-| cert-manager | v1.20.4 | v1.20.4 | `https://github.com/cert-manager/cert-manager/releases` | VERIFIED | Issuer: Vault PKI or a self-signed bootstrapping issuer. Never both for the same domain |
 | external-dns | 1.23.0 | chart 1.23.0 | `https://github.com/kubernetes-sigs/external-dns/releases` | VERIFIED | RFC2136 against the internal DNS, or the CoreDNS etcd provider. No public provider in an air-gapped site |
 | Descheduler | v0.37.0 | v0.37.0 | `https://github.com/kubernetes-sigs/descheduler/releases` | VERIFIED | Run in DryRun for one week before enabling eviction |
 | Vertical Pod Autoscaler | 0.15.0 | chart 0.15.0 | `https://github.com/kubernetes/autoscaler/releases` | VERIFIED | Recommendation mode by default. Auto mode restarts pods and is not for stateful workloads |

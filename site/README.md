@@ -105,7 +105,9 @@ renders a password field and is only ever written into the file the operator dow
 ```json
 { "id": "p5", "title": "Storage", "subtitle": "…",
   "components": ["storage"],
-  "fields": ["cephNodeCount", "cephIpStart", "cephCpu", "cephMemGb", "cephDataDiskGb", "cephJournalDiskGb"] }
+  "fields": ["cephMonCount", "cephMonIpStart", "cephMgrCount", "cephMgrIpStart",
+             "cephOsdCount", "cephOsdIpStart", "cephCpu", "cephMemGb",
+             "cephSystemDiskGb", "cephOsdDataDiskGb", "cephOsdDbDiskGb"] }
 ```
 
 Every component and every value must appear on exactly one page — the validator enforces coverage,
