@@ -15,7 +15,8 @@ build plan for one specific cluster.
 |---|---|
 | Deployment method | Bare metal or virtual machines. Selecting one shows its requirements and failure-domain caveats |
 | Cluster method and release | Kubespray, five releases in parallel; the release list and the pinned Kubernetes/etcd/containerd/Ansible versions come from the catalog and the version matrix |
-| Components | Every component has a fixed option set. Selecting an option changes the plan, the version table and the exports |
+| Components | Every component has a fixed option set. Selecting an option changes the plan, the version table and the exports. Optional components (GPU, logging, service mesh, directory, runtime detection) can be switched off |
+| Service mesh | Off by default. Selecting Istio (sidecar or ambient) adds the mesh step, the IstioOperator, the mTLS/authorization policies and the Gateway API route |
 | Site values | CIDRs, hostnames, node names, endpoints. Rendered locally. Nothing is transmitted |
 | Plan | Ordered steps, filtered by the selection, each linking to the authoritative document |
 | Resolved versions | Only rows marked `VERIFIED` in `compatibility/version-matrix.md` |

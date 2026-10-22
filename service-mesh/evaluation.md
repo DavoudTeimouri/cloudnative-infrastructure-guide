@@ -1,6 +1,6 @@
 # Service mesh evaluation
 
-**Decision: no mesh at v1.** See ADR-0009. This file records the evaluation and the threshold for revisiting it.
+**Decision: no mesh at v1.** See ADR-0009. This file records the evaluation and the threshold for revisiting it. If the threshold is met, the deployment procedure is `service-mesh/istio/istio-deployment.md` (Istio 1.31.3, sidecar or ambient, staged mTLS, revision-based upgrades).
 
 ## What a mesh actually provides
 

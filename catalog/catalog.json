@@ -68,8 +68,8 @@
       "title": "Control plane",
       "required": true,
       "options": [
-        { "id": "cp3", "title": "3 control-plane nodes, stacked etcd", "default": true, "etcd": "3 members, 1 failure tolerated" },
-        { "id": "cp5", "title": "5 control-plane nodes, stacked etcd", "etcd": "5 members, 2 failures tolerated", "warning": "Longer maintenance windows and a third failure domain needed to justify it." }
+        { "id": "cp3", "title": "3 control-plane nodes, stacked etcd", "default": true, "etcd": "3 members, 1 failure tolerated", "doc": "architecture/02-deployment-topology.md" },
+        { "id": "cp5", "title": "5 control-plane nodes, stacked etcd", "etcd": "5 members, 2 failures tolerated", "doc": "architecture/02-deployment-topology.md", "warning": "Longer maintenance windows and a third failure domain needed to justify it." }
       ]
     },
     {
@@ -218,7 +218,8 @@
       "required": false,
       "options": [
         { "id": "none", "title": "None (native networking plus network policy)", "default": true, "doc": "service-mesh/evaluation.md" },
-        { "id": "istio", "title": "Istio", "versionKey": "istio", "doc": "service-mesh/evaluation.md", "warning": "Adopt only when the threshold in service-mesh/evaluation.md is met." }
+        { "id": "istio-ambient", "title": "Istio ambient (ztunnel per node, waypoints only where L7 is needed)", "versionKey": "istio", "doc": "service-mesh/istio/istio-deployment.md", "decisionDoc": "service-mesh/evaluation.md", "note": "Lower per-pod cost, but a ztunnel fault affects every pod on the node." },
+        { "id": "istio", "title": "Istio sidecar (Envoy per pod)", "versionKey": "istio", "doc": "service-mesh/istio/istio-deployment.md", "decisionDoc": "service-mesh/evaluation.md", "warning": "Adopt only when the threshold in service-mesh/evaluation.md is met. This adds a control plane and a new failure domain." }
       ]
     }
   ],
@@ -270,6 +271,7 @@
     { "id": "s07", "phase": "6. Storage", "title": "Deploy the storage platform", "doc": "storage/rook-ceph/rook-ceph.md", "altDoc": "storage/ceph/cephadm-deployment.md", "actions": ["Create the CRUSH map with the host failure domain", "Create the pools, the filesystem and the object store", "Check Ceph HEALTH_OK before consuming any PVC"] },
     { "id": "s08", "phase": "7. Kubernetes", "title": "Deploy the cluster with Kubespray", "doc": "kubespray/kubespray-deployment.md", "extraDocs": ["kubespray/multi-version-support.md"], "actions": ["Fill the inventory and the group vars", "Mirror the artifacts for the selected Kubespray release", "Run cluster.yml, then validate the control plane and etcd"] },
     { "id": "s09", "phase": "8. Cluster services", "title": "CNI, ingress, load balancing, CSI", "doc": "kubernetes/networking/cilium.md", "extraDocs": ["kubernetes/networking/metallb.md", "kubernetes/ingress/nginx-ingress.md"], "actions": ["Install the CNI and confirm kube-proxy replacement", "Configure MetalLB and the ingress controller", "Configure the CSI driver and the StorageClasses", "Apply the Gateway API CRDs"] },
+    { "id": "s09b", "phase": "8b. Service mesh (optional)", "title": "Deploy Istio and enable mTLS in stages", "doc": "service-mesh/istio/istio-deployment.md", "extraDocs": ["service-mesh/evaluation.md", "kubernetes/ingress/multi-controller-plan.md"], "when": { "component": { "serviceMesh": ["istio", "istio-ambient"] } }, "actions": ["Confirm the adoption threshold in service-mesh/evaluation.md is actually met", "Extract and mirror every image the install and the dataplane need", "Decide the dataplane mode: ambient (per node) or sidecar (per pod)", "Install the control plane with Helm so Argo CD owns it", "Apply PeerAuthentication STRICT to one namespace, watch the metrics, then continue", "Apply the default-deny AuthorizationPolicy only after the allow rules exist", "Test a negative case: a pod that should be denied must be denied", "Wire Istio telemetry into the existing Prometheus stack"] },
     { "id": "s10", "phase": "9. Management cluster", "title": "Rancher, Keycloak, Argo CD, backup", "doc": "management-cluster/rancher/rancher.md", "extraDocs": ["management-cluster/keycloak/keycloak.md", "management-cluster/argocd/argocd.md", "lifecycle/backup/backup-and-dr.md"], "actions": ["Install Rancher and register the Application Cluster", "Wire Keycloak OIDC and verify the groups claim", "Install Argo CD and sync the first application", "Install Velero and run a first backup"] },
     { "id": "s11", "phase": "10. Secrets and security", "title": "Vault integration, admission policy, runtime detection", "doc": "secrets-management/kubernetes-integration/secret-delivery.md", "extraDocs": ["kubernetes/security/security-controls.md"], "actions": ["Bind the Vault role to the service account", "Deploy the admission controllers in audit mode, then enforce", "Enable the runtime detection ruleset", "Verify certificate renewal and secret rotation"] },
     { "id": "s12", "phase": "11. Observability", "title": "Metrics, alerting, logs", "doc": "monitoring/prometheus.md", "extraDocs": ["logging/log-pipeline.md"], "actions": ["Install the monitoring stack and confirm every target is up", "Configure the alert routes and the runbook links", "Deploy the log pipeline and prove the redaction filter"] },
@@ -287,6 +289,7 @@
     { "id": "u05", "title": "Edge load balancer", "doc": "network-matrix/external-load-balancer.md", "actions": ["Update the image tags in the Compose file", "Upgrade one node, verify, then the other", "Confirm the VRRP state and the health checks after each node"] },
     { "id": "u06", "title": "GPU operator, driver and CUDA", "doc": "gpu-ai/drivers/compatibility-matrix.md", "actions": ["Drain one GPU node at a time", "Verify the driver, the toolkit and the operator versions line up", "Run nvidia-smi on the node and in a pod before uncordoning"] },
     { "id": "u07", "title": "Ingress controller portfolio", "doc": "kubernetes/ingress/multi-controller-plan.md", "actions": ["Check the deprecation stage of each controller", "Upstream retirement forces Deprecated immediately", "Migrate the traffic share before removing a controller"] },
+    { "id": "u07b", "title": "Service mesh (Istio)", "doc": "service-mesh/istio/istio-deployment.md", "actions": ["One minor version at a time; Istio does not support skipping minors", "Install the new revision alongside the old one (canary control plane)", "Move namespaces one at a time by changing the istio.io/rev label, then restart", "Rollback exists only while the old revision is installed: move the label back", "Downgrade is not supported. Remove the old revision only after every namespace has moved", "Confirm the Kubernetes version window for the target Istio minor before starting"] },
     { "id": "u08", "title": "Vault and the PKI", "doc": "secrets-management/vault/hashicorp-vault-decision.md", "actions": ["Snapshot the raft storage before the upgrade", "Upgrade the standby, then the active", "Verify the unseal procedure and the audit device after the upgrade"] }
   ]
 }

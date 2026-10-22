@@ -51,6 +51,11 @@ jobs:
       - name: Catalog validation
         run: python3 scripts/validate_catalog.py
 
+      - name: Renderer check (runs the real app.js in a JS engine)
+        run: |
+          python3 -m pip install --quiet dukpy
+          python3 tests/test_site_render.py
+
       - name: Upload the site
         uses: actions/upload-pages-artifact@v3
         with:

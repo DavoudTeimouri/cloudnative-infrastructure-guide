@@ -127,11 +127,24 @@ def test_export_templates():
 
 def test_steps_reference_real_components():
     c = catalog()
-    comp_ids = {comp["id"] for comp in c["components"]}
+    options = {comp["id"]: {o["id"] for o in comp["options"]} for comp in c["components"]}
     for step in c["steps"]:
         when = step.get("when") or {}
-        for key in when.get("component", {}):
-            assert key in comp_ids, f"step {step['id']} gates on unknown component {key}"
+        for key, want in (when.get("component") or {}).items():
+            assert key in options, f"step {step['id']} gates on unknown component {key}"
+            wanted = want if isinstance(want, list) else [want]
+            for v in wanted:
+                assert v in options[key], f"step {step['id']} gates on unknown option {key}={v}"
+
+
+def test_every_component_is_reachable():
+    """Every component must appear in the catalog UI with at least one valid doc."""
+    c = catalog()
+    for comp in c["components"]:
+        for opt in comp["options"]:
+            assert opt.get("doc"), f"option {comp['id']}/{opt['id']} has no doc"
+            assert os.path.exists(os.path.join(BASE, opt["doc"])), \
+                f"option {comp['id']}/{opt['id']} doc missing: {opt['doc']}"
 
 
 def test_built_data_is_current():
@@ -168,6 +181,8 @@ def render_export(template, data):
         "firstGpuNode": (csv(values["gpuNodes"]) or [""])[0],
         "firstWorkerNode": (csv(values["workerNodes"]) or [""])[0],
         "firstControlPlaneNode": (csv(values["controlPlaneNodes"]) or [""])[0],
+        "revision": str(data["versions"].get("istio", "")).replace(".", "-"),
+        "istioProfile": "ambient" if choices.get("serviceMesh") == "istio-ambient" else "default",
     }
 
     def sub_dotted(m):
@@ -243,6 +258,7 @@ def main():
         ("export templates render without leftovers", test_exports_render_cleanly),
         ("generated inventory has the expected groups", test_inventory_has_nodes),
         ("step conditions reference real components", test_steps_reference_real_components),
+        ("every component option has a reachable document", test_every_component_is_reachable),
         ("site/data.json matches the sources", test_built_data_is_current),
     ]
     for name, fn in tests:

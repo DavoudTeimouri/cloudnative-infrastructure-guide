@@ -22,8 +22,8 @@ Personal cloud-native knowledge base: on-premises, air-gapped, production-orient
 
 | Item | Value |
 |---|---|
-| Files | 97 markdown, scripts and templates |
-| ADRs | 27 (`decisions/ADR-0001` .. `ADR-0027`) |
+| Files | 95 markdown, scripts and templates |
+| ADRs | 28 (`decisions/ADR-0001` .. `ADR-0028`) |
 | Deliverables | all 12 from the master prompt §32, mapped below |
 | Repository self-check | `tests/test_repo_tools.py` — 8 checks, all passing |
 | Version baseline check date | 2026-10-17 |
@@ -42,7 +42,7 @@ The decisions that shape everything else. Full reasoning in the ADR, referenced 
 | Kubernetes topology | 3 control-plane nodes with stacked etcd; 5 documented as the reference topology for larger sites | ADR-0002, ADR-0003 |
 | CNI | Cilium, kube-proxy-free, with Hubble | ADR-0006 |
 | Container runtime | containerd (2.3.7 under Kubespray release-2.32) | ADR-0005 |
-| Service mesh | **None at v1.** Adopt only when the threshold in `service-mesh/evaluation.md` is met | ADR-0009 |
+| Service mesh | **None at v1.** Adopt only when the threshold in `service-mesh/evaluation.md` is met. Istio 1.31.3 (sidecar or ambient) has a full deployment, mTLS-staging and revision-based upgrade procedure: `service-mesh/istio/istio-deployment.md` | ADR-0009 |
 | GPU sharing | MIG for production multi-tenancy, time-slicing for development only (no VRAM isolation) | ADR-0022 |
 | LLM serving | vLLM primary, llama.cpp for small or quantized models | ADR-0023 |
 | External load balancer | Tiered active/active edge: HAProxy (L4, active health checks) and Nginx (L7, TLS) on host network via Docker Compose, Keepalived with unicast peers. Tier 2 = two VIPs balanced by router ECMP/BGP; tier 3 = DNS/GSLB. A single VRRP VIP is active/standby, not active/active | ADR-0028, ADR-0004 |

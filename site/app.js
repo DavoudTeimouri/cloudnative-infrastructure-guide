@@ -98,7 +98,10 @@
       vrrpAuthPass: state.values.vrrpAuthPass || "",
       firstGpuNode: csv(state.values.gpuNodes)[0] || "",
       firstWorkerNode: csv(state.values.workerNodes)[0] || "",
-      firstControlPlaneNode: csv(state.values.controlPlaneNodes)[0] || ""
+      firstControlPlaneNode: csv(state.values.controlPlaneNodes)[0] || "",
+      // Istio revision names are dots replaced by dashes: 1.31.3 -> 1-31-3.
+      revision: String(DATA.versions.istio || "").replace(/\./g, "-"),
+      istioProfile: state.choices.serviceMesh === "istio-ambient" ? "ambient" : "default"
     };
 
     return tpl.replace(/\{\{\s*([a-zA-Z]+)\.([a-zA-Z0-9_-]+)\s*\}\}/g, function (m, ns, key) {
@@ -240,7 +243,13 @@
       if (!s.when) return true;
       if (s.when.component) {
         for (var k in s.when.component) {
-          if (state.choices[k] !== s.when.component[k]) return false;
+          var want = s.when.component[k];
+          var got = state.choices[k];
+          if (Array.isArray(want)) {
+            if (want.indexOf(got) === -1) return false;
+          } else if (got !== want) {
+            return false;
+          }
         }
       }
       return true;
