@@ -211,6 +211,16 @@ def test_exports_render_cleanly():
                 list(yaml.safe_load_all(body))
             except Exception as e:  # noqa: BLE001
                 problems.append(f"{exp['id']}: invalid YAML: {e}")
+        if exp["filename"].endswith(".sh"):
+            import subprocess
+            import tempfile
+            with tempfile.NamedTemporaryFile("w", suffix=".sh", delete=False) as fh:
+                fh.write(body)
+                tmp = fh.name
+            res = subprocess.run(["bash", "-n", tmp], capture_output=True, text=True)
+            os.unlink(tmp)
+            if res.returncode != 0:
+                problems.append(f"{exp['id']}: bash syntax: {res.stderr.strip()[:200]}")
     assert not problems, "; ".join(problems)
 
 
