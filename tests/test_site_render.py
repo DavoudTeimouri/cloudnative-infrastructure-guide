@@ -181,6 +181,23 @@ var flipped = {
   derived: __g.derived()
 };
 
+// Add-ons: the optional page must add steps, files and runbook rows.
+__g.state.choices.certManager = "vault-pki";
+__g.state.choices.metricsServer = "standalone";
+__g.state.choices.vpa = "auto";
+__g.state.choices.externalDns = "rfc2136";
+__g.gotoPage(8);
+var addonPage = __byId["page"].textContent;
+__g.renderReview();
+var addons = {
+  files: filenames(),
+  bodies: exportBodies().join("\n"),
+  steps: __byId["steps"].children.length,
+  runbook: __g.buildRunbook(),
+  pageHasAddons: addonPage.indexOf("cert-manager") !== -1,
+  pageCount: __byId["page-count"] ? __byId["page-count"].textContent : ""
+};
+
 // Upgrade walkthrough.
 __g.renderUpgrade();
 var upFirst = __byId["upgrade-body"].textContent;
@@ -197,11 +214,19 @@ JSON.stringify({
           runbookHasSizing: base.runbook.indexOf("## Sizing") !== -1 },
   flipped: { files: flipped.files, reviewSteps: flipped.reviewSteps,
              hasCephDocker: flipped.bodiesJoined.indexOf("--docker") !== -1,
-             hasCephHost: flipped.bodiesJoined.indexOf("ceph-1") !== -1,
+             hasCephHost: flipped.bodiesJoined.indexOf("ceph-mon-1") !== -1,
              hasIstio: flipped.bodiesJoined.indexOf("PeerAuthentication") !== -1,
              hasIdp: flipped.bodiesJoined.indexOf("Keycloak — LDAP/AD user federation") !== -1,
              engine: flipped.derived.cephEngine,
              gpuNodes: flipped.derived.gpuHostList },
+  addons: { files: addons.files, steps: addons.steps, pageHasAddons: addons.pageHasAddons,
+            pageCount: addons.pageCount,
+            hasCert: addons.files.indexOf("cert-manager-values.yaml") !== -1,
+            hasIssuer: addons.files.indexOf("cert-manager-issuer.yaml") !== -1,
+            hasVpaAuto: addons.files.indexOf("vpa-auto-values.yaml") !== -1,
+            hasExtDns: addons.files.indexOf("external-dns-values.yaml") !== -1,
+            certInRunbook: addons.runbook.indexOf("cert-manager-values.yaml") !== -1,
+            runbookLeftovers: (addons.runbook.match(/\{\{/g) || []).length },
   upgrade: { firstSteps: upFirst.split("gate").length - 1,
              k8sHasCommand: upK8s.indexOf("ansible-playbook") !== -1,
              k8sHasGate: upK8s.indexOf("gate") !== -1,
@@ -261,6 +286,22 @@ def main():
     if flipped["reviewSteps"] <= base["reviewSteps"]:
         failures.append("selecting mesh/gpu/idp did not add steps")
 
+    addons = result["addons"]
+    if addons["steps"] <= flipped["reviewSteps"]:
+        failures.append("selecting add-ons did not add the add-on step")
+    if not addons["pageHasAddons"]:
+        failures.append("add-ons page does not render cert-manager")
+    if addons["pageCount"] != f"{len(data['pages'])} / {len(data['pages'])}":
+        failures.append(f"page counter wrong on the last page: {addons['pageCount']}")
+    for key, name in (("hasCert", "cert-manager-values.yaml"), ("hasIssuer", "cert-manager-issuer.yaml"),
+                      ("hasVpaAuto", "vpa-auto-values.yaml"), ("hasExtDns", "external-dns-values.yaml")):
+        if not addons[key]:
+            failures.append(f"add-on selection did not render {name}")
+    if not addons["certInRunbook"]:
+        failures.append("runbook does not list the add-on values file")
+    if addons["runbookLeftovers"]:
+        failures.append(f"add-on runbook has {addons['runbookLeftovers']} unresolved placeholders")
+
     up = result["upgrade"]
     if up["runbookLeftovers"]:
         failures.append(f"upgrade runbook has {up['runbookLeftovers']} unresolved placeholders")
@@ -271,16 +312,18 @@ def main():
     if not up["runbookHasRollback"]:
         failures.append("upgrade runbook has no rollback line")
 
-    print(f"OK   base: {base['pages']} pages, {base['reviewSteps']} steps, "
-          f"{len(base['files'])} files, {base['sizingRows'] - 2} sizing rows")
-    print(f"OK   flipped: {len(flipped['files'])} files, engine {flipped['engine']}, "
-          f"gpu {flipped['gpuNodes'] or 'none'}")
-    print(f"OK   upgrade: {len(data['upgrades'])} flows, first gate markers {up['firstSteps']}")
-
     if failures:
         for f in failures:
             print("FAIL", f)
         return 1
+
+    print(f"OK   base: {base['pages']} pages, {base['reviewSteps']} steps, "
+          f"{len(base['files'])} files, {base['sizingRows'] - 2} sizing rows")
+    print(f"OK   flipped: {len(flipped['files'])} files, engine {flipped['engine']}, "
+          f"gpu {flipped['gpuNodes'] or 'none'}")
+    print(f"OK   add-ons: {addons['steps'] - flipped['reviewSteps']} extra step(s), "
+          f"{len(addons['files']) - len(flipped['files'])} extra file(s)")
+    print(f"OK   upgrade: {len(data['upgrades'])} flows, first gate markers {up['firstSteps']}")
     print("All render checks passed.")
     return 0
 

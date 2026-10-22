@@ -147,6 +147,18 @@ For Kubernetes >= 1.32, the recommended 4.x LTS kernel is 4.19; any 5.x or 6.x i
 | DCGM Exporter | 4.8.4 | `https://github.com/NVIDIA/dcgm-exporter/releases` | VERIFIED | GPU metrics; version is tied to the GPU Operator release |
 | Vault Kubernetes auth (helm) | v1.7.6 | `https://github.com/hashicorp/vault-k8s/releases` | VERIFIED | Vault injector and agent chart |
 
+## Platform add-ons
+
+| Component | Version | Pinned | Official source | Status | Notes |
+|---|---|---|---|---|---|
+| cert-manager | v1.20.4 | v1.20.4 | `https://github.com/cert-manager/cert-manager/releases` | VERIFIED | Issuer: Vault PKI or a self-signed bootstrapping issuer. Never both for the same domain |
+| external-dns | 1.23.0 | chart 1.23.0 | `https://github.com/kubernetes-sigs/external-dns/releases` | VERIFIED | RFC2136 against the internal DNS, or the CoreDNS etcd provider. No public provider in an air-gapped site |
+| Descheduler | v0.37.0 | v0.37.0 | `https://github.com/kubernetes-sigs/descheduler/releases` | VERIFIED | Run in DryRun for one week before enabling eviction |
+| Vertical Pod Autoscaler | 0.15.0 | chart 0.15.0 | `https://github.com/kubernetes/autoscaler/releases` | VERIFIED | Recommendation mode by default. Auto mode restarts pods and is not for stateful workloads |
+| Metrics Server | 3.14.0 | chart 3.14.0 | `https://github.com/kubernetes-sigs/metrics-server/releases` | VERIFIED | Required by HPA and by the VPA recommender |
+| OpenTelemetry Operator | v0.161.0 | v0.161.0 | `https://github.com/open-telemetry/opentelemetry-operator/releases` | VERIFIED | Collector only. Traces go to Tempo, not to a second metrics pipeline |
+| Trivy Operator | v0.36.0 | v0.36.0 | `https://github.com/aquasecurity/trivy-operator/releases` | VERIFIED | Vulnerability and config scans as CRDs. Needs the internal DB mirror or offline mode |
+
 ## End-of-life and retirement watchlist
 
 | Component | Status | Date | Source | Action |

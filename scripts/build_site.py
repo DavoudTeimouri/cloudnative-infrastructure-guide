@@ -52,6 +52,13 @@ VERSION_ALIASES = {
     "kubespray": ["Kubespray"],
     "keepalived": ["Keepalived"],
     "vllm": ["vLLM"],
+    "cert-manager": ["cert-manager"],
+    "external-dns": ["external-dns"],
+    "descheduler": ["Descheduler"],
+    "vpa": ["Vertical Pod Autoscaler"],
+    "metrics-server": ["Metrics Server"],
+    "otel-operator": ["OpenTelemetry Operator"],
+    "trivy-operator": ["Trivy Operator"],
 }
 
 

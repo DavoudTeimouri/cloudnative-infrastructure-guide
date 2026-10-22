@@ -85,7 +85,104 @@ Rules:
 - For rack awareness, define a `row` or `room` bucket and map each host to it.
 - A pool with 3 hosts and 3 replicas tolerates one host loss. A pool with 2 hosts and 3 replicas does not tolerate a host loss, because CRUSH cannot place 3 replicas on 2 hosts.
 
-## E. Container engine: Podman or Docker
+## E. Role separation and per-role sizing
+
+Ceph is not one role. Each daemon type has its own count, its own failure tolerance and, when the
+configurator is used, its own node group. Separate hosts per role are the safe default; co-locating
+is an optimisation you make on purpose.
+
+| Role | Default count | Placement rule | Failure tolerance | Notes |
+|---|---|---|---|---|
+| MON | 3 | Separate hosts, separate racks if available | 1 host | Odd count only. 2 is worse than 1; 4 tolerates the same as 3 |
+| MGR | 2 | Separate hosts from MON when possible | 1 host | One active, one standby. The dashboard and the orchestrator die with both |
+| OSD | ≥ 3 | One OSD daemon per data disk; at least 3 hosts for a 3-replica pool | 1 host with 3 hosts and 3 replicas | The only role that holds data. Dedicated NVMe for DB/WAL |
+| MDS | 2 | Active + standby; 2 hosts minimum | 1 host | Required only for CephFS. More than 3 is rarely worth it |
+| RGW | 2 | Behind the edge load balancer | 1 host | Stateless; scale by request rate, not by data size |
+| Crash / exporter | all hosts | Co-located | — | Not a capacity role |
+
+Sizing per role, as a starting point for a 3-host site:
+
+| Role | vCPU | RAM | Disk |
+|---|---|---|---|
+| MON | 2 | 8 GiB | 100 GiB SSD (the monitor store is small but latency-sensitive) |
+| MGR | 2 | 8 GiB | 100 GiB |
+| OSD | 8 | 32 GiB (≈ 4 GiB per OSD plus cache) | 1 data disk per OSD + 1 DB/WAL NVMe |
+| MDS | 4 | 16 GiB | 100 GiB |
+| RGW | 4 | 8 GiB | 100 GiB |
+
+Never put MON on the same host as the only OSD of a pool, and never let the DB/WAL device be shared
+with the OS. A full DB device stalls the OSD, and a stalled OSD turns into `slow ops` before it
+turns into a failed disk.
+
+### Host labels
+
+cephadm places services by label, so labels are the contract between the node inventory and the
+service spec:
+
+```bash
+cephadm shell -- ceph orch host label add ceph-mon-1 mon
+cephadm shell -- ceph orch host label add ceph-mgr-1 mgr
+cephadm shell -- ceph orch host label add ceph-osd-1 osd
+cephadm shell -- ceph orch host label add ceph-mds-1 mds
+cephadm shell -- ceph orch host label add ceph-rgw-1 rgw
+```
+
+### Service spec with explicit per-role placement
+
+```yaml
+service_type: mon
+placement:
+  hosts:
+    - ceph-mon-1
+    - ceph-mon-2
+    - ceph-mon-3
+---
+service_type: mgr
+placement:
+  hosts: [ceph-mgr-1, ceph-mgr-2]
+---
+service_type: osd
+service_id: data
+placement:
+  hosts: [ceph-osd-1, ceph-osd-2, ceph-osd-3]
+data_devices:
+  all: true
+db_devices:
+  all: false
+  paths: [/dev/nvme1n1]
+---
+service_type: mds
+service_id: cephfs
+placement:
+  hosts: [ceph-mds-1, ceph-mds-2]
+---
+service_type: rgw
+service_id: rgw
+placement:
+  hosts: [ceph-rgw-1, ceph-rgw-2]
+spec:
+  rgw_frontend_port: 8080
+```
+
+`placement: hosts:` is explicit on purpose. `placement: label:` is shorter and survives a host
+replacement only if the new host gets the same label — both are valid, and the generated file uses
+explicit hosts so a typo fails at apply time instead of silently placing a MON on an OSD host.
+
+### Co-location rules, when you must
+
+Small sites cannot spare ten hosts. Then:
+
+1. MON and MGR may share a host, but never all three MONs on one host.
+2. OSD and RGW may share a host; RGW is stateless.
+3. MDS and MGR may share a host.
+4. MON and OSD on the same host only with three or more hosts, and accept that losing one host loses
+   a monitor and a third of the data at once.
+5. Never co-locate the only copy of the MON store with the OSD DB device.
+
+The configurator generates the separated layout by default; co-location is a manual edit of the
+generated spec, and the operator owns that decision.
+
+## F. Container engine: Podman or Docker
 
 cephadm runs every Ceph daemon in a container. It supports Podman (the upstream default) and
 Docker. Both are supported here; the choice is per cluster and is recorded in the catalog so the
@@ -115,7 +212,7 @@ EOF
 systemctl restart docker
 ```
 
-## F. Deployment with cephadm
+## G. Deployment with cephadm
 
 Execution context: **first storage node**, then the others. Pass `--docker` to bootstrap and to
 every `cephadm` invocation when Docker is the engine; omit it for Podman.
@@ -160,7 +257,7 @@ cephadm shell -- ceph orch ps
 Mixed engines are not supported within one cluster: the orchestrator records the engine at
 bootstrap and reuses it for every daemon it deploys.
 
-## G. Pools, RBD, CephFS, RGW
+## H. Pools, RBD, CephFS, RGW
 
 ```bash
 # Replicated pool
@@ -177,7 +274,7 @@ cephadm shell -- ceph mgr module enable rgw --force
 cephadm shell -- ceph orch apply rgw rgw --placement="3 osd-1 osd-2 osd-3"  # placement must respect the CRUSH map
 ```
 
-## H. RBD images and Kubernetes consumption
+## I. RBD images and Kubernetes consumption
 
 ```bash
 # Create an image
@@ -213,7 +310,7 @@ volumeBindingMode: Immediate
 
 The CSI secrets come from Vault via External Secrets; they are not inline in the StorageClass.
 
-## I. Monitoring
+## J. Monitoring
 
 The Ceph manager module exposes Prometheus metrics directly:
 
@@ -226,7 +323,7 @@ Key metrics: `ceph_health_status`, `ceph_osd_up`, `ceph_pg_degraded`, `ceph_pg_i
 
 Dashboard + alerts in `monitoring/prometheus.md`.
 
-## J. Recovery procedures
+## K. Recovery procedures
 
 ### OSD failure
 
@@ -261,7 +358,7 @@ cephadm shell -- ceph orch host rm <host>   # after the host is gone
 
 Recovery requires a monmap and the OSD map from a backup. This is why `cephadm shell -- ceph mon dump` and the OSD map are backed up along with the data. See `lifecycle/backup/`.
 
-## K. Backup and disaster recovery
+## L. Backup and disaster recovery
 
 Ceph has three different mechanisms, and they are not interchangeable:
 
@@ -274,7 +371,7 @@ Ceph has three different mechanisms, and they are not interchangeable:
 
 For Kubernetes volumes, use Velero with the CSI snapshotter for application-consistent backups, and a separate Ceph-side backup for the storage platform itself.
 
-## L. Upgrades
+## M. Upgrades
 
 Order matters and Ceph upgrades are not reversible across major versions.
 
@@ -291,7 +388,7 @@ cephadm shell -- ceph orch upgrade start osd
 
 The upgrade must not skip a major version. The supported path is in the Ceph release notes for the target version. Record the check in `compatibility/version-matrix.md`.
 
-## M. Best practices
+## N. Best practices
 
 Mandatory:
 - One OSD per device, data and journal separated.

@@ -1,5 +1,5 @@
 {
-  "catalogVersion": "2.0.0",
+  "catalogVersion": "3.0.0",
   "updated": "2026-10-22",
   "source": {
     "docs": "The repository is the source of truth. This catalog points at it; it never duplicates a procedure.",
@@ -108,7 +108,7 @@
     {
       "id": "p2",
       "title": "Application cluster",
-      "subtitle": "Control plane, workers and their sizes. Names and IPs are generated from the prefix and the first address.",
+      "subtitle": "Control plane, workers and their sizes. Names and addresses are generated from the prefix and the first address.",
       "components": [
         "controlPlane",
         "cni"
@@ -149,28 +149,60 @@
     {
       "id": "p4",
       "title": "Operating system",
-      "subtitle": "Distribution baseline. Local accounts only: nodes are never joined to a directory.",
+      "subtitle": "Distribution and the host baseline: access, time, resolution, kernel, limits, security. Local accounts only — nodes are never joined to a directory.",
       "components": [
         "os"
       ],
       "fields": [
+        "adminUser",
+        "sshPort",
+        "sshPasswordAuth",
+        "sudoNopasswd",
+        "osTimezone",
+        "osLocale",
+        "ntpServers",
+        "dnsServers",
+        "dnsSearchDomain",
+        "kernelArgs",
+        "swapDisabled",
+        "transparentHugePages",
+        "maxPodsPerNode",
+        "fileDescriptorsMax",
+        "selinuxMode",
+        "firewallBackend",
+        "auditRetentionDays",
+        "unattendedSecurityUpdates",
         "caBundle"
       ]
     },
     {
       "id": "p5",
       "title": "Storage",
-      "subtitle": "Ceph inside Kubernetes with Rook, or on dedicated hosts with cephadm on Podman or Docker.",
+      "subtitle": "Rook inside the cluster, or cephadm on dedicated hosts with one node group per Ceph role.",
       "components": [
         "storage"
       ],
       "fields": [
-        "cephNodeCount",
-        "cephIpStart",
+        "rookOsdNodes",
+        "rookDeviceFilter",
+        "rookBlockClass",
+        "rookFsClass",
+        "cephHostPrefix",
+        "cephMonCount",
+        "cephMonIpStart",
+        "cephMgrCount",
+        "cephMgrIpStart",
+        "cephOsdCount",
+        "cephOsdIpStart",
+        "cephMdsCount",
+        "cephMdsIpStart",
+        "cephRgwCount",
+        "cephRgwIpStart",
         "cephCpu",
         "cephMemGb",
-        "cephDataDiskGb",
-        "cephJournalDiskGb"
+        "cephSystemDiskGb",
+        "cephOsdDataDiskGb",
+        "cephOsdDbDiskGb"
       ]
     },
     {
@@ -240,6 +272,26 @@
         "gpuCpu",
         "gpuMemGb",
         "gpuDiskGb"
+      ]
+    },
+    {
+      "id": "p9",
+      "title": "Add-ons",
+      "subtitle": "Optional cluster components, each with its own values file and its own line in the deploy script. They install in the order listed in addons/platform-addons.md.",
+      "components": [
+        "certManager",
+        "metricsServer",
+        "vpa",
+        "descheduler",
+        "externalDns",
+        "trivyOperator",
+        "otelCollector"
+      ],
+      "fields": [
+        "externalDnsZone",
+        "externalDnsServer",
+        "trivySeverity",
+        "otelEndpoint"
       ]
     }
   ],
@@ -678,6 +730,173 @@
           "warning": "No memory isolation between pods. Never for multi-tenant production."
         }
       ]
+    },
+    {
+      "id": "certManager",
+      "title": "Add-on: certificate management",
+      "required": false,
+      "doc": "addons/platform-addons.md",
+      "options": [
+        {
+          "id": "none",
+          "title": "None",
+          "default": true,
+          "doc": "addons/platform-addons.md"
+        },
+        {
+          "id": "vault-pki",
+          "title": "cert-manager with a Vault PKI ClusterIssuer",
+          "versionKey": "cert-manager",
+          "doc": "addons/platform-addons.md"
+        },
+        {
+          "id": "selfsigned",
+          "title": "cert-manager with a self-signed bootstrapping issuer",
+          "versionKey": "cert-manager",
+          "doc": "addons/platform-addons.md",
+          "warning": "Bootstrap only. Remove it once the Vault issuer works."
+        }
+      ]
+    },
+    {
+      "id": "metricsServer",
+      "title": "Add-on: resource metrics",
+      "required": false,
+      "doc": "addons/platform-addons.md",
+      "options": [
+        {
+          "id": "none",
+          "title": "None",
+          "default": true,
+          "doc": "addons/platform-addons.md"
+        },
+        {
+          "id": "standalone",
+          "title": "Metrics Server (required by HPA and VPA)",
+          "versionKey": "metrics-server",
+          "doc": "addons/platform-addons.md"
+        }
+      ]
+    },
+    {
+      "id": "vpa",
+      "title": "Add-on: vertical pod autoscaling",
+      "required": false,
+      "doc": "addons/platform-addons.md",
+      "options": [
+        {
+          "id": "none",
+          "title": "None",
+          "default": true,
+          "doc": "addons/platform-addons.md"
+        },
+        {
+          "id": "recommendation",
+          "title": "Recommendation mode only (no restarts)",
+          "versionKey": "vpa",
+          "doc": "addons/platform-addons.md"
+        },
+        {
+          "id": "auto",
+          "title": "Auto mode (evicts and restarts pods)",
+          "versionKey": "vpa",
+          "doc": "addons/platform-addons.md",
+          "warning": "Never for stateful workloads. Restarts pods on every recommendation change."
+        }
+      ]
+    },
+    {
+      "id": "descheduler",
+      "title": "Add-on: pod rebalancing",
+      "required": false,
+      "doc": "addons/platform-addons.md",
+      "options": [
+        {
+          "id": "none",
+          "title": "None",
+          "default": true,
+          "doc": "addons/platform-addons.md"
+        },
+        {
+          "id": "dry-run",
+          "title": "Dry-run for two weeks",
+          "versionKey": "descheduler",
+          "doc": "addons/platform-addons.md"
+        },
+        {
+          "id": "evict",
+          "title": "Eviction enabled",
+          "versionKey": "descheduler",
+          "doc": "addons/platform-addons.md",
+          "warning": "Respects PodDisruptionBudgets. Every eviction is a restart someone must explain."
+        }
+      ]
+    },
+    {
+      "id": "externalDns",
+      "title": "Add-on: DNS records from objects",
+      "required": false,
+      "doc": "addons/platform-addons.md",
+      "options": [
+        {
+          "id": "none",
+          "title": "None",
+          "default": true,
+          "doc": "addons/platform-addons.md"
+        },
+        {
+          "id": "rfc2136",
+          "title": "RFC2136 against the internal DNS",
+          "versionKey": "external-dns",
+          "doc": "addons/platform-addons.md"
+        },
+        {
+          "id": "coredns-etcd",
+          "title": "CoreDNS etcd provider",
+          "versionKey": "external-dns",
+          "doc": "addons/platform-addons.md"
+        }
+      ]
+    },
+    {
+      "id": "trivyOperator",
+      "title": "Add-on: runtime vulnerability scanning",
+      "required": false,
+      "doc": "addons/platform-addons.md",
+      "options": [
+        {
+          "id": "none",
+          "title": "None",
+          "default": true,
+          "doc": "addons/platform-addons.md"
+        },
+        {
+          "id": "enabled",
+          "title": "Trivy Operator with an internal DB mirror",
+          "versionKey": "trivy-operator",
+          "doc": "addons/platform-addons.md"
+        }
+      ]
+    },
+    {
+      "id": "otelCollector",
+      "title": "Add-on: trace collection",
+      "required": false,
+      "doc": "addons/platform-addons.md",
+      "options": [
+        {
+          "id": "none",
+          "title": "None",
+          "default": true,
+          "doc": "addons/platform-addons.md"
+        },
+        {
+          "id": "daemonset",
+          "title": "OpenTelemetry Collector DaemonSet",
+          "versionKey": "otel-operator",
+          "doc": "addons/platform-addons.md"
+        }
+      ]
     }
   ],
   "values": [
@@ -851,21 +1070,6 @@
       "required": true
     },
     {
-      "id": "cephNodeCount",
-      "label": "Ceph hosts (cephadm only)",
-      "type": "number",
-      "default": 3,
-      "min": 3,
-      "max": 64,
-      "hint": "Three is the minimum for a 3-replica pool with a host failure domain. Ignored for Rook."
-    },
-    {
-      "id": "cephIpStart",
-      "label": "First Ceph host IP",
-      "type": "text",
-      "default": "10.40.0.11"
-    },
-    {
       "id": "cephCpu",
       "label": "Ceph vCPU per host",
       "type": "number",
@@ -878,20 +1082,6 @@
       "type": "number",
       "default": 32,
       "min": 16
-    },
-    {
-      "id": "cephDataDiskGb",
-      "label": "Ceph data disk per host (GiB)",
-      "type": "number",
-      "default": 2000,
-      "min": 100
-    },
-    {
-      "id": "cephJournalDiskGb",
-      "label": "Ceph DB/WAL disk per host (GiB)",
-      "type": "number",
-      "default": 100,
-      "min": 0
     },
     {
       "id": "edgeCount",
@@ -1114,6 +1304,314 @@
       "default": "",
       "secret": true,
       "hint": "Leave empty and set it on the node. Rendered locally into the downloaded file only."
+    },
+    {
+      "id": "adminUser",
+      "label": "Admin user (sudo, no directory)",
+      "type": "text",
+      "default": "ansible",
+      "required": false
+    },
+    {
+      "id": "sshPort",
+      "label": "SSH port",
+      "type": "number",
+      "default": 22,
+      "min": 1,
+      "max": 65535
+    },
+    {
+      "id": "sshPasswordAuth",
+      "label": "Allow SSH password authentication",
+      "type": "bool",
+      "default": false
+    },
+    {
+      "id": "sudoNopasswd",
+      "label": "Passwordless sudo for the automation user",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "id": "osTimezone",
+      "label": "Timezone",
+      "type": "text",
+      "default": "UTC",
+      "required": false
+    },
+    {
+      "id": "osLocale",
+      "label": "Locale",
+      "type": "text",
+      "default": "en_US.UTF-8",
+      "required": false
+    },
+    {
+      "id": "ntpServers",
+      "label": "NTP servers (comma separated)",
+      "type": "text",
+      "default": "10.10.0.5,10.10.0.6",
+      "required": false
+    },
+    {
+      "id": "dnsServers",
+      "label": "DNS servers (comma separated)",
+      "type": "text",
+      "default": "10.10.0.53,10.10.0.54",
+      "required": false
+    },
+    {
+      "id": "dnsSearchDomain",
+      "label": "DNS search domain",
+      "type": "text",
+      "default": "internal.example.com",
+      "required": false
+    },
+    {
+      "id": "kernelArgs",
+      "label": "Extra kernel arguments",
+      "type": "text",
+      "default": "",
+      "hint": "Example: intel_iommu=on iommu=pt for GPU passthrough. Requires a reboot.",
+      "required": false
+    },
+    {
+      "id": "swapDisabled",
+      "label": "Disable swap",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "id": "transparentHugePages",
+      "label": "Transparent huge pages",
+      "type": "select",
+      "default": "madvise",
+      "options": [
+        "madvise",
+        "never",
+        "always"
+      ],
+      "hint": "never for Ceph OSD hosts: THP stalls show up as slow ops.",
+      "required": false
+    },
+    {
+      "id": "maxPodsPerNode",
+      "label": "Max pods per node",
+      "type": "number",
+      "default": 110,
+      "min": 16,
+      "max": 250
+    },
+    {
+      "id": "fileDescriptorsMax",
+      "label": "File descriptors max",
+      "type": "number",
+      "default": 1048576,
+      "min": 65536
+    },
+    {
+      "id": "selinuxMode",
+      "label": "SELinux mode",
+      "type": "select",
+      "default": "enforcing",
+      "options": [
+        "enforcing",
+        "permissive",
+        "disabled"
+      ],
+      "required": false
+    },
+    {
+      "id": "firewallBackend",
+      "label": "Firewall backend",
+      "type": "select",
+      "default": "firewalld",
+      "options": [
+        "firewalld",
+        "nftables",
+        "none"
+      ],
+      "required": false
+    },
+    {
+      "id": "auditRetentionDays",
+      "label": "Audit log retention (days)",
+      "type": "number",
+      "default": 30,
+      "min": 7
+    },
+    {
+      "id": "unattendedSecurityUpdates",
+      "label": "Security-only unattended updates",
+      "type": "bool",
+      "default": true,
+      "hint": "Never let them reboot a node silently; drain first."
+    },
+    {
+      "id": "cephHostPrefix",
+      "label": "Ceph host prefix",
+      "type": "text",
+      "default": "ceph",
+      "required": false
+    },
+    {
+      "id": "cephMonCount",
+      "label": "MON nodes",
+      "type": "number",
+      "default": 3,
+      "min": 1,
+      "max": 9
+    },
+    {
+      "id": "cephMonIpStart",
+      "label": "First MON IP",
+      "type": "text",
+      "default": "10.40.0.11",
+      "required": false
+    },
+    {
+      "id": "cephMgrCount",
+      "label": "MGR nodes",
+      "type": "number",
+      "default": 2,
+      "min": 1,
+      "max": 5
+    },
+    {
+      "id": "cephMgrIpStart",
+      "label": "First MGR IP",
+      "type": "text",
+      "default": "10.40.1.11",
+      "required": false
+    },
+    {
+      "id": "cephOsdCount",
+      "label": "OSD nodes",
+      "type": "number",
+      "default": 3,
+      "min": 3,
+      "max": 64
+    },
+    {
+      "id": "cephOsdIpStart",
+      "label": "First OSD IP",
+      "type": "text",
+      "default": "10.40.2.11",
+      "required": false
+    },
+    {
+      "id": "cephMdsCount",
+      "label": "MDS nodes (CephFS)",
+      "type": "number",
+      "default": 2,
+      "min": 0,
+      "max": 9
+    },
+    {
+      "id": "cephMdsIpStart",
+      "label": "First MDS IP",
+      "type": "text",
+      "default": "10.40.3.11",
+      "required": false
+    },
+    {
+      "id": "cephRgwCount",
+      "label": "RGW nodes (S3)",
+      "type": "number",
+      "default": 2,
+      "min": 0,
+      "max": 16
+    },
+    {
+      "id": "cephRgwIpStart",
+      "label": "First RGW IP",
+      "type": "text",
+      "default": "10.40.4.11",
+      "required": false
+    },
+    {
+      "id": "cephSystemDiskGb",
+      "label": "Ceph system disk per host (GiB)",
+      "type": "number",
+      "default": 100,
+      "min": 40
+    },
+    {
+      "id": "cephOsdDataDiskGb",
+      "label": "OSD data disk per host (GiB)",
+      "type": "number",
+      "default": 2000,
+      "min": 100
+    },
+    {
+      "id": "cephOsdDbDiskGb",
+      "label": "OSD DB/WAL NVMe per host (GiB)",
+      "type": "number",
+      "default": 100,
+      "min": 0
+    },
+    {
+      "id": "rookOsdNodes",
+      "label": "Rook OSD worker nodes",
+      "type": "number",
+      "default": 3,
+      "min": 3,
+      "max": 200,
+      "hint": "Workers that carry an OSD disk. The rest stay storage-free."
+    },
+    {
+      "id": "rookDeviceFilter",
+      "label": "Rook device filter",
+      "type": "text",
+      "default": "nvme0n1",
+      "required": false
+    },
+    {
+      "id": "rookBlockClass",
+      "label": "Rook block StorageClass",
+      "type": "text",
+      "default": "ceph-block",
+      "required": false
+    },
+    {
+      "id": "rookFsClass",
+      "label": "Rook filesystem StorageClass",
+      "type": "text",
+      "default": "ceph-fs",
+      "required": false
+    },
+    {
+      "id": "externalDnsZone",
+      "label": "external-dns zone",
+      "type": "text",
+      "default": "internal.example.com",
+      "required": false
+    },
+    {
+      "id": "externalDnsServer",
+      "label": "external-dns DNS server",
+      "type": "text",
+      "default": "10.10.0.53",
+      "required": false
+    },
+    {
+      "id": "trivySeverity",
+      "label": "Trivy severity filter",
+      "type": "select",
+      "default": "CRITICAL,HIGH",
+      "options": [
+        "CRITICAL",
+        "CRITICAL,HIGH",
+        "HIGH,MEDIUM"
+      ],
+      "required": false
+    },
+    {
+      "id": "otelEndpoint",
+      "label": "OTLP trace backend",
+      "type": "text",
+      "default": "tempo.observability.svc:4317",
+      "required": false
     }
   ],
   "steps": [
@@ -1196,6 +1694,9 @@
         "Apply sysctl, kernel modules and the security baseline",
         "Confirm the local break-glass account and key work with no network dependency",
         "Install the monitoring and logging agents"
+      ],
+      "extraDocs": [
+        "operating-systems/host-configuration.md"
       ]
     },
     {
@@ -1340,6 +1841,49 @@
         "Install the monitoring stack and confirm every target is up",
         "Configure the alert routes and the runbook links",
         "Deploy the log pipeline and prove the redaction filter"
+      ]
+    },
+    {
+      "id": "s12b",
+      "phase": "11b. Add-ons (optional)",
+      "title": "Install the selected add-ons in dependency order",
+      "doc": "addons/platform-addons.md",
+      "when": {
+        "component_any": {
+          "certManager": [
+            "vault-pki",
+            "selfsigned"
+          ],
+          "metricsServer": [
+            "standalone"
+          ],
+          "vpa": [
+            "recommendation",
+            "auto"
+          ],
+          "descheduler": [
+            "dry-run",
+            "evict"
+          ],
+          "externalDns": [
+            "rfc2136",
+            "coredns-etcd"
+          ],
+          "trivyOperator": [
+            "enabled"
+          ],
+          "otelCollector": [
+            "daemonset"
+          ]
+        }
+      },
+      "actions": [
+        "cert-manager first: every TLS-dependent add-on needs an issuer",
+        "Metrics Server, then VPA, then the descheduler",
+        "external-dns last, after the edge VIP exists",
+        "Trivy Operator with a mirrored vulnerability DB, never an internet download",
+        "OpenTelemetry Collector only when a trace backend accepts OTLP",
+        "Validate: kubectl get apiservice v1beta1.metrics.k8s.io, kubectl get certificates -A, kubectl get clusterissuer"
       ]
     },
     {

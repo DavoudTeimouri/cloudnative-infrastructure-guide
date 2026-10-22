@@ -155,19 +155,55 @@
       });
     }
 
-    var ceph = [];
+    var cephRoles = { mon: [], mgr: [], osd: [], mds: [], rgw: [] };
     if (storageMode().indexOf("cephadm") === 0) {
-      for (var j = 0; j < num("cephNodeCount"); j++) {
-        ceph.push({ name: "ceph-" + (j + 1), ip: ipAdd(state.values.cephIpStart, j) });
-      }
+      var cp2 = state.values.cephHostPrefix || "ceph";
+      var spec = [
+        ["mon", "cephMonCount", "cephMonIpStart"],
+        ["mgr", "cephMgrCount", "cephMgrIpStart"],
+        ["osd", "cephOsdCount", "cephOsdIpStart"],
+        ["mds", "cephMdsCount", "cephMdsIpStart"],
+        ["rgw", "cephRgwCount", "cephRgwIpStart"]
+      ];
+      spec.forEach(function (role) {
+        for (var n = 0; n < num(role[1]); n++) {
+          cephRoles[role[0]].push({
+            name: cp2 + "-" + role[0] + "-" + (n + 1),
+            ip: ipAdd(state.values[role[2]], n)
+          });
+        }
+      });
     }
+    var ceph = cephRoles.mon.concat(cephRoles.mgr, cephRoles.osd, cephRoles.mds, cephRoles.rgw);
 
     var edge = [];
     for (var k = 0; k < num("edgeCount"); k++) {
       edge.push({ name: "lb-" + (k + 1), ip: ipAdd(state.values.edgeIpStart, k) });
     }
 
-    return { cp: cp, w: w, gpu: g, mgmt: mgmt, ceph: ceph, edge: edge };
+    return { cp: cp, w: w, gpu: g, mgmt: mgmt, ceph: ceph, cephRoles: cephRoles, edge: edge };
+  }
+
+  function names(list) {
+    return list.map(function (n) { return n.name; }).join(" ");
+  }
+
+  function tsvRows(list, role) {
+    return list.map(function (n) { return role + "\t" + n.name + "\t" + n.ip; }).join("\n");
+  }
+
+  function cephAddCmds(list, role) {
+    return list.map(function (n) {
+      return "ceph orch host add " + n.name + " " + n.ip + " --labels " + role;
+    }).join("\n");
+  }
+
+  function placement(list) {
+    return list.map(function (n) { return "    - " + n.name; }).join("\n");
+  }
+
+  function ips(list) {
+    return list.map(function (n) { return n.ip; }).join(" ");
   }
 
   function hostLines(list) {
@@ -217,6 +253,36 @@
       mgmtHosts: hostLines(t.mgmt),
       mgmtCount: String(t.mgmt.length),
       cephHosts: hostLines(t.ceph),
+      cephAllNames: names(t.ceph),
+      cephMonHosts: hostLines(t.cephRoles.mon),
+      cephMonNames: names(t.cephRoles.mon),
+      cephMonIps: ips(t.cephRoles.mon),
+      cephMonPlacement: placement(t.cephRoles.mon),
+      cephMgrPlacement: placement(t.cephRoles.mgr),
+      cephOsdPlacement: placement(t.cephRoles.osd),
+      cephMdsPlacement: placement(t.cephRoles.mds),
+      cephRgwPlacement: placement(t.cephRoles.rgw),
+      cephMgrNames: names(t.cephRoles.mgr),
+      cephMgrIps: ips(t.cephRoles.mgr),
+      cephOsdHosts: hostLines(t.cephRoles.osd),
+      cephOsdNames: names(t.cephRoles.osd),
+      cephOsdIps: ips(t.cephRoles.osd),
+      cephMdsNames: names(t.cephRoles.mds),
+      cephMdsIps: ips(t.cephRoles.mds),
+      cephRgwNames: names(t.cephRoles.rgw),
+      cephRgwIps: ips(t.cephRoles.rgw),
+      cephHostAddCmds: cephAddCmds(t.cephRoles.mon, "mon") + "\n" +
+        cephAddCmds(t.cephRoles.mgr, "mgr") + "\n" +
+        cephAddCmds(t.cephRoles.osd, "osd") + "\n" +
+        cephAddCmds(t.cephRoles.mds, "mds") + "\n" +
+        cephAddCmds(t.cephRoles.rgw, "rgw"),
+      nodeRows: [
+        tsvRows(t.cp, "control-plane"), tsvRows(t.w, "worker"), tsvRows(t.gpu, "gpu"),
+        tsvRows(t.mgmt, "management"), tsvRows(t.cephRoles.mon, "ceph-mon"),
+        tsvRows(t.cephRoles.mgr, "ceph-mgr"), tsvRows(t.cephRoles.osd, "ceph-osd"),
+        tsvRows(t.cephRoles.mds, "ceph-mds"), tsvRows(t.cephRoles.rgw, "ceph-rgw"),
+        tsvRows(t.edge, "edge")
+      ].filter(function (x) { return x; }).join("\n"),
       cephHostList: t.ceph.map(function (n) { return n.name + "=" + n.ip; }).join(", "),
       cephOtherIps: t.ceph.slice(1).map(function (n) { return n.ip; }).join(" "),
       cephMonIp: t.ceph.length ? t.ceph[0].ip : "",
@@ -290,6 +356,22 @@
 
   function stepApplies(step) {
     if (!step.when) return true;
+
+    if (step.when.component_any) {
+      var any = step.when.component_any;
+      var hitAny = false;
+      Object.keys(any).forEach(function (k) {
+        var got = state.choices[k];
+        var allowed = asArray(any[k]) ? any[k] : [any[k]];
+        if (asArray(got)) {
+          for (var n = 0; n < got.length; n++) if (allowed.indexOf(got[n]) !== -1) hitAny = true;
+        } else if (allowed.indexOf(got) !== -1) {
+          hitAny = true;
+        }
+      });
+      if (!hitAny) return false;
+    }
+
     var want = step.when.component || {};
     var keys = Object.keys(want);
     for (var i = 0; i < keys.length; i++) {
@@ -329,6 +411,17 @@
 
   function fieldNode(v) {
     var input;
+    if (v.type === "bool") {
+      input = el("input", {
+        type: "checkbox",
+        checked: state.values[v.id] === "true" ? "checked" : null,
+        onchange: function () { state.values[v.id] = input.checked ? "true" : "false"; }
+      });
+      return el("div", { class: "field bool" }, [
+        el("label", { class: "check" }, [input, el("span", { text: v.label })]),
+        v.hint ? el("div", { class: "hint", text: v.hint }) : null
+      ]);
+    }
     if (v.type === "select") {
       input = el("select", {
         onchange: function () { state.values[v.id] = input.value; }
@@ -537,13 +630,20 @@
       box.appendChild(nodeListCard("Management nodes generated", t.mgmt));
     }
     if (page.id === "p5" && storageMode().indexOf("cephadm") === 0) {
-      box.appendChild(nodeListCard("Ceph hosts generated", t.ceph));
+      var roles = t.cephRoles;
+      [["MON", roles.mon], ["MGR", roles.mgr], ["OSD", roles.osd],
+       ["MDS", roles.mds], ["RGW", roles.rgw]].forEach(function (r) {
+        box.appendChild(nodeListCard("Ceph " + r[0] + " hosts generated", r[1]));
+      });
     }
     if (page.id === "p6") {
       box.appendChild(nodeListCard("Edge nodes generated", t.edge));
     }
 
     if ($("prev")) $("prev").disabled = state.page === 0;
+    if ($("page-count")) {
+      $("page-count").textContent = (state.page + 1) + " / " + DATA.pages.length;
+    }
     if ($("next")) {
       $("next").textContent = state.page === DATA.pages.length - 1 ? "Review" : "Next";
     }
@@ -567,14 +667,26 @@
     function add(label, list, cpuId, memId, diskId, dataId) {
       if (!list.length) return;
       var cpu = num(cpuId), mem = num(memId), disk = num(diskId);
-      var data = dataId ? num(dataId) : 0;
+      var data = 0;
+      if (dataId) {
+        (Object.prototype.toString.call(dataId) === "[object Array]" ? dataId : [dataId]).forEach(function (id) {
+          data += num(id);
+        });
+      }
       rows.push([label, String(list.length), String(cpu), String(mem), String(disk + data)]);
     }
     add("Application control plane", t.cp, "appCpCpu", "appCpMemGb", "appCpDiskGb", null);
     add("Application workers", t.w, "appWorkerCpu", "appWorkerMemGb", "appWorkerDiskGb", "appWorkerDataDiskGb");
     if (t.gpu.length) add("GPU workers", t.gpu, "gpuCpu", "gpuMemGb", "gpuDiskGb", null);
     add("Management cluster", t.mgmt, "mgmtCpu", "mgmtMemGb", "mgmtDiskGb", null);
-    if (t.ceph.length) add("Ceph hosts", t.ceph, "cephCpu", "cephMemGb", "cephDataDiskGb", "cephJournalDiskGb");
+    if (t.ceph.length) {
+      var r = t.cephRoles;
+      add("Ceph MON hosts", r.mon, "cephCpu", "cephMemGb", "cephSystemDiskGb", null);
+      add("Ceph MGR hosts", r.mgr, "cephCpu", "cephMemGb", "cephSystemDiskGb", null);
+      add("Ceph OSD hosts", r.osd, "cephCpu", "cephMemGb", "cephSystemDiskGb", ["cephOsdDataDiskGb", "cephOsdDbDiskGb"]);
+      add("Ceph MDS hosts", r.mds, "cephCpu", "cephMemGb", "cephSystemDiskGb", null);
+      add("Ceph RGW hosts", r.rgw, "cephCpu", "cephMemGb", "cephSystemDiskGb", null);
+    }
     add("Edge nodes", t.edge, "edgeCpu", "edgeMemGb", "edgeDiskGb", null);
     return rows;
   }
@@ -586,7 +698,7 @@
     if ($("plan-summary")) {
       $("plan-summary").textContent =
         (method ? method.title : "—") + " · " + (cm ? cm.title : "—") + " · " +
-        DATA.components.length + " components";
+        DATA.components.length + " components · " + chosenAddons().length + " add-ons";
     }
     if ($("plan-note")) {
       $("plan-note").textContent =
@@ -691,16 +803,82 @@
     return t.cp.length + t.w.length + t.gpu.length + t.mgmt.length + t.ceph.length + t.edge.length;
   }
 
+  var ADDON_FILES = {
+    "certManager:vault-pki": "cert-manager-values.yaml",
+    "certManager:selfsigned": "cert-manager-values.yaml",
+    "vpa:recommendation": "vpa-values.yaml",
+    "vpa:auto": "vpa-auto-values.yaml",
+    "descheduler:dry-run": "descheduler-dryrun-values.yaml",
+    "descheduler:evict": "descheduler-evict-values.yaml",
+    "externalDns:rfc2136": "external-dns-values.yaml",
+    "externalDns:coredns-etcd": "external-dns-coredns-values.yaml",
+    "trivyOperator:enabled": "trivy-values.yaml",
+    "otelCollector:daemonset": "otel-collector.yaml"
+  };
+  var ADDON_VERIFY = {
+    certManager: "kubectl get clusterissuer && kubectl get certificates -A",
+    metricsServer: "kubectl get apiservice v1beta1.metrics.k8s.io",
+    vpa: "kubectl get vpa -A",
+    descheduler: "kubectl -n kube-system get cronjob descheduler",
+    externalDns: "kubectl -n external-dns logs deploy/external-dns --tail=20",
+    trivyOperator: "kubectl get vulnerabilityreports -A | head",
+    otelCollector: "kubectl -n observability get opentelemetrycollector"
+  };
+  var ADDON_ORDER = ["certManager", "metricsServer", "vpa", "descheduler", "externalDns", "trivyOperator", "otelCollector"];
+
+  function chosenAddons() {
+    var out = [];
+    ADDON_ORDER.forEach(function (id) {
+      var o = optionOf(id);
+      if (!o || o.id === "none") return;
+      out.push({
+        id: id,
+        title: o.title,
+        file: ADDON_FILES[id + ":" + o.id] || null,
+        verify: ADDON_VERIFY[id]
+      });
+    });
+    return out;
+  }
+
   function buildRunbook() {
     var method = DATA.methods.filter(function (m) { return m.id === state.method; })[0];
     var cm = DATA.clusterMethods.filter(function (m) { return m.id === state.cluster; })[0];
-    var out = ["# Runbook — " + state.values.clusterName + " (" + state.values.env + ")", ""];
+    var t = topology();
+    var addons = chosenAddons();
+    var name = state.values.clusterName;
+
+    var out = ["# Deployment runbook — " + name + " (" + state.values.env + ")", ""];
     out.push("Generated by the cloud-native guide site on " + new Date().toISOString().slice(0, 10) + ".");
+    out.push("The automated path is the default. The step list below is what the scripts do, in order,");
+    out.push("with the document that explains each decision.");
+    out.push("");
+    out.push("## Quick start");
+    out.push("");
+    out.push("Download every generated file into one directory on the admin host, then:");
+    out.push("");
+    out.push("```bash");
+    out.push("chmod +x deploy.sh 0*.sh 1*.sh 2*.sh 3*.sh 4*.sh 5*.sh");
+    out.push("./deploy.sh --dry-run     # print every action, change nothing");
+    out.push("./deploy.sh               # run every phase, stop at the first failure");
+    out.push("./deploy.sh --phase 40    # resume from one phase");
+    out.push("./deploy.sh --verify      # re-run only the acceptance checks");
+    out.push("```");
+    out.push("");
+    out.push("Phases: `00` preflight, `10` OS baseline, `20` Ceph, `30` Kubernetes, `40` add-ons, `50` verify.");
+    out.push("Every phase is idempotent and writes `logs/<phase>-<timestamp>.log`. A phase that fails stops the run;");
+    out.push("fix the cause, re-run the same command. Nothing is skipped silently.");
+    out.push("");
+    out.push("Files the scripts expect next to `deploy.sh`: `nodes.tsv`, `hosts.ini`, `hosts-mgmt.ini`,");
+    out.push("`k8s-cluster-vars.yml`, `ceph-spec.yaml`, `ceph-bootstrap.sh` and the add-on values files listed below.");
+    out.push("");
+    out.push("## Plan");
     out.push("");
     out.push("| Setting | Value |");
     out.push("|---|---|");
     out.push("| Deployment | " + (method ? method.title : "-") + " |");
     out.push("| Cluster method | " + (cm ? cm.title : "-") + " |");
+    out.push("| Nodes (all roles) | " + topologyTotals() + " |");
     DATA.components.forEach(function (c) {
       out.push("| " + c.title + " | " + optionTitle(c.id) + " |");
     });
@@ -713,12 +891,54 @@
     out.push("");
     out.push("## Nodes");
     out.push("");
-    out.push("```");
-    var t = topology();
-    t.cp.concat(t.w, t.gpu, t.mgmt, t.ceph, t.edge).forEach(function (n) {
-      out.push(n.name + "  " + n.ip);
+    out.push("| Role | Name | Address |");
+    out.push("|---|---|---|");
+    function rows(label, list) {
+      list.forEach(function (n) { out.push("| " + label + " | " + n.name + " | " + n.ip + " |"); });
+    }
+    rows("control plane", t.cp);
+    rows("worker", t.w);
+    rows("gpu", t.gpu);
+    rows("management", t.mgmt);
+    rows("ceph-mon", t.cephRoles.mon);
+    rows("ceph-mgr", t.cephRoles.mgr);
+    rows("ceph-osd", t.cephRoles.osd);
+    rows("ceph-mds", t.cephRoles.mds);
+    rows("ceph-rgw", t.cephRoles.rgw);
+    rows("edge", t.edge);
+    out.push("");
+    out.push("## Phased steps");
+    DATA.steps.filter(stepApplies).forEach(function (s, i) {
+      out.push("");
+      out.push("### " + s.phase + " — " + s.title);
+      out.push("");
+      (s.actions || []).forEach(function (a) { out.push("- " + a); });
+      out.push("");
+      out.push("Reference: `" + s.doc + "`");
+      (s.extraDocs || []).forEach(function (d) { out.push("- `" + d + "`"); });
+      out.push("");
+      out.push("Gate: the phase's own verification passes before the next phase starts. If it does not,");
+      out.push("stop and fix it. A partially applied phase is re-run, not skipped.");
     });
-    out.push("```");
+    out.push("");
+    out.push("## Add-ons");
+    out.push("");
+    if (!addons.length) {
+      out.push("No optional add-ons selected. The baseline is complete without them.");
+    } else {
+      out.push("Install in this order. `40-addons.sh` skips any file that is not present, so the list below");
+      out.push("is the contract between the site and the script.");
+      out.push("");
+      out.push("| # | Add-on | Values file | Verify |");
+      out.push("|---|---|---|---|");
+      addons.forEach(function (a, i) {
+        out.push("| " + (i + 1) + " | " + a.title + " | " + (a.file || "chart defaults") + " | `" + a.verify + "` |");
+      });
+      out.push("");
+      out.push("Order is a dependency chain, not a preference: cert-manager issues the certificates that");
+      out.push("external-dns webhooks and ingress controllers consume; Metrics Server feeds VPA and the");
+      out.push("descheduler; Trivy and the collector are independent and can be last.");
+    }
     out.push("");
     out.push("## Versions");
     out.push("");
@@ -728,26 +948,18 @@
       out.push("| " + k + " | " + DATA.versions[k] + " |");
     });
     out.push("");
-    out.push("## Implementation steps");
-    DATA.steps.filter(stepApplies).forEach(function (s) {
-      out.push("");
-      out.push("### " + s.phase + " — " + s.title);
-      out.push("");
-      (s.actions || []).forEach(function (a) { out.push("- " + a); });
-      out.push("");
-      out.push("Reference: `" + s.doc + "`");
-      (s.extraDocs || []).forEach(function (d) { out.push("- `" + d + "`"); });
+    out.push("## Upgrades");
+    out.push("");
+    DATA.upgrades.forEach(function (f) {
+      out.push("- **" + f.title + "** — rollback: " + f.rollback + " Downtime: " + f.downtime + " Procedure: `" + f.doc + "`");
     });
     out.push("");
-    out.push("## Upgrade flows");
-    DATA.upgrades.forEach(function (f) {
-      out.push("");
-      out.push("### " + f.title);
-      out.push("");
-      out.push("- Rollback: " + f.rollback);
-      out.push("- Downtime: " + f.downtime);
-      out.push("- Procedure: `" + f.doc + "`");
-    });
+    out.push("## When a phase fails");
+    out.push("");
+    out.push("1. Read the phase log, not the console tail.");
+    out.push("2. Re-run the phase in `--dry-run` to see the intended action.");
+    out.push("3. Fix the input (address, mirror, credential path) and re-run the same phase.");
+    out.push("4. Never hand-edit a generated file in place without correcting the site value that produced it.");
     out.push("");
     out.push("---");
     out.push("");

@@ -1,5 +1,5 @@
 {
-  "catalogVersion": "2.0.0",
+  "catalogVersion": "3.0.0",
   "updated": "2026-10-22",
   "source": {
     "docs": "The repository is the source of truth. This catalog points at it; it never duplicates a procedure.",
@@ -108,7 +108,7 @@
     {
       "id": "p2",
       "title": "Application cluster",
-      "subtitle": "Control plane, workers and their sizes. Names and IPs are generated from the prefix and the first address.",
+      "subtitle": "Control plane, workers and their sizes. Names and addresses are generated from the prefix and the first address.",
       "components": [
         "controlPlane",
         "cni"
@@ -149,28 +149,60 @@
     {
       "id": "p4",
       "title": "Operating system",
-      "subtitle": "Distribution baseline. Local accounts only: nodes are never joined to a directory.",
+      "subtitle": "Distribution and the host baseline: access, time, resolution, kernel, limits, security. Local accounts only \u2014 nodes are never joined to a directory.",
       "components": [
         "os"
       ],
       "fields": [
+        "adminUser",
+        "sshPort",
+        "sshPasswordAuth",
+        "sudoNopasswd",
+        "osTimezone",
+        "osLocale",
+        "ntpServers",
+        "dnsServers",
+        "dnsSearchDomain",
+        "kernelArgs",
+        "swapDisabled",
+        "transparentHugePages",
+        "maxPodsPerNode",
+        "fileDescriptorsMax",
+        "selinuxMode",
+        "firewallBackend",
+        "auditRetentionDays",
+        "unattendedSecurityUpdates",
         "caBundle"
       ]
     },
     {
       "id": "p5",
       "title": "Storage",
-      "subtitle": "Ceph inside Kubernetes with Rook, or on dedicated hosts with cephadm on Podman or Docker.",
+      "subtitle": "Rook inside the cluster, or cephadm on dedicated hosts with one node group per Ceph role.",
       "components": [
         "storage"
       ],
       "fields": [
-        "cephNodeCount",
-        "cephIpStart",
+        "rookOsdNodes",
+        "rookDeviceFilter",
+        "rookBlockClass",
+        "rookFsClass",
+        "cephHostPrefix",
+        "cephMonCount",
+        "cephMonIpStart",
+        "cephMgrCount",
+        "cephMgrIpStart",
+        "cephOsdCount",
+        "cephOsdIpStart",
+        "cephMdsCount",
+        "cephMdsIpStart",
+        "cephRgwCount",
+        "cephRgwIpStart",
         "cephCpu",
         "cephMemGb",
-        "cephDataDiskGb",
-        "cephJournalDiskGb"
+        "cephSystemDiskGb",
+        "cephOsdDataDiskGb",
+        "cephOsdDbDiskGb"
       ]
     },
     {
@@ -240,6 +272,26 @@
         "gpuCpu",
         "gpuMemGb",
         "gpuDiskGb"
+      ]
+    },
+    {
+      "id": "p9",
+      "title": "Add-ons",
+      "subtitle": "Optional cluster components, each with its own values file and its own line in the deploy script. They install in the order listed in addons/platform-addons.md.",
+      "components": [
+        "certManager",
+        "metricsServer",
+        "vpa",
+        "descheduler",
+        "externalDns",
+        "trivyOperator",
+        "otelCollector"
+      ],
+      "fields": [
+        "externalDnsZone",
+        "externalDnsServer",
+        "trivySeverity",
+        "otelEndpoint"
       ]
     }
   ],
@@ -678,6 +730,173 @@
           "warning": "No memory isolation between pods. Never for multi-tenant production."
         }
       ]
+    },
+    {
+      "id": "certManager",
+      "title": "Add-on: certificate management",
+      "required": false,
+      "doc": "addons/platform-addons.md",
+      "options": [
+        {
+          "id": "none",
+          "title": "None",
+          "default": true,
+          "doc": "addons/platform-addons.md"
+        },
+        {
+          "id": "vault-pki",
+          "title": "cert-manager with a Vault PKI ClusterIssuer",
+          "versionKey": "cert-manager",
+          "doc": "addons/platform-addons.md"
+        },
+        {
+          "id": "selfsigned",
+          "title": "cert-manager with a self-signed bootstrapping issuer",
+          "versionKey": "cert-manager",
+          "doc": "addons/platform-addons.md",
+          "warning": "Bootstrap only. Remove it once the Vault issuer works."
+        }
+      ]
+    },
+    {
+      "id": "metricsServer",
+      "title": "Add-on: resource metrics",
+      "required": false,
+      "doc": "addons/platform-addons.md",
+      "options": [
+        {
+          "id": "none",
+          "title": "None",
+          "default": true,
+          "doc": "addons/platform-addons.md"
+        },
+        {
+          "id": "standalone",
+          "title": "Metrics Server (required by HPA and VPA)",
+          "versionKey": "metrics-server",
+          "doc": "addons/platform-addons.md"
+        }
+      ]
+    },
+    {
+      "id": "vpa",
+      "title": "Add-on: vertical pod autoscaling",
+      "required": false,
+      "doc": "addons/platform-addons.md",
+      "options": [
+        {
+          "id": "none",
+          "title": "None",
+          "default": true,
+          "doc": "addons/platform-addons.md"
+        },
+        {
+          "id": "recommendation",
+          "title": "Recommendation mode only (no restarts)",
+          "versionKey": "vpa",
+          "doc": "addons/platform-addons.md"
+        },
+        {
+          "id": "auto",
+          "title": "Auto mode (evicts and restarts pods)",
+          "versionKey": "vpa",
+          "doc": "addons/platform-addons.md",
+          "warning": "Never for stateful workloads. Restarts pods on every recommendation change."
+        }
+      ]
+    },
+    {
+      "id": "descheduler",
+      "title": "Add-on: pod rebalancing",
+      "required": false,
+      "doc": "addons/platform-addons.md",
+      "options": [
+        {
+          "id": "none",
+          "title": "None",
+          "default": true,
+          "doc": "addons/platform-addons.md"
+        },
+        {
+          "id": "dry-run",
+          "title": "Dry-run for two weeks",
+          "versionKey": "descheduler",
+          "doc": "addons/platform-addons.md"
+        },
+        {
+          "id": "evict",
+          "title": "Eviction enabled",
+          "versionKey": "descheduler",
+          "doc": "addons/platform-addons.md",
+          "warning": "Respects PodDisruptionBudgets. Every eviction is a restart someone must explain."
+        }
+      ]
+    },
+    {
+      "id": "externalDns",
+      "title": "Add-on: DNS records from objects",
+      "required": false,
+      "doc": "addons/platform-addons.md",
+      "options": [
+        {
+          "id": "none",
+          "title": "None",
+          "default": true,
+          "doc": "addons/platform-addons.md"
+        },
+        {
+          "id": "rfc2136",
+          "title": "RFC2136 against the internal DNS",
+          "versionKey": "external-dns",
+          "doc": "addons/platform-addons.md"
+        },
+        {
+          "id": "coredns-etcd",
+          "title": "CoreDNS etcd provider",
+          "versionKey": "external-dns",
+          "doc": "addons/platform-addons.md"
+        }
+      ]
+    },
+    {
+      "id": "trivyOperator",
+      "title": "Add-on: runtime vulnerability scanning",
+      "required": false,
+      "doc": "addons/platform-addons.md",
+      "options": [
+        {
+          "id": "none",
+          "title": "None",
+          "default": true,
+          "doc": "addons/platform-addons.md"
+        },
+        {
+          "id": "enabled",
+          "title": "Trivy Operator with an internal DB mirror",
+          "versionKey": "trivy-operator",
+          "doc": "addons/platform-addons.md"
+        }
+      ]
+    },
+    {
+      "id": "otelCollector",
+      "title": "Add-on: trace collection",
+      "required": false,
+      "doc": "addons/platform-addons.md",
+      "options": [
+        {
+          "id": "none",
+          "title": "None",
+          "default": true,
+          "doc": "addons/platform-addons.md"
+        },
+        {
+          "id": "daemonset",
+          "title": "OpenTelemetry Collector DaemonSet",
+          "versionKey": "otel-operator",
+          "doc": "addons/platform-addons.md"
+        }
+      ]
     }
   ],
   "values": [
@@ -851,21 +1070,6 @@
       "required": true
     },
     {
-      "id": "cephNodeCount",
-      "label": "Ceph hosts (cephadm only)",
-      "type": "number",
-      "default": 3,
-      "min": 3,
-      "max": 64,
-      "hint": "Three is the minimum for a 3-replica pool with a host failure domain. Ignored for Rook."
-    },
-    {
-      "id": "cephIpStart",
-      "label": "First Ceph host IP",
-      "type": "text",
-      "default": "10.40.0.11"
-    },
-    {
       "id": "cephCpu",
       "label": "Ceph vCPU per host",
       "type": "number",
@@ -878,20 +1082,6 @@
       "type": "number",
       "default": 32,
       "min": 16
-    },
-    {
-      "id": "cephDataDiskGb",
-      "label": "Ceph data disk per host (GiB)",
-      "type": "number",
-      "default": 2000,
-      "min": 100
-    },
-    {
-      "id": "cephJournalDiskGb",
-      "label": "Ceph DB/WAL disk per host (GiB)",
-      "type": "number",
-      "default": 100,
-      "min": 0
     },
     {
       "id": "edgeCount",
@@ -1114,6 +1304,314 @@
       "default": "",
       "secret": true,
       "hint": "Leave empty and set it on the node. Rendered locally into the downloaded file only."
+    },
+    {
+      "id": "adminUser",
+      "label": "Admin user (sudo, no directory)",
+      "type": "text",
+      "default": "ansible",
+      "required": false
+    },
+    {
+      "id": "sshPort",
+      "label": "SSH port",
+      "type": "number",
+      "default": 22,
+      "min": 1,
+      "max": 65535
+    },
+    {
+      "id": "sshPasswordAuth",
+      "label": "Allow SSH password authentication",
+      "type": "bool",
+      "default": false
+    },
+    {
+      "id": "sudoNopasswd",
+      "label": "Passwordless sudo for the automation user",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "id": "osTimezone",
+      "label": "Timezone",
+      "type": "text",
+      "default": "UTC",
+      "required": false
+    },
+    {
+      "id": "osLocale",
+      "label": "Locale",
+      "type": "text",
+      "default": "en_US.UTF-8",
+      "required": false
+    },
+    {
+      "id": "ntpServers",
+      "label": "NTP servers (comma separated)",
+      "type": "text",
+      "default": "10.10.0.5,10.10.0.6",
+      "required": false
+    },
+    {
+      "id": "dnsServers",
+      "label": "DNS servers (comma separated)",
+      "type": "text",
+      "default": "10.10.0.53,10.10.0.54",
+      "required": false
+    },
+    {
+      "id": "dnsSearchDomain",
+      "label": "DNS search domain",
+      "type": "text",
+      "default": "internal.example.com",
+      "required": false
+    },
+    {
+      "id": "kernelArgs",
+      "label": "Extra kernel arguments",
+      "type": "text",
+      "default": "",
+      "hint": "Example: intel_iommu=on iommu=pt for GPU passthrough. Requires a reboot.",
+      "required": false
+    },
+    {
+      "id": "swapDisabled",
+      "label": "Disable swap",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "id": "transparentHugePages",
+      "label": "Transparent huge pages",
+      "type": "select",
+      "default": "madvise",
+      "options": [
+        "madvise",
+        "never",
+        "always"
+      ],
+      "hint": "never for Ceph OSD hosts: THP stalls show up as slow ops.",
+      "required": false
+    },
+    {
+      "id": "maxPodsPerNode",
+      "label": "Max pods per node",
+      "type": "number",
+      "default": 110,
+      "min": 16,
+      "max": 250
+    },
+    {
+      "id": "fileDescriptorsMax",
+      "label": "File descriptors max",
+      "type": "number",
+      "default": 1048576,
+      "min": 65536
+    },
+    {
+      "id": "selinuxMode",
+      "label": "SELinux mode",
+      "type": "select",
+      "default": "enforcing",
+      "options": [
+        "enforcing",
+        "permissive",
+        "disabled"
+      ],
+      "required": false
+    },
+    {
+      "id": "firewallBackend",
+      "label": "Firewall backend",
+      "type": "select",
+      "default": "firewalld",
+      "options": [
+        "firewalld",
+        "nftables",
+        "none"
+      ],
+      "required": false
+    },
+    {
+      "id": "auditRetentionDays",
+      "label": "Audit log retention (days)",
+      "type": "number",
+      "default": 30,
+      "min": 7
+    },
+    {
+      "id": "unattendedSecurityUpdates",
+      "label": "Security-only unattended updates",
+      "type": "bool",
+      "default": true,
+      "hint": "Never let them reboot a node silently; drain first."
+    },
+    {
+      "id": "cephHostPrefix",
+      "label": "Ceph host prefix",
+      "type": "text",
+      "default": "ceph",
+      "required": false
+    },
+    {
+      "id": "cephMonCount",
+      "label": "MON nodes",
+      "type": "number",
+      "default": 3,
+      "min": 1,
+      "max": 9
+    },
+    {
+      "id": "cephMonIpStart",
+      "label": "First MON IP",
+      "type": "text",
+      "default": "10.40.0.11",
+      "required": false
+    },
+    {
+      "id": "cephMgrCount",
+      "label": "MGR nodes",
+      "type": "number",
+      "default": 2,
+      "min": 1,
+      "max": 5
+    },
+    {
+      "id": "cephMgrIpStart",
+      "label": "First MGR IP",
+      "type": "text",
+      "default": "10.40.1.11",
+      "required": false
+    },
+    {
+      "id": "cephOsdCount",
+      "label": "OSD nodes",
+      "type": "number",
+      "default": 3,
+      "min": 3,
+      "max": 64
+    },
+    {
+      "id": "cephOsdIpStart",
+      "label": "First OSD IP",
+      "type": "text",
+      "default": "10.40.2.11",
+      "required": false
+    },
+    {
+      "id": "cephMdsCount",
+      "label": "MDS nodes (CephFS)",
+      "type": "number",
+      "default": 2,
+      "min": 0,
+      "max": 9
+    },
+    {
+      "id": "cephMdsIpStart",
+      "label": "First MDS IP",
+      "type": "text",
+      "default": "10.40.3.11",
+      "required": false
+    },
+    {
+      "id": "cephRgwCount",
+      "label": "RGW nodes (S3)",
+      "type": "number",
+      "default": 2,
+      "min": 0,
+      "max": 16
+    },
+    {
+      "id": "cephRgwIpStart",
+      "label": "First RGW IP",
+      "type": "text",
+      "default": "10.40.4.11",
+      "required": false
+    },
+    {
+      "id": "cephSystemDiskGb",
+      "label": "Ceph system disk per host (GiB)",
+      "type": "number",
+      "default": 100,
+      "min": 40
+    },
+    {
+      "id": "cephOsdDataDiskGb",
+      "label": "OSD data disk per host (GiB)",
+      "type": "number",
+      "default": 2000,
+      "min": 100
+    },
+    {
+      "id": "cephOsdDbDiskGb",
+      "label": "OSD DB/WAL NVMe per host (GiB)",
+      "type": "number",
+      "default": 100,
+      "min": 0
+    },
+    {
+      "id": "rookOsdNodes",
+      "label": "Rook OSD worker nodes",
+      "type": "number",
+      "default": 3,
+      "min": 3,
+      "max": 200,
+      "hint": "Workers that carry an OSD disk. The rest stay storage-free."
+    },
+    {
+      "id": "rookDeviceFilter",
+      "label": "Rook device filter",
+      "type": "text",
+      "default": "nvme0n1",
+      "required": false
+    },
+    {
+      "id": "rookBlockClass",
+      "label": "Rook block StorageClass",
+      "type": "text",
+      "default": "ceph-block",
+      "required": false
+    },
+    {
+      "id": "rookFsClass",
+      "label": "Rook filesystem StorageClass",
+      "type": "text",
+      "default": "ceph-fs",
+      "required": false
+    },
+    {
+      "id": "externalDnsZone",
+      "label": "external-dns zone",
+      "type": "text",
+      "default": "internal.example.com",
+      "required": false
+    },
+    {
+      "id": "externalDnsServer",
+      "label": "external-dns DNS server",
+      "type": "text",
+      "default": "10.10.0.53",
+      "required": false
+    },
+    {
+      "id": "trivySeverity",
+      "label": "Trivy severity filter",
+      "type": "select",
+      "default": "CRITICAL,HIGH",
+      "options": [
+        "CRITICAL",
+        "CRITICAL,HIGH",
+        "HIGH,MEDIUM"
+      ],
+      "required": false
+    },
+    {
+      "id": "otelEndpoint",
+      "label": "OTLP trace backend",
+      "type": "text",
+      "default": "tempo.observability.svc:4317",
+      "required": false
     }
   ],
   "steps": [
@@ -1196,6 +1694,9 @@
         "Apply sysctl, kernel modules and the security baseline",
         "Confirm the local break-glass account and key work with no network dependency",
         "Install the monitoring and logging agents"
+      ],
+      "extraDocs": [
+        "operating-systems/host-configuration.md"
       ]
     },
     {
@@ -1340,6 +1841,49 @@
         "Install the monitoring stack and confirm every target is up",
         "Configure the alert routes and the runbook links",
         "Deploy the log pipeline and prove the redaction filter"
+      ]
+    },
+    {
+      "id": "s12b",
+      "phase": "11b. Add-ons (optional)",
+      "title": "Install the selected add-ons in dependency order",
+      "doc": "addons/platform-addons.md",
+      "when": {
+        "component_any": {
+          "certManager": [
+            "vault-pki",
+            "selfsigned"
+          ],
+          "metricsServer": [
+            "standalone"
+          ],
+          "vpa": [
+            "recommendation",
+            "auto"
+          ],
+          "descheduler": [
+            "dry-run",
+            "evict"
+          ],
+          "externalDns": [
+            "rfc2136",
+            "coredns-etcd"
+          ],
+          "trivyOperator": [
+            "enabled"
+          ],
+          "otelCollector": [
+            "daemonset"
+          ]
+        }
+      },
+      "actions": [
+        "cert-manager first: every TLS-dependent add-on needs an issuer",
+        "Metrics Server, then VPA, then the descheduler",
+        "external-dns last, after the edge VIP exists",
+        "Trivy Operator with a mirrored vulnerability DB, never an internet download",
+        "OpenTelemetry Collector only when a trace backend accepts OTLP",
+        "Validate: kubectl get apiservice v1beta1.metrics.k8s.io, kubectl get certificates -A, kubectl get clusterissuer"
       ]
     },
     {
@@ -1917,6 +2461,76 @@
       "template": "# Generated by the cloud-native guide site\n# Kubespray: {{choice.kubespray}}\n\nregistry_host: \"{{value.registryHost}}\"\nregistry_addr: \"{{value.registryAddr}}\"\nfiles_repo: \"{{value.filesRepo}}\"\n\ngithub_url: \"{{value.filesRepo}}/github.com\"\ndl_k8s_io_url: \"{{value.filesRepo}}/dl.k8s.io\"\nstorage_googleapis_url: \"{{value.filesRepo}}/storage.googleapis.com\"\nget_helm_url: \"{{value.filesRepo}}/get.helm.sh\"\n\ncontainerd_registries_mirrors:\n  - prefix: \"{{value.registryAddr}}\"\n    mirrors:\n      - host: \"https://{{value.registryAddr}}\"\n        capabilities: [\"pull\", \"resolve\"]\n        skip_verify: false\n        header:\n          Authorization: \"Basic {{registryAuth}}\"\n{{extraRegistryMirrors}}\n"
     },
     {
+      "id": "deploy",
+      "name": "Deploy orchestrator",
+      "filename": "deploy.sh",
+      "description": "One entry point: preflight, OS, Ceph, Kubernetes, add-ons, verify. Stops at the first failure and logs every phase.",
+      "template": "#!/usr/bin/env bash\n# Generated by the cloud-native guide site \u2014 {{value.clusterName}} ({{value.env}})\n# One entry point, six phases, stop at the first failure.\nset -euo pipefail\n\nHERE=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"\nLOG_DIR=\"$HERE/logs\"\nexport DRY_RUN=\"${DRY_RUN:-0}\"\nFROM=\"\"; VERIFY_ONLY=0; ASSUME_YES=0\n\nusage() {\n  cat <<EOF\nUsage: ./deploy.sh [--dry-run] [--phase NN] [--verify] [--yes]\n\n  --dry-run    Print every action, change nothing.\n  --phase NN   Start at a phase: 00 10 20 30 40 50.\n  --verify     Run only the acceptance checks (phase 50).\n  --yes        Do not ask for confirmation.\nEOF\n}\n\nwhile [ $# -gt 0 ]; do\n  case \"$1\" in\n    --dry-run) DRY_RUN=1 ;;\n    --phase) FROM=\"$2\"; shift ;;\n    --verify) VERIFY_ONLY=1 ;;\n    --yes|-y) ASSUME_YES=1 ;;\n    -h|--help) usage; exit 0 ;;\n    *) echo \"unknown option: $1\" >&2; usage; exit 2 ;;\n  esac\n  shift\ndone\n\nmkdir -p \"$LOG_DIR\"\nSTAMP=\"$(date +%Y%m%d-%H%M%S)\"\n\nphase() {\n  local num=\"$1\" title=\"$2\" script=\"$3\"\n  if [ -n \"$FROM\" ] && [ \"$num\" \\< \"$FROM\" ]; then return 0; fi\n  if [ ! -f \"$HERE/$script\" ]; then\n    echo \"SKIP  $num $title \u2014 $script is not part of this plan\"\n    return 0\n  fi\n  echo \"==>   $num $title\"\n  set +e\n  bash \"$HERE/$script\" 2>&1 | tee \"$LOG_DIR/$num-$STAMP.log\"\n  local rc=${PIPESTATUS[0]}\n  set -e\n  if [ \"$rc\" -ne 0 ]; then\n    echo \"FAIL  $num $title (exit $rc) \u2014 log: $LOG_DIR/$num-$STAMP.log\" >&2\n    exit \"$rc\"\n  fi\n  echo \"OK    $num $title\"\n}\n\nif [ \"$ASSUME_YES\" -eq 0 ] && [ \"$DRY_RUN\" -eq 0 ] && [ \"$VERIFY_ONLY\" -eq 0 ]; then\n  echo \"This configures every node in nodes.tsv and deploys {{value.clusterName}}.\"\n  printf 'Type the cluster name to continue: '\n  read -r answer\n  [ \"$answer\" = \"{{value.clusterName}}\" ] || { echo \"aborted\"; exit 1; }\nfi\n\nif [ \"$VERIFY_ONLY\" -eq 1 ]; then\n  phase 50 verify 50-verify.sh\n  exit $?\nfi\n\nphase 00 preflight       00-preflight.sh\nphase 10 \"OS baseline\"   10-os-baseline.sh\nphase 20 \"Ceph\"          20-ceph.sh\nphase 30 \"Kubernetes\"    30-kubespray.sh\nphase 40 \"add-ons\"       40-addons.sh\nphase 50 verify          50-verify.sh\n\necho\necho \"Done. Logs: $LOG_DIR\"\n"
+    },
+    {
+      "id": "nodes-tsv",
+      "name": "Node inventory",
+      "filename": "nodes.tsv",
+      "description": "Every node with its role and address. The scripts read this file; it is generated from the counts, so it cannot drift from the plan.",
+      "template": "# Generated by the cloud-native guide site \u2014 {{value.clusterName}} ({{value.env}})\n# role\tname\taddress\n{{nodeRows}}\n"
+    },
+    {
+      "id": "preflight",
+      "name": "Preflight checks",
+      "filename": "00-preflight.sh",
+      "description": "Read-only: registry, SSH, clock, disk and DNS on every node, before anything changes.",
+      "template": "#!/usr/bin/env bash\n# Generated by the cloud-native guide site\n# Read-only checks on the admin host. Changes nothing, anywhere.\nset -euo pipefail\n\nHERE=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"\nNODES=\"$HERE/nodes.tsv\"\nFAIL=0; WARN=0\n\nok()   { printf 'PASS  %s\\n' \"$*\"; }\nbad()  { printf 'FAIL  %s\\n' \"$*\"; FAIL=$((FAIL + 1)); }\nwarn() { printf 'WARN  %s\\n' \"$*\"; WARN=$((WARN + 1)); }\n\nfor t in ssh curl awk; do\n  command -v \"$t\" >/dev/null 2>&1 || bad \"missing tool: $t\"\ndone\n[ -f \"$NODES\" ] || { bad \"nodes.tsv is missing\"; exit 1; }\n\n# Registry first: without it, nothing else matters.\nif curl -fsS --max-time 10 -o /dev/null \"https://{{value.registryAddr}}/v2/\"; then\n  ok \"registry https://{{value.registryAddr}}/v2/\"\nelse\n  bad \"registry unreachable: https://{{value.registryAddr}}/v2/\"\nfi\n\nwhile IFS=$'\\t' read -r role name ip; do\n  case \"$role\" in ''|\\#*) continue ;; esac\n\n  if ssh -o BatchMode=yes -o ConnectTimeout=5 -p {{value.sshPort}} \"{{value.adminUser}}@$ip\" true 2>/dev/null; then\n    ok \"$name ssh\"\n  else\n    bad \"$name ssh unreachable ($ip:{{value.sshPort}})\"\n    continue\n  fi\n\n  if ssh -o BatchMode=yes -o ConnectTimeout=5 -p {{value.sshPort}} \"{{value.adminUser}}@$ip\" \\\n      \"chronyc tracking >/dev/null 2>&1 && chronyc tracking | awk '/System time/ {print \\$4}'\" 2>/dev/null | grep -q '^[0-9.]*$'; then\n    ok \"$name chrony\"\n  else\n    warn \"$name chrony not reporting (install it in phase 10)\"\n  fi\n\n  avail=$(ssh -o BatchMode=yes -o ConnectTimeout=5 -p {{value.sshPort}} \"{{value.adminUser}}@$ip\" \\\n    \"df -BG --output=avail / | tail -1 | tr -dc '0-9'\" 2>/dev/null || echo 0)\n  if [ \"${avail:-0}\" -ge 20 ]; then\n    ok \"$name disk ${avail}G free\"\n  else\n    bad \"$name disk under 20G free (${avail:-0}G)\"\n  fi\n\n  if ssh -o BatchMode=yes -o ConnectTimeout=5 -p {{value.sshPort}} \"{{value.adminUser}}@$ip\" \\\n      \"getent hosts {{value.registryHost}} >/dev/null\" 2>/dev/null; then\n    ok \"$name resolves {{value.registryHost}}\"\n  else\n    bad \"$name cannot resolve {{value.registryHost}}\"\n  fi\ndone < \"$NODES\"\n\necho\necho \"preflight: $FAIL failure(s), $WARN warning(s)\"\n[ \"$FAIL\" -eq 0 ]\n"
+    },
+    {
+      "id": "os-baseline",
+      "name": "OS baseline orchestrator",
+      "filename": "10-os-baseline.sh",
+      "description": "Copies the node payload to every host and runs it. Idempotent.",
+      "template": "#!/usr/bin/env bash\n# Generated by the cloud-native guide site\n# Copies 10-os-node.sh to every node and runs it. Idempotent.\nset -euo pipefail\n\nHERE=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"\nNODES=\"$HERE/nodes.tsv\"\nPAYLOAD=\"$HERE/10-os-node.sh\"\n[ -f \"$PAYLOAD\" ] || { echo \"missing $PAYLOAD\" >&2; exit 1; }\n\nwhile IFS=$'\\t' read -r role name ip; do\n  case \"$role\" in ''|\\#*) continue ;; esac\n  echo \"--- $name ($role, $ip)\"\n  scp -P {{value.sshPort}} -o BatchMode=yes \"$PAYLOAD\" \"{{value.adminUser}}@$ip:/tmp/10-os-node.sh\"\n  ssh -p {{value.sshPort}} -o BatchMode=yes \"{{value.adminUser}}@$ip\" \\\n    \"sudo bash /tmp/10-os-node.sh && rm -f /tmp/10-os-node.sh\"\ndone < \"$NODES\"\n\necho \"OS baseline applied. Reboot nodes whose kernel arguments changed before phase 30.\"\n"
+    },
+    {
+      "id": "os-node",
+      "name": "OS baseline payload",
+      "filename": "10-os-node.sh",
+      "description": "Runs on a node: time, DNS, access, kernel, limits, SELinux, firewall, audit, updates.",
+      "template": "#!/usr/bin/env bash\n# Generated by the cloud-native guide site\n# Runs ON a node as root. Idempotent; safe to re-run.\nset -euo pipefail\n\nTZ_NAME=\"{{value.osTimezone}}\"\nLOCALE=\"{{value.osLocale}}\"\nNTP_LIST=\"{{value.ntpServers}}\"\nDNS_LIST=\"{{value.dnsServers}}\"\nDNS_SEARCH=\"{{value.dnsSearchDomain}}\"\nADMIN_USER=\"{{value.adminUser}}\"\nSSH_PORT=\"{{value.sshPort}}\"\nPASSWORD_AUTH=\"{{value.sshPasswordAuth}}\"\nNOPASSWD=\"{{value.sudoNopasswd}}\"\nSWAP_OFF=\"{{value.swapDisabled}}\"\nTHP=\"{{value.transparentHugePages}}\"\nFD_MAX=\"{{value.fileDescriptorsMax}}\"\nSELINUX=\"{{value.selinuxMode}}\"\nFIREWALL=\"{{value.firewallBackend}}\"\nAUDIT_DAYS=\"{{value.auditRetentionDays}}\"\nAUTO_UPDATES=\"{{value.unattendedSecurityUpdates}}\"\nKERNEL_ARGS=\"{{value.kernelArgs}}\"\n\ntimedatectl set-timezone \"$TZ_NAME\"\nlocalectl set-locale LANG=\"$LOCALE\" 2>/dev/null || true\n\n# --- time -----------------------------------------------------------------\ninstall -d /etc/chrony.d\n: > /etc/chrony.d/00-platform.conf\nIFS=',' read -ra SRV <<< \"$NTP_LIST\"\nfor s in \"${SRV[@]}\"; do echo \"server ${s// /} iburst\" >> /etc/chrony.d/00-platform.conf; done\nsystemctl enable --now chronyd 2>/dev/null || systemctl enable --now chrony 2>/dev/null || true\nsystemctl restart chronyd 2>/dev/null || true\n\n# --- name resolution ------------------------------------------------------\nIFS=',' read -ra DNS <<< \"$DNS_LIST\"\nCON=\"$(nmcli -t -f NAME connection show --active | head -1 || true)\"\nif [ -n \"$CON\" ]; then\n  nmcli con mod \"$CON\" ipv4.dns \"$(IFS=' '; echo \"${DNS[*]}\")\" ipv4.dns-search \"$DNS_SEARCH\"\n  nmcli con up \"$CON\" || true\nelse\n  printf 'nameserver %s\\n' \"${DNS[@]}\" > /etc/resolv.conf\n  echo \"search $DNS_SEARCH\" >> /etc/resolv.conf\nfi\n\n# --- access ---------------------------------------------------------------\nid \"$ADMIN_USER\" >/dev/null 2>&1 || useradd -m -s /bin/bash \"$ADMIN_USER\"\nif getent group wheel >/dev/null; then usermod -aG wheel \"$ADMIN_USER\"; else usermod -aG sudo \"$ADMIN_USER\"; fi\n\nif [ \"$NOPASSWD\" = \"true\" ]; then\n  echo \"$ADMIN_USER ALL=(ALL) NOPASSWD:ALL\" > /etc/sudoers.d/90-automation\n  chmod 0440 /etc/sudoers.d/90-automation\n  visudo -cf /etc/sudoers.d/90-automation >/dev/null\nelse\n  rm -f /etc/sudoers.d/90-automation\nfi\n\ninstall -d -m 0755 /etc/ssh/sshd_config.d\n{\n  echo \"Port $SSH_PORT\"\n  echo \"Port 22   # remove once $SSH_PORT is proven reachable\"\n  echo \"PasswordAuthentication $([ \"$PASSWORD_AUTH\" = \"true\" ] && echo yes || echo no)\"\n  echo \"PermitRootLogin prohibit-password\"\n  echo \"MaxAuthTries 4\"\n} > /etc/ssh/sshd_config.d/10-platform.conf\nsshd -t\nsystemctl reload sshd\n\n# --- kernel and memory ----------------------------------------------------\nif [ \"$SWAP_OFF\" = \"true\" ]; then\n  swapoff -a || true\n  sed -ri '/\\sswap\\s/s/^#?/#/' /etc/fstab\nfi\n\ncat > /etc/sysctl.d/90-platform.conf <<EOF\nvm.max_map_count = 262144\nfs.file-max = $FD_MAX\nkernel.pid_max = 4194304\nnet.ipv4.ip_forward = 1\nnet.bridge.bridge-nf-call-iptables = 1\nnet.bridge.bridge-nf-call-ip6tables = 1\nEOF\nsysctl --system >/dev/null\n\ncat > /etc/modules-load.d/90-platform.conf <<EOF\noverlay\nbr_netfilter\nnf_conntrack\nrbd\nEOF\nmodprobe overlay || true\nmodprobe br_netfilter || true\nmodprobe rbd || true\n\ncat > /etc/security/limits.d/90-platform.conf <<EOF\n*    soft nofile $FD_MAX\n*    hard nofile $FD_MAX\nroot soft nofile $FD_MAX\nroot hard nofile $FD_MAX\nEOF\n\nif [ -w /sys/kernel/mm/transparent_hugepage/enabled ]; then\n  echo \"$THP\" > /sys/kernel/mm/transparent_hugepage/enabled || true\nfi\n\nif [ -n \"$KERNEL_ARGS\" ]; then\n  if command -v grubby >/dev/null 2>&1; then\n    grubby --update-kernel=ALL --args=\"$KERNEL_ARGS\"\n  else\n    sed -i \"s/^GRUB_CMDLINE_LINUX=\\\"\\(.*\\)\\\"/GRUB_CMDLINE_LINUX=\\\"\\1 $KERNEL_ARGS\\\"/\" /etc/default/grub\n    update-grub\n  fi\n  echo \"REBOOT REQUIRED: kernel arguments changed\"\nfi\n\n# --- security -------------------------------------------------------------\nif command -v getenforce >/dev/null 2>&1; then\n  setenforce 0 2>/dev/null || true\n  sed -i \"s/^SELINUX=.*/SELINUX=$SELINUX/\" /etc/selinux/config\nfi\n\nif [ \"$FIREWALL\" = \"firewalld\" ] && command -v firewall-cmd >/dev/null 2>&1; then\n  systemctl enable --now firewalld\n  firewall-cmd --permanent --add-port=\"$SSH_PORT/tcp\" >/dev/null\n  firewall-cmd --reload >/dev/null\nelif [ \"$FIREWALL\" = \"nftables\" ] && command -v nft >/dev/null 2>&1; then\n  nft add rule inet filter input tcp dport \"$SSH_PORT\" accept 2>/dev/null || true\nfi\n\nif [ -f /etc/audit/auditd.conf ]; then\n  sed -i \"s/^num_logs = .*/num_logs = $((AUDIT_DAYS > 5 ? 5 : AUDIT_DAYS))/\" /etc/audit/auditd.conf || true\n  systemctl restart auditd 2>/dev/null || true\nfi\n\nif [ \"$AUTO_UPDATES\" = \"true\" ]; then\n  if command -v dnf >/dev/null 2>&1; then\n    dnf install -y dnf-automatic >/dev/null 2>&1 || true\n    sed -i 's/^upgrade_type = .*/upgrade_type = security/' /etc/dnf/automatic.conf 2>/dev/null || true\n    systemctl enable --now dnf-automatic.timer 2>/dev/null || true\n  elif command -v apt-get >/dev/null 2>&1; then\n    dpkg -l unattended-upgrades >/dev/null 2>&1 || apt-get install -y unattended-upgrades\n    systemctl enable --now unattended-upgrades 2>/dev/null || true\n  fi\nfi\n\necho \"baseline applied: $(hostname)\"\n"
+    },
+    {
+      "id": "ceph-phase",
+      "name": "Ceph phase",
+      "filename": "20-ceph.sh",
+      "description": "Bootstraps Ceph on the first MON, adds every role host with its label, applies the role spec, waits for HEALTH_OK.",
+      "when": {
+        "component": "storage",
+        "values": [
+          "cephadm-podman",
+          "cephadm-docker"
+        ]
+      },
+      "template": "#!/usr/bin/env bash\n# Generated by the cloud-native guide site\n# Runs on the admin host. Bootstraps Ceph on the first MON, then adds every role host.\nset -euo pipefail\n\nHERE=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"\nMON1=\"{{cephMonIp}}\"\nSSH_OPTS=\"-o BatchMode=yes -p {{value.sshPort}}\"\nBOOT=\"$HERE/ceph-bootstrap.sh\"\nSPEC=\"$HERE/cluster-spec.yaml\"\n[ -f \"$BOOT\" ] || { echo \"missing $BOOT\" >&2; exit 1; }\n[ -f \"$SPEC\" ] || { echo \"missing $SPEC\" >&2; exit 1; }\n\nif [ \"${DRY_RUN:-0}\" = \"1\" ]; then\n  echo \"would scp ceph-bootstrap.sh + cluster-spec.yaml to $MON1 and run cephadm bootstrap\"\n  exit 0\nfi\n\nscp $SSH_OPTS \"$BOOT\" \"root@$MON1:/root/ceph-bootstrap.sh\"\nssh $SSH_OPTS \"root@$MON1\" \"bash /root/ceph-bootstrap.sh\"\n\n# Copy the admin keyring to every other role host so cephadm shell works there too.\nfor h in {{cephOtherIps}}; do\n  ssh $SSH_OPTS \"root@$MON1\" \"ssh -o BatchMode=yes root@$h 'mkdir -p /etc/ceph' && scp -o BatchMode=yes /etc/ceph/ceph.conf /etc/ceph/ceph.client.admin.keyring root@$h:/etc/ceph/\" \\\n    || echo \"WARN: keyring copy to $h failed; add it manually\"\ndone\n\n# Add hosts with their role label. Explicit hosts, not labels alone: a typo must fail here.\nwhile read -r cmd; do\n  [ -n \"$cmd\" ] || continue\n  ssh $SSH_OPTS \"root@$MON1\" \"cephadm shell -- $cmd\" || echo \"WARN: $cmd\"\ndone <<'CMDS'\n{{cephHostAddCmds}}\nCMDS\n\nscp $SSH_OPTS \"$SPEC\" \"root@$MON1:/root/cluster-spec.yaml\"\nssh $SSH_OPTS \"root@$MON1\" \"cephadm shell -- ceph orch apply -i /root/cluster-spec.yaml\"\n\necho \"waiting for HEALTH_OK (up to 20 minutes)\"\nfor i in $(seq 1 40); do\n  health=$(ssh $SSH_OPTS \"root@$MON1\" \"cephadm shell -- ceph health\" 2>/dev/null || echo UNKNOWN)\n  echo \"  $health\"\n  case \"$health\" in HEALTH_OK*) exit 0 ;; esac\n  sleep 30\ndone\necho \"Ceph did not reach HEALTH_OK. Inspect: cephadm shell -- ceph -s\" >&2\nexit 1\n"
+    },
+    {
+      "id": "k8s-phase",
+      "name": "Kubernetes phase",
+      "filename": "30-kubespray.sh",
+      "description": "Runs the pinned Kubespray release from its own virtualenv, then waits for every node to be Ready.",
+      "template": "#!/usr/bin/env bash\n# Generated by the cloud-native guide site\n# Runs on the admin host, against the inventory generated with this plan.\nset -euo pipefail\n\nHERE=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"\nRUN=\"$HERE/run-kubespray.sh\"\n[ -f \"$RUN\" ] || { echo \"missing $RUN\" >&2; exit 1; }\n[ -f \"$HERE/hosts.ini\" ] || { echo \"missing hosts.ini\" >&2; exit 1; }\n\nif [ \"${DRY_RUN:-0}\" = \"1\" ]; then\n  echo \"would run: bash $RUN\"\n  exit 0\nfi\n\nbash \"$RUN\"\n\nKUBECONFIG=\"${KUBECONFIG:-/opt/kubespray/inventory/{{value.clusterName}}-{{value.env}}/artifacts/admin.conf}\"\nexport KUBECONFIG\nkubectl wait --for=condition=Ready node --all --timeout=15m\nkubectl get nodes -o wide\n"
+    },
+    {
+      "id": "addons-phase",
+      "name": "Add-ons phase",
+      "filename": "40-addons.sh",
+      "description": "Installs exactly the add-ons whose values files were generated. A missing chart is reported, never pulled from the internet.",
+      "template": "#!/usr/bin/env bash\n# Generated by the cloud-native guide site\n# Installs only the add-ons whose values files were generated with this plan.\nset -euo pipefail\n\nHERE=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"\nCHARTS=\"$HERE/charts\"\nKUBECTL=(kubectl)\n\nrun() {\n  if [ \"${DRY_RUN:-0}\" = \"1\" ]; then echo \"dry-run: $*\"; return 0; fi\n  \"$@\"\n}\n\nhelm_install() {\n  local name=\"$1\" ns=\"$2\" chart=\"$3\"; shift 3\n  if [ ! -f \"$CHARTS/$chart\" ]; then\n    echo \"SKIP $name: $CHARTS/$chart not present (mirror the chart first)\"\n    return 0\n  fi\n  run helm upgrade --install \"$name\" \"$CHARTS/$chart\" -n \"$ns\" --create-namespace --wait \"$@\"\n}\n\n# 1. cert-manager, then its issuer.\nhelm_install cert-manager cert-manager \"cert-manager-{{version.cert-manager}}.tgz\" \\\n  -f \"$HERE/cert-manager-values.yaml\" || true\nfor issuer in \"$HERE/cert-manager-issuer.yaml\" \"$HERE/cert-manager-selfsigned.yaml\"; do\n  [ -f \"$issuer\" ] && run \"${KUBECTL[@]}\" apply -f \"$issuer\"\ndone\n\n# 2. Metrics Server: the API aggregation HPA and VPA depend on.\nhelm_install metrics-server kube-system \"metrics-server-{{version.metrics-server}}.tgz\" || true\n\n# 3. Vertical Pod Autoscaler.\nif [ -f \"$HERE/vpa-auto-values.yaml\" ]; then\n  helm_install vpa vertical-pod-autoscaler \"vpa-{{version.vpa}}.tgz\" -f \"$HERE/vpa-auto-values.yaml\" || true\nelif [ -f \"$HERE/vpa-values.yaml\" ]; then\n  helm_install vpa vertical-pod-autoscaler \"vpa-{{version.vpa}}.tgz\" -f \"$HERE/vpa-values.yaml\" || true\nfi\n\n# 4. Descheduler.\nif [ -f \"$HERE/descheduler-evict-values.yaml\" ]; then\n  helm_install descheduler kube-system \"descheduler-{{version.descheduler}}.tgz\" \\\n    -f \"$HERE/descheduler-evict-values.yaml\" || true\nelif [ -f \"$HERE/descheduler-dryrun-values.yaml\" ]; then\n  helm_install descheduler kube-system \"descheduler-{{version.descheduler}}.tgz\" \\\n    -f \"$HERE/descheduler-dryrun-values.yaml\" || true\nfi\n\n# 5. external-dns.\nif [ -f \"$HERE/external-dns-coredns-values.yaml\" ]; then\n  helm_install external-dns external-dns \"external-dns-{{version.external-dns}}.tgz\" \\\n    -f \"$HERE/external-dns-coredns-values.yaml\" || true\nelif [ -f \"$HERE/external-dns-values.yaml\" ]; then\n  helm_install external-dns external-dns \"external-dns-{{version.external-dns}}.tgz\" \\\n    -f \"$HERE/external-dns-values.yaml\" || true\nfi\n\n# 6. Trivy Operator: needs the vulnerability DB mirrored, never an internet pull.\n[ -f \"$HERE/trivy-values.yaml\" ] && helm_install trivy-operator trivy-system \\\n  \"trivy-operator-{{version.trivy-operator}}.tgz\" -f \"$HERE/trivy-values.yaml\" || true\n\n# 7. OpenTelemetry Collector CR.\n[ -f \"$HERE/otel-collector.yaml\" ] && run \"${KUBECTL[@]}\" apply -f \"$HERE/otel-collector.yaml\"\n\necho \"Add-ons applied. Run 50-verify.sh.\"\n"
+    },
+    {
+      "id": "verify",
+      "name": "Acceptance checks",
+      "filename": "50-verify.sh",
+      "description": "Nodes Ready, pods settled, Ceph health, metrics API, cert-manager and Argo CD presence.",
+      "template": "#!/usr/bin/env bash\n# Generated by the cloud-native guide site\n# Acceptance checks. Read-only. Exits non-zero when anything is not ready.\nset -euo pipefail\n\nHERE=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"\nKUBECTL=(kubectl)\nFAIL=0\nok()  { printf 'PASS  %s\\n' \"$*\"; }\nbad() { printf 'FAIL  %s\\n' \"$*\"; FAIL=$((FAIL + 1)); }\n\nif ! command -v kubectl >/dev/null 2>&1; then\n  bad \"kubectl not installed on the admin host\"\n  exit 1\nfi\n\nif \"${KUBECTL[@]}\" get nodes >/dev/null 2>&1; then\n  total=$(\"${KUBECTL[@]}\" get nodes --no-headers | wc -l)\n  ready=$(\"${KUBECTL[@]}\" get nodes --no-headers | awk '$2 == \"Ready\"' | wc -l)\n  [ \"$total\" -gt 0 ] && [ \"$total\" = \"$ready\" ] && ok \"$ready/$total nodes Ready\" \\\n    || bad \"$ready/$total nodes Ready\"\nelse\n  bad \"cannot reach the API server (check KUBECONFIG)\"\nfi\n\nnotrun=$(\"${KUBECTL[@]}\" get pods -A --no-headers 2>/dev/null | awk '$4 != \"Running\" && $4 != \"Completed\"' | wc -l)\n[ \"$notrun\" -eq 0 ] && ok \"no pods outside Running/Completed\" || bad \"$notrun pod(s) not Running\"\n\n\"${KUBECTL[@]}\" get apiservice v1beta1.metrics.k8s.io >/dev/null 2>&1 \\\n  && ok \"metrics API registered\" || echo \"INFO  metrics API absent (Metrics Server not selected)\"\n\nif [ -f \"$HERE/cluster-spec.yaml\" ]; then\n  mon=\"{{cephMonIp}}\"\n  health=$(ssh -o BatchMode=yes -p {{value.sshPort}} \"root@$mon\" \"cephadm shell -- ceph health\" 2>/dev/null || echo UNKNOWN)\n  case \"$health\" in HEALTH_OK*) ok \"Ceph $health\" ;; *) bad \"Ceph health: $health\" ;; esac\nfi\n\n\"${KUBECTL[@]}\" -n argocd get application --no-headers >/dev/null 2>&1 \\\n  && ok \"Argo CD reachable\" || echo \"INFO  Argo CD not installed yet\"\n\n\"${KUBECTL[@]}\" get clusterissuer >/dev/null 2>&1 \\\n  && ok \"cert-manager CRDs present\" || echo \"INFO  cert-manager not selected\"\n\necho\necho \"verify: $FAIL failure(s)\"\n[ \"$FAIL\" -eq 0 ]\n"
+    },
+    {
       "id": "ceph-bootstrap",
       "name": "cephadm bootstrap script",
       "component": "storage",
@@ -1930,7 +2544,7 @@
       "filename": "ceph-bootstrap.sh",
       "language": "bash",
       "description": "Prepares the engine and bootstraps the first monitor. Engine: {{choice.storage}}.",
-      "template": "#!/usr/bin/env bash\n# Generated by the cloud-native guide site\n# Engine: {{choice.storage}}   Ceph: {{version.ceph}}\n# Hosts: {{cephHostList}}\nset -euo pipefail\n\nMON_IP=\"{{cephMonIp}}\"\nENGINE=\"{{cephEngine}}\"\nREGISTRY=\"{{value.registryHost}}\"\n\n# 1. The container engine must exist before cephadm runs. cephadm will not install it.\nif [ \"$ENGINE\" = \"docker\" ]; then\n  dnf install -y docker-ce docker-ce-cli containerd.io || \\\n    apt-get install -y docker-ce docker-ce-cli containerd.io\n  systemctl enable --now docker\n  mkdir -p /etc/docker\n  cat >/etc/docker/daemon.json <<EOF\n{ \"registry-mirrors\": [\"https://${REGISTRY}\"], \"live-restore\": true }\nEOF\n  systemctl restart docker\nelse\n  dnf install -y podman || apt-get install -y podman\n  systemctl enable --now podman.socket\nfi\n\n# 2. cephadm itself.\ndnf install -y cephadm || apt-get install -y cephadm\n\n# 3. Bootstrap. --docker is passed only for the Docker engine.\ncephadm {{cephEngineFlag}} bootstrap \\\n  --mon-ip \"$MON_IP\" \\\n  --cluster-network {{value.storageCidr}} \\\n  --registry \"$REGISTRY\" \\\n  --log-to-file\n\n# 4. Copy the config and keyring to the other hosts, then add them.\n#    for h in {{cephOtherIps}}; do ssh root@$h mkdir -p /etc/ceph; \\\n#      scp /etc/ceph/ceph.conf /etc/ceph/ceph.client.admin.keyring root@$h:/etc/ceph/; done\ncephadm shell -- ceph -s\n"
+      "template": "#!/usr/bin/env bash\n# Generated by the cloud-native guide site\n# Engine: {{choice.storage}}   Ceph: {{version.ceph}}\n# Roles: MON [{{cephMonNames}}]\n#        MGR [{{cephMgrNames}}]\n#        OSD [{{cephOsdNames}}]\n#        MDS [{{cephMdsNames}}]\n#        RGW [{{cephRgwNames}}]\n# Runs on the first MON host. deploy.sh copies it there.\nset -euo pipefail\n\nMON_IP=\"{{cephMonIp}}\"\nENGINE=\"{{cephEngine}}\"\nREGISTRY=\"{{value.registryHost}}\"\n\n# 1. The container engine must exist before cephadm runs. cephadm will not install it.\nif [ \"$ENGINE\" = \"docker\" ]; then\n  dnf install -y docker-ce docker-ce-cli containerd.io || \\\n    apt-get install -y docker-ce docker-ce-cli containerd.io\n  systemctl enable --now docker\n  mkdir -p /etc/docker\n  cat >/etc/docker/daemon.json <<EOF\n{ \"registry-mirrors\": [\"https://${REGISTRY}\"], \"live-restore\": true }\nEOF\n  systemctl restart docker\nelse\n  dnf install -y podman || apt-get install -y podman\n  systemctl enable --now podman.socket\nfi\n\n# 2. cephadm itself, from the internal repository.\ndnf install -y cephadm || apt-get install -y cephadm\n\n# 3. Bootstrap. --docker is passed only for the Docker engine.\ncephadm {{cephEngineFlag}} bootstrap \\\n  --mon-ip \"$MON_IP\" \\\n  --cluster-network {{value.storageCidr}} \\\n  --registry \"$REGISTRY\" \\\n  --log-to-file\n\ncephadm shell -- ceph -s\necho \"Bootstrap done. Run 20-ceph.sh from the admin host to add the other role hosts.\"\n"
     },
     {
       "id": "ceph-spec",
@@ -1946,7 +2560,7 @@
       "filename": "cluster-spec.yaml",
       "language": "yaml",
       "description": "Declarative placement for MON, MGR, OSD and RGW by host label, not by hostname.",
-      "template": "# Generated by the cloud-native guide site\n# Apply with: cephadm shell -- ceph orch apply -i /root/cluster-spec.yaml\nservice_type: mon\nplacement:\n  label: mon\n---\nservice_type: mgr\nplacement:\n  label: mgr\n---\nservice_type: osd\nservice_id: default\nplacement:\n  label: osd\ndata_devices:\n  all: true\n---\nservice_type: rgw\nservice_id: rgw\nplacement:\n  label: rgw\nspec:\n  rgw_frontend_port: 8080\n"
+      "template": "# Generated by the cloud-native guide site\n# Explicit per-role placement. Apply on a MON host:\n#   cephadm shell -- ceph orch apply -i /root/cluster-spec.yaml\nservice_type: mon\nplacement:\n  hosts:\n{{cephMonPlacement}}\n---\nservice_type: mgr\nplacement:\n  hosts:\n{{cephMgrPlacement}}\n---\nservice_type: osd\nservice_id: data\nplacement:\n  hosts:\n{{cephOsdPlacement}}\ndata_devices:\n  all: true\ndb_devices:\n  all: false\n  paths: [/dev/nvme1n1]\n---\nservice_type: mds\nservice_id: cephfs\nplacement:\n  hosts:\n{{cephMdsPlacement}}\n---\nservice_type: rgw\nservice_id: rgw\nplacement:\n  hosts:\n{{cephRgwPlacement}}\nspec:\n  rgw_frontend_port: 8080\n"
     },
     {
       "id": "metallb-pool",
@@ -2102,6 +2716,150 @@
       "language": "yaml",
       "description": "OpenAI-compatible inference server with the model cache on local NVMe.",
       "template": "# Generated by the cloud-native guide site\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: vllm\n  namespace: ai\nspec:\n  replicas: {{gpuReplicas}}\n  selector:\n    matchLabels: {app: vllm}\n  template:\n    metadata:\n      labels: {app: vllm}\n    spec:\n      nodeSelector:\n        node-role.kubernetes.io/gpu: \"true\"\n      tolerations:\n        - key: nvidia.com/gpu\n          operator: Equal\n          value: \"true\"\n          effect: NoSchedule\n      containers:\n        - name: vllm\n          image: {{value.registryHost}}/platform/vllm:{{version.vllm}}\n          args:\n            - \"--model=/models/model\"\n            - \"--served-model-name=llama\"\n            - \"--port=8000\"\n            - \"--tensor-parallel-size=1\"\n            - \"--gpu-memory-utilization=0.90\"\n            - \"--max-model-len=8192\"\n            - \"--trust-remote-code=false\"\n          ports:\n            - containerPort: 8000\n          resources:\n            limits:\n              nvidia.com/gpu: 1\n          volumeMounts:\n            - {name: model-cache, mountPath: /models}\n      volumes:\n        - name: model-cache\n          hostPath: {path: /mnt/models, type: DirectoryOrCreate}\n"
+    },
+    {
+      "id": "cert-values",
+      "name": "cert-manager values",
+      "filename": "cert-manager-values.yaml",
+      "description": "Two replicas, PodDisruptionBudget, ServiceMonitor. No ACME.",
+      "when": {
+        "component": "certManager",
+        "values": [
+          "vault-pki",
+          "selfsigned"
+        ]
+      },
+      "template": "# Generated by the cloud-native guide site \u2014 cert-manager {{version.cert-manager}}\ninstallCRDs: true\nreplicaCount: 2\npodDisruptionBudget:\n  enabled: true\n  minAvailable: 1\nprometheus:\n  enabled: true\n  servicemonitor:\n    enabled: true\nresources:\n  requests: {cpu: 50m, memory: 64Mi}\n  limits: {memory: 256Mi}\nwebhook:\n  replicaCount: 2\ncainjector:\n  replicaCount: 2\n# No ACME. An air-gapped site uses the Vault PKI issuer in cert-manager-issuer.yaml.\n"
+    },
+    {
+      "id": "cert-issuer",
+      "name": "Vault PKI ClusterIssuer",
+      "filename": "cert-manager-issuer.yaml",
+      "description": "One issuer for the platform. Requires the Vault Kubernetes auth role.",
+      "when": {
+        "component": "certManager",
+        "values": [
+          "vault-pki"
+        ]
+      },
+      "template": "# Generated by the cloud-native guide site\n# Vault PKI ClusterIssuer. Requires the cert-manager Vault auth role and a token secret.\napiVersion: cert-manager.io/v1\nkind: ClusterIssuer\nmetadata:\n  name: vault-pki\nspec:\n  vault:\n    server: {{value.vaultHost}}\n    path: pki/sign/platform\n    auth:\n      kubernetes:\n        role: cert-manager\n        mountPath: /v1/auth/kubernetes\n        secretRef:\n          name: cert-manager-vault-token\n          key: token\n"
+    },
+    {
+      "id": "cert-selfsigned",
+      "name": "Bootstrap ClusterIssuer",
+      "filename": "cert-manager-selfsigned.yaml",
+      "description": "Self-signed issuer for bootstrapping only. Remove it once Vault issues certificates.",
+      "when": {
+        "component": "certManager",
+        "values": [
+          "selfsigned"
+        ]
+      },
+      "template": "# Generated by the cloud-native guide site\n# Bootstrap issuer only. Remove it once the Vault issuer works.\napiVersion: cert-manager.io/v1\nkind: ClusterIssuer\nmetadata:\n  name: selfsigned-bootstrap\nspec:\n  selfSigned: {}\n"
+    },
+    {
+      "id": "vpa-rec",
+      "name": "VPA recommendation values",
+      "filename": "vpa-values.yaml",
+      "description": "Recommender and admission controller only. The updater stays off: nothing is restarted.",
+      "when": {
+        "component": "vpa",
+        "values": [
+          "recommendation"
+        ]
+      },
+      "template": "# Generated by the cloud-native guide site \u2014 VPA {{version.vpa}}\n# Recommendation mode: the updater is off, so nothing is evicted or restarted.\nrecommender:\n  replicaCount: 2\nupdater:\n  enabled: false\nadmissionController:\n  enabled: true\n  replicas: 2\n"
+    },
+    {
+      "id": "vpa-auto",
+      "name": "VPA auto values",
+      "filename": "vpa-auto-values.yaml",
+      "description": "Updater enabled. Evicts and restarts pods whose requests are out of range.",
+      "when": {
+        "component": "vpa",
+        "values": [
+          "auto"
+        ]
+      },
+      "template": "# Generated by the cloud-native guide site \u2014 VPA {{version.vpa}}\n# Auto mode: the updater evicts pods whose requests are out of range.\n# Never apply this to a stateful workload.\nrecommender:\n  replicaCount: 2\nupdater:\n  enabled: true\nadmissionController:\n  enabled: true\n  replicas: 2\n"
+    },
+    {
+      "id": "desched-dry",
+      "name": "Descheduler dry-run values",
+      "filename": "descheduler-dryrun-values.yaml",
+      "description": "Decisions logged, pods not evicted. Two weeks before eviction.",
+      "when": {
+        "component": "descheduler",
+        "values": [
+          "dry-run"
+        ]
+      },
+      "template": "# Generated by the cloud-native guide site \u2014 Descheduler {{version.descheduler}}\n# Dry run: decisions are logged, pods are not evicted. Two weeks minimum.\nkind: CronJob\nschedule: \"*/30 * * * *\"\ndeschedulingInterval: 10m\ndryRun: true\ncmdOptions:\n  v: 3\nstrategies:\n  - name: RemoveDuplicates\n  - name: LowNodeUtilization\n    params:\n      thresholds: {cpu: 20, memory: 20, pods: 20}\n      targetThresholds: {cpu: 50, memory: 50, pods: 50}\n"
+    },
+    {
+      "id": "desched-evict",
+      "name": "Descheduler eviction values",
+      "filename": "descheduler-evict-values.yaml",
+      "description": "Eviction enabled, PodDisruptionBudgets respected.",
+      "when": {
+        "component": "descheduler",
+        "values": [
+          "evict"
+        ]
+      },
+      "template": "# Generated by the cloud-native guide site \u2014 Descheduler {{version.descheduler}}\n# Eviction enabled. Respect PodDisruptionBudgets; every eviction is a restart.\nkind: CronJob\nschedule: \"*/30 * * * *\"\ndeschedulingInterval: 10m\ndryRun: false\ncmdOptions:\n  v: 3\nstrategies:\n  - name: RemoveDuplicates\n  - name: LowNodeUtilization\n    params:\n      thresholds: {cpu: 20, memory: 20, pods: 20}\n      targetThresholds: {cpu: 50, memory: 50, pods: 50}\n"
+    },
+    {
+      "id": "ext-dns",
+      "name": "external-dns RFC2136 values",
+      "filename": "external-dns-values.yaml",
+      "description": "Internal DNS over RFC2136 with a TSIG key. upsert-only to start.",
+      "when": {
+        "component": "externalDns",
+        "values": [
+          "rfc2136"
+        ]
+      },
+      "template": "# Generated by the cloud-native guide site \u2014 external-dns {{version.external-dns}}\n# RFC2136 against the internal DNS. Start with upsert-only; move to sync after a week.\nprovider:\n  name: rfc2136\nenv:\n  - name: EXTERNAL_DNS_RFC2136_HOST\n    value: \"{{externalDnsServer}}\"\n  - name: EXTERNAL_DNS_RFC2136_PORT\n    value: \"53\"\n  - name: EXTERNAL_DNS_RFC2136_ZONE\n    value: \"{{externalDnsZone}}.\"\n  - name: EXTERNAL_DNS_RFC2136_TSIG_KEYNAME\n    value: \"externaldns-key\"\n  - name: EXTERNAL_DNS_RFC2136_TSIG_SECRET_ALG\n    value: \"hmac-sha256\"\ndomainFilters:\n  - {{externalDnsZone}}\npolicy: upsert-only\nregistry: txt\ntxtOwnerId: \"{{value.clusterName}}-{{value.env}}\"\n"
+    },
+    {
+      "id": "ext-dns-etcd",
+      "name": "external-dns CoreDNS etcd values",
+      "filename": "external-dns-coredns-values.yaml",
+      "description": "CoreDNS etcd provider for an internal DNS that has no RFC2136 endpoint.",
+      "when": {
+        "component": "externalDns",
+        "values": [
+          "coredns-etcd"
+        ]
+      },
+      "template": "# Generated by the cloud-native guide site \u2014 external-dns {{version.external-dns}}\n# CoreDNS etcd provider. The etcd endpoints must be the internal DNS cluster.\nprovider:\n  name: coredns\n  webhook:\n    image:\n      repository: {{value.registryHost}}/platform/external-dns-coredns\nenv:\n  - name: ETCD_URLS\n    value: \"http://etcd-0.dns.internal:2379\"\ndomainFilters:\n  - {{externalDnsZone}}\npolicy: upsert-only\nregistry: txt\ntxtOwnerId: \"{{value.clusterName}}-{{value.env}}\"\n"
+    },
+    {
+      "id": "trivy-values",
+      "name": "Trivy Operator values",
+      "filename": "trivy-values.yaml",
+      "description": "CRITICAL/HIGH only, unfixed ignored, ServiceMonitor on. DB path is a mirrored server.",
+      "when": {
+        "component": "trivyOperator",
+        "values": [
+          "enabled"
+        ]
+      },
+      "template": "# Generated by the cloud-native guide site \u2014 Trivy Operator {{version.trivy-operator}}\n# The vulnerability DB must be mirrored; the operator cannot download it here.\ntrivy:\n  ignoreUnfixed: true\n  severity: \"{{trivySeverity}}\"\n  # serverURL: http://trivy-server.trivy-system:4954\noperator:\n  scanJobTimeout: 5m\n  metricsVulnIdEnabled: true\nserviceMonitor:\n  enabled: true\n"
+    },
+    {
+      "id": "otel-collector",
+      "name": "OpenTelemetry Collector",
+      "filename": "otel-collector.yaml",
+      "description": "DaemonSet collector: OTLP in, memory limiter, batch, OTLP out to the trace backend.",
+      "when": {
+        "component": "otelCollector",
+        "values": [
+          "daemonset"
+        ]
+      },
+      "template": "# Generated by the cloud-native guide site \u2014 OpenTelemetry Operator {{version.otel-operator}}\napiVersion: opentelemetry.io/v1beta1\nkind: OpenTelemetryCollector\nmetadata:\n  name: otel\n  namespace: observability\nspec:\n  mode: daemonset\n  config:\n    receivers:\n      otlp:\n        protocols: {grpc: {}, http: {}}\n    processors:\n      memory_limiter:\n        check_interval: 1s\n        limit_percentage: 75\n      batch: {}\n    exporters:\n      otlp:\n        endpoint: {{otelEndpoint}}\n        tls: {insecure: false}\n    service:\n      pipelines:\n        traces:\n          receivers: [otlp]\n          processors: [memory_limiter, batch]\n          exporters: [otlp]\n"
     }
   ],
   "versions": {
@@ -2131,6 +2889,13 @@
     "kubespray": "v2.32.0",
     "keepalived": "2.4.3",
     "vllm": "v0.32.0",
+    "cert-manager": "v1.21.2",
+    "external-dns": "1.23.0",
+    "descheduler": "v0.37.0",
+    "vpa": "0.15.0",
+    "metrics-server": "3.14.0",
+    "otel-operator": "v0.161.0",
+    "trivy-operator": "v0.36.0",
     "kubernetes": "v1.36.5",
     "etcd": "3.6.15",
     "containerd": "2.3.7",

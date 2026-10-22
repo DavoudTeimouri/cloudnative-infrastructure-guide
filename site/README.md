@@ -13,30 +13,34 @@ plan and a per-component upgrade walkthrough.
 ## What it does
 
 The configurator is a wizard. One page per group, then a review page, then a separate upgrade
-walkthrough.
+walkthrough. The Back and Next buttons are pinned to the bottom of the page, below the content,
+with the page counter between them.
 
 | Page | Inputs |
 |---|---|
 | 1. Deployment | Bare metal or VM, cluster name, environment, domain |
 | 2. Application cluster | Control-plane count, worker count, GPU count, vCPU/RAM/disk per role, node prefix, first address |
 | 3. Management cluster | Its own worker count and sizes, Rancher, Keycloak, directory integrations (multi-select) |
-| 4. Operating system | Oracle Linux 9/8, Ubuntu 24.04/22.04, CA bundle path |
-| 5. Storage | Rook in-cluster, or cephadm on Podman or Docker, with Ceph host count and disks |
+| 4. Operating system | Oracle Linux 9/8, Ubuntu 24.04/22.04, admin user, SSH port and policy, sudo, timezone, locale, NTP, DNS, search domain, kernel arguments, swap, THP, max pods, file descriptors, SELinux, firewall, audit retention, unattended updates, CA bundle |
+| 5. Storage | Rook in-cluster (OSD workers, device filter, StorageClasses), or cephadm on Podman or Docker with one node group per role: MON, MGR, OSD, MDS, RGW |
 | 6. Traffic | Edge count and VIP, MetalLB pool, DMZ CIDR, VRRP pass phrase, ingress controller |
 | 7. Network and offline | Seven CIDRs, API VIP, registry and file mirror, extra registries and repos |
 | 8. Platform services | GitOps, secrets, observability, logging, policy, runtime detection, backup, mesh, GPU |
+| 9. Add-ons | cert-manager, Metrics Server, VPA, Descheduler, external-dns, Trivy Operator, OpenTelemetry Collector |
 
 Everything else is derived. Node names and addresses come from the prefix, the counts and the first
-address (`<prefix>-cp-N`, `<prefix>-w-N`, `<prefix>-gpu-N`, `<prefix>-mgmt-N`, `ceph-N`, `lb-N`), so
-the inventories, the Keepalived peers, the Ceph host list and the sizing table cannot disagree with
-the counts.
+address (`<prefix>-cp-N`, `<prefix>-w-N`, `<prefix>-gpu-N`, `<prefix>-mgmt-N`,
+`<ceph prefix>-mon-N`, `-mgr-N`, `-osd-N`, `-mds-N`, `-rgw-N`, `lb-N`), so the inventories, the
+Keepalived peers, the Ceph per-role placement and the sizing table cannot disagree with the counts.
 
 | Output | Where it appears |
 |---|---|
 | Sizing totals | Review page, and the runbook |
 | Resolved versions | Review page (VERIFIED rows only) and every export |
 | Filtered implementation steps | Review page, links to the authoritative document |
-| Generated files | Review page: both inventories, Kubespray group vars, cephadm bootstrap and spec, MetalLB, Keepalived, edge Compose, bootstrap scripts, Istio manifests, Vault policy, GPU manifests, directory checklist |
+| Generated files | Review page: both inventories, Kubespray group vars, cephadm bootstrap and per-role spec, MetalLB, Keepalived, edge Compose, bootstrap scripts, Istio manifests, Vault policy, GPU manifests, directory checklist, add-on values files, deployment bundle |
+| Deployment bundle | `deploy.sh`, `nodes.tsv`, `00-preflight.sh` … `50-verify.sh`: a phased, idempotent run with a stop at the first failure |
+| Add-on values | One file per selected option: cert-manager values and issuer, VPA recommendation or auto, Descheduler dry-run or eviction, external-dns RFC2136 or CoreDNS etcd, Trivy, OpenTelemetry |
 | Runbook | Download button, full plan plus sizing and upgrade summary |
 | Upgrade walkthrough | Upgrade view: gates, commands rendered against your values, downtime, rollback |
 
@@ -92,7 +96,8 @@ cannot be merged.
 
 ### Value
 
-`type` is `text`, `number`, `select`, or `lines` (textarea, one entry per line). `secret: true`
+`type` is `text`, `number`, `select`, `bool` (checkbox, rendered as `true`/`false`) or `lines`
+(textarea, one entry per line). `secret: true`
 renders a password field and is only ever written into the file the operator downloads.
 
 ### Page

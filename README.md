@@ -63,7 +63,8 @@ sources, so the site cannot drift from the documents. Details: `site/README.md`.
 
 **Use it, step by step**
 
-The configurator is a wizard: one page per group, then a review page.
+The configurator is a wizard: one page per group, then a review page. The **Back** and **Next**
+buttons sit at the bottom of every page, below the content, with the page counter between them.
 
 1. **Deployment** — bare metal or virtual machines, cluster name, environment, domain. Read the
    requirements: the VM option lists what changes in the failure domain.
@@ -73,23 +74,56 @@ The configurator is a wizard: one page per group, then a review page.
 3. **Management cluster** — its own worker count and sizes, because Rancher, Keycloak, Argo CD,
    Harbor and Vault do not share the workload cluster's capacity. Includes the directory
    integrations (multi-select) and the directory endpoint.
-4. **Operating system** — Oracle Linux 9/8 or Ubuntu 24.04/22.04. Local accounts only; nodes are
-   never joined to a directory.
+4. **Operating system** — Oracle Linux 9/8 or Ubuntu 24.04/22.04, plus the host baseline: admin
+   user, SSH port and password policy, sudo, timezone and locale, NTP and DNS servers, search
+   domain, kernel arguments, swap, transparent huge pages, max pods, file descriptors, SELinux,
+   firewall backend, audit retention, unattended security updates, and the CA bundle. Local
+   accounts only; nodes are never joined to a directory. Reference:
+   `operating-systems/host-configuration.md`.
 5. **Storage** — Rook-Ceph inside the cluster, or cephadm on dedicated hosts with **Podman or
-   Docker**, with the Ceph host count, sizes and disks.
+   Docker**. cephadm gets one node group per role: MON, MGR, OSD, MDS and RGW each have their own
+   count and first address, so no role shares a host by accident. Rook gets the OSD worker count,
+   device filter and StorageClass names. Reference: `storage/ceph/cephadm-deployment.md`.
 6. **Traffic** — edge node count, edge VIP, MetalLB pool, DMZ CIDR, the VRRP pass phrase, and the
    ingress controller.
 7. **Network and offline artifacts** — the seven CIDRs, the API VIP, registry and file-mirror
    endpoints, additional registries and package repositories, and the registry credential.
 8. **Platform services** — GitOps, secrets, observability, logging, admission policy, runtime
    detection, backup, service mesh, GPU.
-9. **Review** — sizing totals, every resolved version, the filtered implementation steps, and the
-   generated files: inventories for both clusters, Kubespray group vars, cephadm bootstrap and
-   service spec, MetalLB pool, Keepalived, edge Compose stack, bootstrap scripts, Istio manifests,
-   Vault policy, GPU manifests, the directory-integration checklist, and the runbook.
-10. **Upgrade** — a separate walkthrough. Pick the component and the target, and the site renders
+9. **Add-ons** — optional cluster components, each with its own version, values file and line in
+   the deploy script: cert-manager (Vault PKI or a bootstrap issuer), Metrics Server, Vertical Pod
+   Autoscaler (recommendation or auto), Descheduler (dry-run or eviction), external-dns (RFC2136
+   or CoreDNS etcd), Trivy Operator, OpenTelemetry Collector. Reference:
+   `addons/platform-addons.md`.
+10. **Review** — sizing totals per role, every resolved version, the filtered implementation
+    steps, and the generated files: inventories for both clusters, Kubespray group vars, cephadm
+    bootstrap and per-role service spec, MetalLB pool, Keepalived, edge Compose stack, bootstrap
+    scripts, Istio manifests, Vault policy, GPU manifests, the directory-integration checklist,
+    the add-on values files, the deployment bundle, and the runbook.
+11. **Upgrade** — a separate walkthrough. Pick the component and the target, and the site renders
     the ordered steps with gate markers, the command for each step rendered against your values,
     the downtime, and the rollback statement.
+
+**Automated deployment bundle**
+
+The review page emits an executable bundle, not a reading list:
+
+| File | Role |
+|---|---|
+| `deploy.sh` | One entry point: `--dry-run`, `--phase NN`, `--verify`, `--yes`. Stops at the first failure, logs every phase |
+| `nodes.tsv` | Every node with its role and address, generated from the counts |
+| `00-preflight.sh` | Read-only checks: registry, SSH, clock, disk, DNS. Nothing changes until this passes |
+| `10-os-baseline.sh` / `10-os-node.sh` | Copies and applies the host baseline on every node |
+| `20-ceph.sh` | cephadm bootstrap on the first MON, adds every role host with its label, applies the spec, waits for `HEALTH_OK` |
+| `30-kubespray.sh` | Runs the pinned Kubespray release from its own virtualenv, waits for every node Ready |
+| `40-addons.sh` | Installs exactly the add-ons whose values files exist; a missing chart is reported, never downloaded |
+| `50-verify.sh` | Acceptance checks: nodes, pods, metrics API, Ceph health, cert-manager, Argo CD |
+
+A user with the addresses and the registry endpoint can run `./deploy.sh --dry-run`, then
+`./deploy.sh`, and fix the phase that fails. Every phase is idempotent; re-running it is the
+recovery path. The runbook download wraps the same order in prose with the document behind each
+decision.
+
 
 **Change it, step by step**
 
@@ -121,15 +155,18 @@ requirements/            requirements, tech matrix, roadmap, validation, accepta
                          standards, performance, component-guide template
 compatibility/           version & compatibility matrix (pinned, with check dates)
 offline-artifacts/       artifact matrix, offline architecture, staging workflow
-operating-systems/       oracle-linux/ ubuntu/ distro-specific baselines
+operating-systems/       oracle-linux/ ubuntu/ distro baselines +
+                         host-configuration.md (every host input, per distro)
 automation/              ansible/ awx/ gitlab-ci/
 kubespray/               deployment guide, multi-version support, inventory and
                          group-vars templates
 kubernetes/              control-plane/ networking/ ingress/ csi/ security/
                          ingress/  nginx-ingress.md, multi-controller-plan.md
-storage/                 ceph/ rook-ceph/ alternatives/
+storage/                 ceph/ (incl. per-role node separation) rook-ceph/ alternatives/
 management-cluster/      rancher/ argocd/ keycloak/ platform-services/
 identity/                application-level directory integration (no host join)
+addons/                  platform-addons.md: cert-manager, metrics-server, VPA,
+                         descheduler, external-dns, Trivy, OpenTelemetry
 secrets-management/      vault/ (architecture + HashiCorp product decision)
                          kubernetes-integration/ pki/ recovery/
 gpu-ai/                  gpu-ai-architecture, gpu-workers/ drivers/ scheduling/

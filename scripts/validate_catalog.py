@@ -165,11 +165,12 @@ def test_step_conditions():
     opts = {x["id"]: {o["id"] for o in x["options"]} for x in c["components"]}
     for step in c["steps"]:
         when = step.get("when") or {}
-        for key, want in (when.get("component") or {}).items():
-            assert key in opts, f"step {step['id']} gates on unknown component {key}"
-            wanted = want if isinstance(want, list) else [want]
-            for v in wanted:
-                assert v in opts[key], f"step {step['id']} gates on unknown option {key}={v}"
+        for group in ("component", "component_any"):
+            for key, want in (when.get(group) or {}).items():
+                assert key in opts, f"step {step['id']} gates on unknown component {key}"
+                wanted = want if isinstance(want, list) else [want]
+                for v in wanted:
+                    assert v in opts[key], f"step {step['id']} gates on unknown option {key}={v}"
 
 
 # ---------------------------------------------------------------------------
@@ -229,15 +230,28 @@ def topology(values, choices):
             for i in range(num(values, "mgmtWorkerCount"))]
 
     storage = str(choices.get("storage", ""))
-    ceph = []
+    prefix_ceph = values.get("cephHostPrefix", "ceph")
+    roles = {"mon": [], "mgr": [], "osd": [], "mds": [], "rgw": []}
     if storage.startswith("cephadm"):
-        ceph = [{"name": f"ceph-{i + 1}", "ip": ip_add(values.get("cephIpStart", ""), i)}
-                for i in range(num(values, "cephNodeCount"))]
+        for role_id, count_key, start_key in (
+            ("mon", "cephMonCount", "cephMonIpStart"),
+            ("mgr", "cephMgrCount", "cephMgrIpStart"),
+            ("osd", "cephOsdCount", "cephOsdIpStart"),
+            ("mds", "cephMdsCount", "cephMdsIpStart"),
+            ("rgw", "cephRgwCount", "cephRgwIpStart"),
+        ):
+            for i in range(num(values, count_key)):
+                roles[role_id].append({
+                    "name": f"{prefix_ceph}-{role_id}-{i + 1}",
+                    "ip": ip_add(values.get(start_key, ""), i),
+                })
+    ceph = roles["mon"] + roles["mgr"] + roles["osd"] + roles["mds"] + roles["rgw"]
 
     edge = [{"name": f"lb-{i + 1}", "ip": ip_add(values.get("edgeIpStart", ""), i)}
             for i in range(num(values, "edgeCount"))]
 
-    return {"cp": cp, "w": workers, "gpu": gpu, "mgmt": mgmt, "ceph": ceph, "edge": edge}
+    return {"cp": cp, "w": workers, "gpu": gpu, "mgmt": mgmt, "ceph": ceph,
+            "cephRoles": roles, "edge": edge}
 
 
 def derived(data, values, choices, versions):
@@ -274,6 +288,36 @@ def derived(data, values, choices, versions):
         "mgmtHosts": host_lines(t["mgmt"]),
         "mgmtCount": str(len(t["mgmt"])),
         "cephHosts": host_lines(t["ceph"]),
+        "cephAllNames": " ".join(n["name"] for n in t["ceph"]),
+        "cephMonHosts": host_lines(t["cephRoles"]["mon"]),
+        "cephMonNames": " ".join(n["name"] for n in t["cephRoles"]["mon"]),
+        "cephMonPlacement": "\n".join(f"    - {n['name']}" for n in t["cephRoles"]["mon"]),
+        "cephMonIps": " ".join(n["ip"] for n in t["cephRoles"]["mon"]),
+        "cephMgrNames": " ".join(n["name"] for n in t["cephRoles"]["mgr"]),
+        "cephMgrPlacement": "\n".join(f"    - {n['name']}" for n in t["cephRoles"]["mgr"]),
+        "cephMgrIps": " ".join(n["ip"] for n in t["cephRoles"]["mgr"]),
+        "cephOsdHosts": host_lines(t["cephRoles"]["osd"]),
+        "cephOsdNames": " ".join(n["name"] for n in t["cephRoles"]["osd"]),
+        "cephOsdPlacement": "\n".join(f"    - {n['name']}" for n in t["cephRoles"]["osd"]),
+        "cephOsdIps": " ".join(n["ip"] for n in t["cephRoles"]["osd"]),
+        "cephMdsNames": " ".join(n["name"] for n in t["cephRoles"]["mds"]),
+        "cephMdsPlacement": "\n".join(f"    - {n['name']}" for n in t["cephRoles"]["mds"]),
+        "cephMdsIps": " ".join(n["ip"] for n in t["cephRoles"]["mds"]),
+        "cephRgwNames": " ".join(n["name"] for n in t["cephRoles"]["rgw"]),
+        "cephRgwPlacement": "\n".join(f"    - {n['name']}" for n in t["cephRoles"]["rgw"]),
+        "cephRgwIps": " ".join(n["ip"] for n in t["cephRoles"]["rgw"]),
+        "cephHostAddCmds": "\n".join(
+            f"ceph orch host add {n['name']} {n['ip']} --labels {role}"
+            for role in ("mon", "mgr", "osd", "mds", "rgw")
+            for n in t["cephRoles"][role]),
+        "nodeRows": "\n".join(
+            f"{role}\t{n['name']}\t{n['ip']}"
+            for role, lst in (("control-plane", t["cp"]), ("worker", t["w"]), ("gpu", t["gpu"]),
+                              ("management", t["mgmt"]), ("ceph-mon", t["cephRoles"]["mon"]),
+                              ("ceph-mgr", t["cephRoles"]["mgr"]), ("ceph-osd", t["cephRoles"]["osd"]),
+                              ("ceph-mds", t["cephRoles"]["mds"]), ("ceph-rgw", t["cephRoles"]["rgw"]),
+                              ("edge", t["edge"]))
+            for n in lst),
         "cephHostList": ", ".join(f"{n['name']}={n['ip']}" for n in t["ceph"]),
         "cephOtherIps": " ".join(n["ip"] for n in t["ceph"][1:]),
         "cephMonIp": t["ceph"][0]["ip"] if t["ceph"] else "",
@@ -289,7 +333,7 @@ def derived(data, values, choices, versions):
         "vrrpAuthPass": "",
         "revision": str(versions.get("istio", "")).replace(".", "-"),
         "istioProfile": "ambient" if choices.get("serviceMesh") == "istio-ambient" else "default",
-        "totalNodes": str(sum(len(v) for v in t.values())),
+        "totalNodes": str(sum(len(v) for k, v in t.items() if k != "cephRoles")),
     }
 
 
