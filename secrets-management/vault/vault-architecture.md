@@ -54,7 +54,7 @@ Break-glass unseal: Shamir key shares (3 of 5) held offline by separate custodia
 | Workload identity (K8s 1.24+ projected tokens) | Vault Kubernetes auth | Short-lived, no static SA secret |
 | Ceph RGW / RBD | Ceph-native auth keys (separate from Vault) | Ceph keys stored in Vault, distributed to Ceph at deploy time |
 
-Key point: AD integration for Linux (SSSD/realmd) does **not** automatically configure Vault, Kubernetes, or any application. Each application gets an explicit integration procedure.
+Key point: directory integration is application-level and never automatic. Vault, Kubernetes and every other service gets its own explicit OIDC or LDAP procedure — see `identity/directory-integration.md`.
 
 ## 8.4 Secret categories and storage
 

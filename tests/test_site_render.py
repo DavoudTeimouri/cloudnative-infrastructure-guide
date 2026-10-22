@@ -2,12 +2,11 @@
 """Render site/app.js against a DOM stub and assert what the page shows.
 
 A static asset check cannot catch a renderer that throws on load — that is how
-the exports object shape bug reached production once. This runs the real
-app.js in an embedded JS engine (dukpy) with a minimal DOM, then asserts the
-step list and the export cards.
+the exports shape bug reached production once. This boots the real app.js in
+dukpy (Duktape, ES5) with a minimal DOM and drives it through the wizard, the
+review page and the upgrade walkthrough.
 
-Skips with exit code 0 when dukpy is not installed, so the repository stays
-usable without it. CI installs it.
+Skips with exit code 0 when dukpy is not installed. CI installs it.
 """
 import json
 import os
@@ -25,10 +24,18 @@ function Node(tag) {
   this._text = "";
   this._html = "";
   this.className = "";
+  this.hidden = false;
+  this.disabled = false;
+  this.value = "";
+  this.checked = false;
   var self = this;
   this.classList = {
-    add: function (c) { if (self.className.indexOf(c) === -1) self.className = (self.className + " " + c).trim(); },
-    remove: function (c) { self.className = self.className.split(/\s+/).filter(function (x) { return x && x !== c; }).join(" "); },
+    add: function (c) {
+      if (self.className.indexOf(c) === -1) self.className = (self.className + " " + c).trim();
+    },
+    remove: function (c) {
+      self.className = self.className.split(/\s+/).filter(function (x) { return x && x !== c; }).join(" ");
+    },
     contains: function (c) { return self.className.split(/\s+/).indexOf(c) !== -1; }
   };
 }
@@ -37,8 +44,16 @@ Node.prototype.removeChild = function (c) {
   var i = this.children.indexOf(c);
   if (i >= 0) this.children.splice(i, 1);
 };
-Node.prototype.setAttribute = function () {};
-Node.prototype.addEventListener = function () {};
+Node.prototype.setAttribute = function (k, v) { if (k === "value") this.value = v; };
+Node.prototype.getAttribute = function (k) {
+  return (k === "data-view" || k === "value") ? this[k] : "";
+};
+Node.prototype.addEventListener = function (ev, fn) {
+  if (ev === "click") this.onclick = fn;
+  if (ev === "change") this.onchange = fn;
+  if (ev === "input") this.oninput = fn;
+};
+Node.prototype.select = function () {};
 Node.prototype.querySelector = function (sel) {
   var found = null;
   (function walk(n) {
@@ -50,8 +65,18 @@ Node.prototype.querySelector = function (sel) {
   if (!found) { found = new Node(sel); this.appendChild(found); }
   return found;
 };
+Object.defineProperty(Node.prototype, "childNodes", {
+  get: function () { return this.children; }
+});
+Object.defineProperty(Node.prototype, "firstChild", {
+  get: function () { return this.children.length ? this.children[0] : null; }
+});
 Object.defineProperty(Node.prototype, "textContent", {
-  get: function () { return this._text; },
+  get: function () {
+    var out = this._text;
+    for (var i = 0; i < this.children.length; i++) out += this.children[i].textContent;
+    return out;
+  },
   set: function (v) { this._text = String(v); }
 });
 Object.defineProperty(Node.prototype, "innerHTML", {
@@ -67,57 +92,24 @@ var document = {
     if (!__byId[id]) __byId[id] = new Node("div#" + id);
     return __byId[id];
   },
-  querySelector: function (sel) { return new Node(sel); },
+  querySelector: function (sel) { return __byId[sel] || new Node(sel); },
+  querySelectorAll: function () { return []; },
   body: new Node("body"),
   documentElement: new Node("html")
 };
 var navigator = {};
-"""
-
-HARNESS_TAIL = r"""
-function countSteps() { return __byId["steps"].children.length; }
-function stepTitles() {
-  return __byId["steps"].children.map(function (li) {
-    var t = "";
-    li.children.forEach(function (c) { if (c.className === "step-title") t = c.textContent; });
-    return t;
-  });
-}
-function visibleExports() {
-  return __byId["exports"].children.filter(function (c) {
-    return c.className.indexOf("hidden") === -1;
-  }).map(function (c) {
-    var name = "", file = "";
-    c.children.forEach(function (x) {
-      if (x.tagName === "h4" && !name) name = x.textContent;
-      if (x.className === "fname" && !file) file = x.textContent;
-    });
-    return { name: name, file: file };
-  });
-}
-function exportBody(id) {
-  var found = null;
-  __byId["exports"].children.forEach(function (c) {
-    if (c.className.indexOf("hidden") === -1 && !found) {
-      c.children.forEach(function (x) {
-        if (x.tagName === "pre" && !found) found = x.textContent;
-      });
-    }
-  });
-  return found || "";
-}
-function versionsCount() { return __byId["versions"].querySelector("tbody").children.length; }
-
-__boot(DATA);
-
-var result = {
-  steps: countSteps(),
-  titles: stepTitles(),
-  exports: visibleExports(),
-  versions: versionsCount(),
-  summary: __byId["plan-summary"].textContent,
-  unresolved: (exportBody() .match(/\{\{/g) || []).length
+var window = {
+  location: { hash: "" },
+  addEventListener: function () {},
+  scrollTo: function () {}
 };
+/* The page's fetch bootstrap is replaced by an explicit boot() call below. */
+function fetch() {
+  var noop = { then: function () { return noop; }, "catch": function () { return noop; } };
+  return noop;
+}
+function Blob() {}
+function URL() {}
 """
 
 
@@ -125,21 +117,101 @@ def run(data):
     import dukpy
 
     app = open(APP, encoding="utf-8").read()
-    marker = '  fetch("data.json")'
-    idx = app.find(marker)
-    if idx == -1:
-        raise AssertionError("app.js no longer ends with the fetch bootstrap; update the test")
-    app = app[:idx] + "  __boot = boot;\n})();\n"
+    js = DOM_SHIM + "var DATA = " + json.dumps(data) + ";\n" + app + r"""
+var __g = window.__guide;
+__g.boot(DATA);
 
-    js = (
-        DOM_SHIM
-        + "var DATA = " + json.dumps(data) + ";\n"
-        + "var __boot = null;\n"
-        + app
-        + HARNESS_TAIL
-        + "JSON.stringify(result);"
-    )
-    return json.loads(dukpy.evaljs(js))
+function texts(list) {
+  var out = [];
+  for (var i = 0; i < list.length; i++) out.push(list[i].textContent);
+  return out;
+}
+function filenames() {
+  var out = [];
+  var cards = __byId["exports"].children;
+  for (var i = 0; i < cards.length; i++) {
+    var kids = cards[i].children;
+    for (var j = 0; j < kids.length; j++) {
+      if (kids[j].className === "fname") out.push(kids[j].textContent);
+    }
+  }
+  return out;
+}
+function exportBodies() {
+  var out = [];
+  var cards = __byId["exports"].children;
+  for (var i = 0; i < cards.length; i++) {
+    var kids = cards[i].children;
+    for (var j = 0; j < kids.length; j++) {
+      if (kids[j].tagName === "pre") out.push(kids[j].textContent);
+    }
+  }
+  return out;
+}
+
+var page1 = __byId["page"].textContent;
+__g.gotoPage(1);
+var page2 = __byId["page"].textContent;
+__g.gotoPage(7);
+__g.renderReview();
+
+var base = {
+  pages: DATA.pages.length,
+  page1HasMethod: page1.indexOf("Bare metal") !== -1,
+  page2HasNodes: page2.indexOf("k8s-cp-1") !== -1 && page2.indexOf("10.20.0.11") !== -1,
+  reviewSteps: __byId["steps"].children.length,
+  reviewExports: __byId["exports"].children.length,
+  files: filenames(),
+  sizingRows: __byId["sizing"].querySelector("tbody").children.length,
+  versions: __byId["versions"].querySelector("tbody").children.length,
+  runbook: __g.buildRunbook()
+};
+
+// Flip the interesting selections and re-render.
+__g.state.choices.gpu = "mig";
+__g.state.choices.storage = "cephadm-docker";
+__g.state.choices.serviceMesh = "istio-ambient";
+__g.state.choices.idpIntegration = ["keycloak-federation", "harbor-oidc"];
+__g.renderReview();
+
+var flipped = {
+  files: filenames(),
+  reviewSteps: __byId["steps"].children.length,
+  bodiesJoined: exportBodies().join("\n"),
+  derived: __g.derived()
+};
+
+// Upgrade walkthrough.
+__g.renderUpgrade();
+var upFirst = __byId["upgrade-body"].textContent;
+__g.state.upgrade.flow = "kubernetes";
+__g.renderUpgrade();
+var upK8s = __byId["upgrade-body"].textContent;
+var upRunbook = __g.buildUpgradeRunbook();
+
+JSON.stringify({
+  base: { pages: base.pages, page1HasMethod: base.page1HasMethod, page2HasNodes: base.page2HasNodes,
+          reviewSteps: base.reviewSteps, reviewExports: base.reviewExports, files: base.files,
+          sizingRows: base.sizingRows, versions: base.versions,
+          runbookLeftovers: (base.runbook.match(/\{\{/g) || []).length,
+          runbookHasSizing: base.runbook.indexOf("## Sizing") !== -1 },
+  flipped: { files: flipped.files, reviewSteps: flipped.reviewSteps,
+             hasCephDocker: flipped.bodiesJoined.indexOf("--docker") !== -1,
+             hasCephHost: flipped.bodiesJoined.indexOf("ceph-1") !== -1,
+             hasIstio: flipped.bodiesJoined.indexOf("PeerAuthentication") !== -1,
+             hasIdp: flipped.bodiesJoined.indexOf("Keycloak — LDAP/AD user federation") !== -1,
+             engine: flipped.derived.cephEngine,
+             gpuNodes: flipped.derived.gpuHostList },
+  upgrade: { firstSteps: upFirst.split("gate").length - 1,
+             k8sHasCommand: upK8s.indexOf("ansible-playbook") !== -1,
+             k8sHasGate: upK8s.indexOf("gate") !== -1,
+             runbookLeftovers: (upRunbook.match(/\{\{/g) || []).length,
+             runbookHasRollback: upRunbook.indexOf("Rollback:") !== -1 }
+});
+"""
+
+    raw = dukpy.evaljs(js)
+    return json.loads(raw)
 
 
 def main():
@@ -150,39 +222,60 @@ def main():
         return 0
 
     data = json.load(open(DATA, encoding="utf-8"))
+    result = run(data)
     failures = []
 
-    base = run(data)
+    base = result["base"]
     expected_steps = len([s for s in data["steps"] if not s.get("when")])
-    if base["steps"] != expected_steps:
-        failures.append(f"default steps: expected {expected_steps}, got {base['steps']}")
-    if any("Istio" in t for t in base["titles"]):
-        failures.append("mesh step visible with the default (no mesh) selection")
-    if base["unresolved"]:
-        failures.append("unresolved template placeholders in the first visible export")
+    if base["pages"] != len(data["pages"]):
+        failures.append(f"pages: expected {len(data['pages'])}, got {base['pages']}")
+    if not base["page1HasMethod"]:
+        failures.append("page 1 does not render the deployment methods")
+    if not base["page2HasNodes"]:
+        failures.append("page 2 does not render the generated node list")
+    if base["reviewSteps"] != expected_steps:
+        failures.append(f"default steps: expected {expected_steps}, got {base['reviewSteps']}")
+    if not base["sizingRows"]:
+        failures.append("sizing table is empty")
     if base["versions"] < 5:
         failures.append(f"version table too short: {base['versions']}")
-    print(f"OK   default render: {base['steps']} steps, {len(base['exports'])} exports, {base['versions']} versions")
+    if base["runbookLeftovers"]:
+        failures.append(f"runbook has {base['runbookLeftovers']} unresolved placeholders")
+    if not base["runbookHasSizing"]:
+        failures.append("runbook has no sizing section")
+    if not base["files"]:
+        failures.append("no export cards rendered")
 
-    # Switch the mesh on by making it the default option, then boot again.
-    mesh_data = json.loads(json.dumps(data))
-    for comp in mesh_data["components"]:
-        if comp["id"] == "serviceMesh":
-            for opt in comp["options"]:
-                opt["default"] = opt["id"] == "istio-ambient"
-    mesh = run(mesh_data)
-    if not any("Istio" in t for t in mesh["titles"]):
-        failures.append("mesh step missing when the mesh is selected")
-    files = {e["file"] for e in mesh["exports"]}
-    for wanted in ("istio-operator.yaml", "peer-authentication.yaml", "istio-gateway.yaml"):
-        if wanted not in files:
-            failures.append(f"mesh export missing: {wanted}")
-    print(f"OK   mesh render: {mesh['steps']} steps, {len(mesh['exports'])} exports")
+    flipped = result["flipped"]
+    for wanted in ("ceph-bootstrap.sh", "peer-authentication.yaml", "idp-integration.md"):
+        if wanted not in flipped["files"]:
+            failures.append(f"selection change did not reveal {wanted}")
+    if flipped["engine"] != "docker":
+        failures.append(f"ceph engine: expected docker, got {flipped['engine']}")
+    if not flipped["hasCephDocker"]:
+        failures.append("ceph bootstrap does not carry --docker")
+    if not flipped["hasIstio"]:
+        failures.append("istio policy body missing after selecting the mesh")
+    if not flipped["hasIdp"]:
+        failures.append("idp checklist does not list the selected integration")
+    if flipped["reviewSteps"] <= base["reviewSteps"]:
+        failures.append("selecting mesh/gpu/idp did not add steps")
 
-    # No mesh: the Istio cards must be absent.
-    if any(e["file"].startswith("istio") or e["file"] == "peer-authentication.yaml"
-           for e in base["exports"]):
-        failures.append("Istio exports visible while the mesh is off")
+    up = result["upgrade"]
+    if up["runbookLeftovers"]:
+        failures.append(f"upgrade runbook has {up['runbookLeftovers']} unresolved placeholders")
+    if not up["k8sHasCommand"]:
+        failures.append("kubernetes flow does not render its command")
+    if not up["k8sHasGate"]:
+        failures.append("kubernetes flow lost its gate marker")
+    if not up["runbookHasRollback"]:
+        failures.append("upgrade runbook has no rollback line")
+
+    print(f"OK   base: {base['pages']} pages, {base['reviewSteps']} steps, "
+          f"{len(base['files'])} files, {base['sizingRows'] - 2} sizing rows")
+    print(f"OK   flipped: {len(flipped['files'])} files, engine {flipped['engine']}, "
+          f"gpu {flipped['gpuNodes'] or 'none'}")
+    print(f"OK   upgrade: {len(data['upgrades'])} flows, first gate markers {up['firstSteps']}")
 
     if failures:
         for f in failures:

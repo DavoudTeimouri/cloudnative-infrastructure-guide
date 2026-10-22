@@ -53,8 +53,8 @@ Effort is engineering days for one engineer, excluding hardware lead time and ne
 | | |
 |---|---|
 | Prerequisites | Phase 4 automation + inventories; internal package repos configured |
-| Deliverables | `operating-systems/oracle-linux/*`, `operating-systems/ubuntu/*`: repo config, sysctl, security baselines, SSSD/realmd, TLS trust, monitoring/logging agents |
-| Acceptance | Provisioned host from bare metal to a hardened, domain-joined, monitored node with one Ansible run; `ansible all -m setup` idempotent (0 changed on second run); SSSD login works; break-glass local account works; `auditd`/journald shipping verified; package install works with no internet |
+| Deliverables | `operating-systems/oracle-linux/*`, `operating-systems/ubuntu/*`: repo config, sysctl, security baselines, local accounts and break-glass access, TLS trust, monitoring/logging agents |
+| Acceptance | Provisioned host from bare metal to a hardened, monitored node with one Ansible run; `ansible all -m setup` idempotent (0 changed on second run); break-glass local account works with the directory unreachable; `auditd`/journald shipping verified; package install works with no internet |
 | Risks | SELinux/AppArmor blocking container runtime; AppArmor profile mismatch on Ubuntu; documented per-distro |
 | Effort | 12-20 d |
 | Rollback | Re-run playbook; hosts rebuildable from PXE/ISO + Ansible |

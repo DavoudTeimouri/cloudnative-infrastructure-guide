@@ -1,40 +1,51 @@
 # Interactive guide site
 
-A static site, published from this repository, that turns the documents into a step-by-step
-build plan for one specific cluster.
+A static site, published from this repository, that turns the documents into a configurable build
+plan and a per-component upgrade walkthrough.
 
 - **Live:** <https://davoudteimouri.github.io/cloudnative-infrastructure-guide/>
-- **Source:** `site/` (markup, style, renderer) + `site/data.json` (generated)
+- **Source:** `site/index.html`, `site/app.js`, `site/styles.css` (hand-written) and `site/data.json` (generated)
+- **Data model:** `catalog/catalog.json`, `catalog/exports.json`, `catalog/upgrades.json`
 - **Builder:** `scripts/build_site.py`
-- **Validator:** `scripts/validate_catalog.py`
+- **Validators:** `scripts/validate_catalog.py`, `tests/test_site_render.py`
 - **CI:** `.github/workflows/site.yml`
 
 ## What it does
 
-| Function | Behavior |
+The configurator is a wizard. One page per group, then a review page, then a separate upgrade
+walkthrough.
+
+| Page | Inputs |
 |---|---|
-| Deployment method | Bare metal or virtual machines. Selecting one shows its requirements and failure-domain caveats |
-| Cluster method and release | Kubespray, five releases in parallel; the release list and the pinned Kubernetes/etcd/containerd/Ansible versions come from the catalog and the version matrix |
-| Components | Every component has a fixed option set. Selecting an option changes the plan, the version table and the exports. Optional components (GPU, logging, service mesh, directory, runtime detection) can be switched off |
-| Service mesh | Off by default. Selecting Istio (sidecar or ambient) adds the mesh step, the IstioOperator, the mTLS/authorization policies and the Gateway API route |
-| Site values | CIDRs, hostnames, node names, endpoints. Rendered locally. Nothing is transmitted |
-| Plan | Ordered steps, filtered by the selection, each linking to the authoritative document |
-| Resolved versions | Only rows marked `VERIFIED` in `compatibility/version-matrix.md` |
-| Exports | Kubespray inventory, group vars, offline group vars, MetalLB pool, Keepalived config, edge Compose stack, Vault policy, GPU labels, vLLM Deployment, runbook |
-| Upgrades | A separate section, ordered per component, with the rollback limitation stated where one exists |
+| 1. Deployment | Bare metal or VM, cluster name, environment, domain |
+| 2. Application cluster | Control-plane count, worker count, GPU count, vCPU/RAM/disk per role, node prefix, first address |
+| 3. Management cluster | Its own worker count and sizes, Rancher, Keycloak, directory integrations (multi-select) |
+| 4. Operating system | Oracle Linux 9/8, Ubuntu 24.04/22.04, CA bundle path |
+| 5. Storage | Rook in-cluster, or cephadm on Podman or Docker, with Ceph host count and disks |
+| 6. Traffic | Edge count and VIP, MetalLB pool, DMZ CIDR, VRRP pass phrase, ingress controller |
+| 7. Network and offline | Seven CIDRs, API VIP, registry and file mirror, extra registries and repos |
+| 8. Platform services | GitOps, secrets, observability, logging, policy, runtime detection, backup, mesh, GPU |
 
-Two rules make the output honest:
+Everything else is derived. Node names and addresses come from the prefix, the counts and the first
+address (`<prefix>-cp-N`, `<prefix>-w-N`, `<prefix>-gpu-N`, `<prefix>-mgmt-N`, `ceph-N`, `lb-N`), so
+the inventories, the Keepalived peers, the Ceph host list and the sizing table cannot disagree with
+the counts.
 
-1. The site carries **no independent knowledge**. Every statement comes from a document, the
-   catalog, or the version matrix.
-2. A step is a **reading order**, not a script. The linked document is the authority, and the
-   generated files are starting points that must be reviewed.
+| Output | Where it appears |
+|---|---|
+| Sizing totals | Review page, and the runbook |
+| Resolved versions | Review page (VERIFIED rows only) and every export |
+| Filtered implementation steps | Review page, links to the authoritative document |
+| Generated files | Review page: both inventories, Kubespray group vars, cephadm bootstrap and spec, MetalLB, Keepalived, edge Compose, bootstrap scripts, Istio manifests, Vault policy, GPU manifests, directory checklist |
+| Runbook | Download button, full plan plus sizing and upgrade summary |
+| Upgrade walkthrough | Upgrade view: gates, commands rendered against your values, downtime, rollback |
 
 ## How it stays current
 
 ```
-catalog/catalog.json            components, options, steps, values, upgrade sections
-catalog/exports.json            export templates with {{placeholders}}
+catalog/catalog.json            pages, components, options, values, steps
+catalog/exports.json            export templates and their gates
+catalog/upgrades.json           upgrade flows, gates, commands, rollback
 compatibility/version-matrix.md pinned versions, VERIFIED rows only
                 │
                 ▼
@@ -46,99 +57,130 @@ compatibility/version-matrix.md pinned versions, VERIFIED rows only
 
 | Change | What you edit | What updates |
 |---|---|---|
-| A version bump | `compatibility/version-matrix.md` | Every place the site shows that version, on the next build. No catalog edit |
-| A new component or option | `catalog/catalog.json` | The form, the plan, the version table |
-| A new step or phase | `catalog/catalog.json` | The plan and the runbook export |
-| A renamed document | `catalog/catalog.json` **and** the file | The build fails until both agree — `validate_catalog.py` checks that every referenced path exists |
-| A new exportable file | `catalog/exports.json` | A new card in the export section, downloadable immediately |
-| A document rewrite | nothing on the site | The site links to the document; the text lives in one place only |
+| A version bump | `compatibility/version-matrix.md` | Every place that version appears, on the next build |
+| A new page, component or option | `catalog/catalog.json` | The wizard, the review, the exports |
+| A new exportable file | `catalog/exports.json` | A new card, downloadable immediately |
+| An upgrade step or gate | `catalog/upgrades.json` | The walkthrough and its runbook |
+| A renamed document | the catalog **and** the file | The build fails until both agree |
+| A document rewrite | nothing | The site links to the document; text lives in one place |
 
-The build is deterministic. `build_site.py --check` fails when `site/data.json` no longer
-matches the sources, so a stale site cannot be merged.
+`build_site.py --check` fails when `site/data.json` no longer matches the sources, so a stale site
+cannot be merged.
 
-## Step by step: use the site
+## Data contract
 
-1. Open the live URL.
-2. Pick the **deployment method**. Read the requirements before continuing: the VM option lists
-   the caveats that change the failure domain.
-3. Pick the **cluster method and release**. Confirm the pinned Kubernetes version is the one you
-   intend to run; the other releases stay visible for comparison.
-4. Walk the **components**. Required components have no "none" option. Options that carry a
-   warning show it inline — read it before selecting.
-5. Fill the **site values**. Leave the two secret fields empty if you prefer to set them on the
-   target host; they are never transmitted.
-6. Read the **plan** top to bottom. Open each referenced document. The plan does not replace the
-   document.
-7. Download the **exports** you need. Review every file: image tags, paths, interface names and
-   the registry host are placeholders resolved from your input, not validated against your site.
-8. Download the **runbook** and attach it to the change record.
-9. Before any version change, read the **upgrades** section. Kubernetes and Ceph have no
-   rollback; the backup is the rollback.
-
-## Step by step: change the site
-
-```bash
-# 1. Edit the catalog, the export templates or the version matrix.
-# 2. Regenerate the data.
-python3 scripts/build_site.py
-
-# 3. Validate: missing documents, unknown placeholders, stale data.
-python3 scripts/validate_catalog.py
-
-# 4. Preview locally.
-python3 -m http.server 8080 --directory site
-#    http://localhost:8080
-
-# 5. Commit both the source and the generated data.
-git add catalog/ compatibility/version-matrix.md site/data.json
-git commit -m "site: <what changed>"
-```
-
-The CI job runs the same two scripts and fails when `site/data.json` is stale.
-
-## Adding a component
-
-Add one entry to `catalog/catalog.json`:
+### Component
 
 ```json
 {
-  "id": "backup",
-  "title": "Backup",
+  "id": "storage",
+  "title": "Storage",
   "required": true,
   "options": [
-    { "id": "velero", "title": "Velero with CSI snapshots", "default": true,
-      "versionKey": "velero", "doc": "lifecycle/backup/backup-and-dr.md" }
+    { "id": "rook", "title": "Rook-Ceph inside the cluster", "default": true,
+      "versionKey": "rook", "doc": "storage/rook-ceph/rook-ceph.md" },
+    { "id": "cephadm-podman", "title": "cephadm on dedicated hosts — Podman",
+      "versionKey": "ceph", "doc": "storage/ceph/cephadm-deployment.md" }
   ]
 }
 ```
 
-Rules the validator enforces:
+- exactly one option carries `"default": true` (`multi: true` components need at least one)
+- `versionKey` must resolve in the version matrix, otherwise the version is absent from the page
+- `doc` must exist, or the build fails
+- `warning` renders inline; `note` renders below the title
 
-- exactly one option carries `"default": true`
-- every `doc` path exists
-- every `versionKey` resolves to a `VERIFIED` row in the version matrix
-- every `when.component` condition names a real component id
+### Value
 
-## Adding an export
+`type` is `text`, `number`, `select`, or `lines` (textarea, one entry per line). `secret: true`
+renders a password field and is only ever written into the file the operator downloads.
 
-Add one entry to `catalog/exports.json`. Placeholders:
+### Page
+
+```json
+{ "id": "p5", "title": "Storage", "subtitle": "…",
+  "components": ["storage"],
+  "fields": ["cephNodeCount", "cephIpStart", "cephCpu", "cephMemGb", "cephDataDiskGb", "cephJournalDiskGb"] }
+```
+
+Every component and every value must appear on exactly one page — the validator enforces coverage,
+so a value cannot be added and then silently dropped from the UI.
+
+### Export
+
+```json
+{
+  "id": "ceph-bootstrap",
+  "component": "storage",
+  "when": { "component": "storage", "values": ["cephadm-podman", "cephadm-docker"] },
+  "filename": "ceph-bootstrap.sh",
+  "template": "… {{cephHostList}} … {{cephEngineFlag}} …"
+}
+```
+
+`when` gates the card on selected option ids (any of them). Without `when`, `component` gates on
+"not `none`".
+
+### Upgrade flow
+
+```json
+{
+  "id": "kubernetes",
+  "title": "Kubernetes and Kubespray",
+  "doc": "lifecycle/upgrades/upgrade-procedures.md",
+  "versionSource": "kubespray",
+  "downtime": "…", "rollback": "None. The restore path is the backup.",
+  "steps": [
+    { "phase": "1. Gate", "title": "…", "gate": true,
+      "actions": ["…"], "command": "ansible-playbook … -e kube_version={{version.kubernetes}}" }
+  ]
+}
+```
+
+Every flow needs at least one `gate`. The validator enforces that, because a flow without a gate
+invites an upgrade with no verification point.
+
+## Placeholders
 
 | Placeholder | Source |
 |---|---|
 | `{{value.<id>}}` | a field in `catalog.json` → `values` |
-| `{{choice.<component>}}` | the selected option id of that component |
+| `{{choice.<component>}}` | the selected option id (a comma list for multi-select) |
 | `{{version.<key>}}` | the resolved version matrix |
-| `{{controlPlaneNodes}}`, `{{workerNodes}}`, `{{gpuNodeGroup}}` | derived from the node-name fields |
+| `{{appCpHosts}}`, `{{appWorkerHosts}}`, `{{gpuHosts}}`, `{{gpuGroup}}` | generated from the counts |
+| `{{mgmtHosts}}`, `{{cephHosts}}`, `{{cephHostList}}`, `{{cephMonIp}}`, `{{cephOtherIps}}` | generated |
+| `{{edgeHosts}}`, `{{edgeHostList}}`, `{{edgeL1}}`, `{{edgePeerList}}` | generated |
+| `{{cephEngine}}`, `{{cephEngineFlag}}` | `podman` / `docker` and `''` / `--docker` |
+| `{{idpTargets}}` | one bullet per selected directory integration |
+| `{{extraRegistryMirrors}}` | YAML block from the extra-registries field |
+| `{{revision}}`, `{{istioProfile}}` | Istio revision (`1.31.3` → `1-31-3`) and ambient/default |
 | `{{registryAuth}}`, `{{vrrpAuthPass}}` | the two secret fields, rendered locally only |
 
-Keep templates flat. Loops and conditionals belong in the renderer (`site/app.js`), not in the
-template, because a static JSON file cannot be tested as code.
+Keep templates flat. Loops and conditionals belong in `site/app.js`, because a JSON string cannot
+be tested as code.
+
+## Adding an upgrade flow
+
+1. Add the section to `lifecycle/upgrades/upgrade-procedures.md` — that document is the authority.
+2. Add the flow to `catalog/upgrades.json` with the same order, the same gates, and the true
+   rollback statement.
+3. `python3 scripts/build_site.py && python3 scripts/validate_catalog.py && python3 tests/test_site_render.py`
+4. Commit the catalog and `site/data.json`.
 
 ## Design constraints
 
-- **No build toolchain.** The site is plain HTML, CSS and JavaScript. It works from a file
-  system, from Pages, and from an internal mirror with no network.
-- **No dependency on a CDN.** No fonts, no analytics, no third-party scripts. It must render in
-  an air-gapped environment.
-- **No server.** No API, no telemetry, no storage. Values stay in the browser tab.
+- **ES5 only.** `tests/test_site_render.py` runs `app.js` in Duktape: no `let`/`const`, no arrow
+  functions, no template literals.
+- **No build toolchain, no CDN, no server.** Plain HTML/CSS/JS, works from the file system and from
+  an internal mirror with no network.
+- **No telemetry, no storage.** Values stay in the browser tab.
 - **One source of truth.** The site never holds a fact the repository does not hold.
+
+## Verify
+
+```bash
+python3 scripts/build_site.py
+python3 scripts/validate_catalog.py      # docs exist, placeholders resolve, pages cover everything
+python3 tests/test_site_render.py        # boots app.js, walks the wizard, flips selections, renders upgrades
+python3 -m http.server 8080 --directory site
+```

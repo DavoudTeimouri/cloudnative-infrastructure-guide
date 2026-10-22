@@ -1,0 +1,124 @@
+{
+  "note": "Upgrade walkthroughs. One flow per component. The site renders the steps in order for the selected flow, resolves the version placeholders from the version matrix, and lets the operator download a runbook. Order is the contract: a step marked gate must pass before the next one starts.",
+  "flows": [
+    {
+      "id": "kubernetes",
+      "title": "Kubernetes and Kubespray",
+      "component": "controlPlane",
+      "doc": "lifecycle/upgrades/upgrade-procedures.md",
+      "versionSource": "kubespray",
+      "downtime": "Control plane rolls one node at a time. Workloads keep running if PodDisruptionBudgets exist; without them, expect pod restarts.",
+      "rollback": "None. Kubernetes does not support downgrade. The restore path is the backup taken in step 1.",
+      "steps": [
+        { "phase": "1. Gate", "title": "Confirm compatibility and mirror the target artifacts", "gate": true, "actions": ["Target release is in the supported set (five releases, release-2.28 .. release-2.32)", "Target Kubernetes minor is exactly one above the current one", "Kubelet, kube-proxy, CoreDNS, etcd and the CNI versions are compatible with the target", "Every image and binary for the target is mirrored and pull-verified"], "command": "python3 scripts/kubespray_release_matrix.py release-2.28 release-2.29 release-2.30 release-2.31 release-2.32" },
+        { "phase": "1. Gate", "title": "Back up etcd and the cluster state", "gate": true, "actions": ["Snapshot etcd on every control-plane node", "Export the current inventory and group vars", "Record the current versions for the rollback comparison"], "command": "ETCDCTL_API=3 etcdctl --endpoints=https://127.0.0.1:2379 \\\n  --cacert=/etc/kubernetes/pki/etcd/ca.crt \\\n  --cert=/etc/kubernetes/pki/etcd/server.crt \\\n  --key=/etc/kubernetes/pki/etcd/server.key \\\n  snapshot save /backup/etcd-$(date +%F-%H%M).db" },
+        { "phase": "2. Prepare", "title": "Create the target release's environment", "actions": ["Check out the target Kubespray release into its own directory", "Create its own virtualenv with its pinned Ansible", "Copy the inventory and re-apply the site group vars", "Never reuse the previous release's virtualenv"], "command": "git -C /opt/kubespray clone --branch release-2.32 --depth 1 \\\n  https://github.com/kubernetes-sigs/kubespray /opt/kubespray/release-2.32\npython3 -m venv /opt/kubespray/venv-release-2.32\n/opt/kubespray/venv-release-2.32/bin/pip install -r /opt/kubespray/release-2.32/requirements.txt" },
+        { "phase": "3. Execute", "title": "Run the upgrade playbook", "actions": ["Run cluster.yml from the target release against the existing inventory", "Watch the control plane first, then the workers, one node at a time", "Stop at the first failed task; do not re-run blindly"], "command": "cd /opt/kubespray/release-2.32 && \\\n/opt/kubespray/venv-release-2.32/bin/ansible-playbook -i /opt/kubespray/inventory/prod-staging/hosts.ini \\\n  -b --become-user=root cluster.yml -e kube_version={{version.kubernetes}}" },
+        { "phase": "4. Verify", "title": "Validate before moving the next minor", "gate": true, "actions": ["All nodes report the target version and Ready", "etcd members are healthy and the leader is stable", "CNI and CoreDNS pods are running on the new version", "A test workload schedules, pulls an image and answers a request"], "command": "kubectl get nodes -o wide\nkubectl -n kube-system get pods\nkubectl -n kube-system exec etcd-<node> -- etcdctl endpoint health --cluster" },
+        { "phase": "5. Close", "title": "Record the new binding", "actions": ["Update the inventory's kubespray-release marker", "Update the version matrix check date", "Keep the previous release directory until the next upgrade succeeds"] }
+      ]
+    },
+    {
+      "id": "ceph",
+      "title": "Ceph (Rook or cephadm)",
+      "component": "storage",
+      "doc": "lifecycle/upgrades/upgrade-procedures.md",
+      "downtime": "No client downtime if the pools are healthy and one OSD at a time is drained.",
+      "rollback": "None across a major version. Downgrade within a minor is unsupported; the restore path is the backup.",
+      "steps": [
+        { "phase": "1. Gate", "title": "Health and capacity check", "gate": true, "actions": ["ceph status is HEALTH_OK, not HEALTH_WARN", "No degraded or backfilling placement groups", "At least 25% free capacity in every pool", "The Rook release supports the target Ceph version"], "command": "ceph -s\nceph df\nceph osd tree" },
+        { "phase": "1. Gate", "title": "Back up the cluster configuration", "gate": true, "actions": ["Export the CRUSH map", "Export the auth database", "Snapshot the monitors' store (or the Rook config ConfigMap)"], "command": "ceph osd getcrushmap -o /backup/crushmap.bin\nceph auth export -o /backup/auth.keyring\nceph config dump > /backup/ceph-config.json" },
+        { "phase": "2. Control", "title": "Upgrade the orchestrator first", "actions": ["Rook: upgrade the operator, then CephCluster.spec.cephVersion", "cephadm: run ceph orch upgrade start --ceph-version <target>", "One daemon type at a time; wait for HEALTH_OK between types"], "command": "helm upgrade rook-ceph rook-release/rook-ceph -n rook-ceph \\\n  --version {{version.rook}} -f values.yaml\nkubectl -n rook-ceph patch cephcluster rook-ceph --type merge \\\n  -p '{\"spec\":{\"cephVersion\":{\"image\":\"{{value.registryHost}}/ceph/ceph:{{version.ceph}}\"}}}'" },
+        { "phase": "3. Data path", "title": "Watch the daemons converge", "actions": ["MONs first, then MGR, MDS, RGW, then OSDs", "Do not start a second upgrade while a daemon is still restarting", "Confirm each type reaches HEALTH_OK before the next"], "command": "ceph orch ps --daemon-type mon\nceph orch ps --daemon-type osd\nwatch -n 10 ceph -s" },
+        { "phase": "4. Verify", "title": "Prove the data path works", "gate": true, "actions": ["Write and read a test object through RGW", "Mount a CephFS volume and read a file", "Create a PVC and confirm it binds", "Run a CSI snapshot and restore"], "command": "rados -p rbd bench 10 write --no-cleanup\nkubectl -n {{value.appNamespace}} get pvc" }
+      ]
+    },
+    {
+      "id": "istio",
+      "title": "Istio",
+      "component": "serviceMesh",
+      "doc": "service-mesh/istio/istio-deployment.md",
+      "versionSource": "istio",
+      "downtime": "No data-plane downtime with a revision-based canary. Sidecar mode restarts pods as namespaces move.",
+      "rollback": "Available only while the old revision is installed: move the namespace label back. No downgrade.",
+      "steps": [
+        { "phase": "1. Gate", "title": "Confirm the version window and mirror the images", "gate": true, "actions": ["Target minor is one above the current one", "The Kubernetes minor is inside the target Istio's support window", "Every image for the new revision is mirrored"], "command": "istioctl version\nistioctl manifest generate --revision {{revision}} -f istio-operator.yaml | grep -E 'image: '" },
+        { "phase": "2. Control plane", "title": "Install the new revision alongside the old one", "actions": ["Install with a revision name derived from the version", "Both control planes run simultaneously", "Do not remove the old revision yet"], "command": "istioctl install --revision={{revision}} -f istio-operator.yaml\nkubectl -n istio-system get pods -l istio.io/rev={{revision}}" },
+        { "phase": "3. Data plane", "title": "Move namespaces one at a time", "actions": ["Change the injection label to the new revision", "Restart the workloads in that namespace only", "Watch error rate and latency for one business cycle before the next namespace"], "command": "kubectl label namespace {{value.appNamespace}} istio.io/rev={{revision}} --overwrite\nkubectl rollout restart deployment -n {{value.appNamespace}}" },
+        { "phase": "4. Verify", "title": "Prove mTLS and policy still apply", "gate": true, "actions": ["istioctl analyze reports no errors", "A negative authorization test is still denied", "Proxy version matches the new revision"], "command": "istioctl analyze -A\nistioctl proxy-status" },
+        { "phase": "5. Close", "title": "Remove the old revision", "actions": ["Only after every namespace has moved", "Keep the old IstioOperator file in Git for reference", "Record the new revision in the upgrade log"], "command": "istioctl uninstall --revision=<old-revision>" }
+      ]
+    },
+    {
+      "id": "edge",
+      "title": "Edge load balancer",
+      "component": "edge",
+      "doc": "network-matrix/external-load-balancer.md",
+      "downtime": "None if the VIP moves cleanly. One node at a time, draining first.",
+      "rollback": "Revert the image tag in the Compose file and recreate the stack on the same node.",
+      "steps": [
+        { "phase": "1. Gate", "title": "Confirm the standby can hold the VIP", "gate": true, "actions": ["VRRP state on both nodes is BACKUP/MASTER as expected", "Health checks are passing on both", "The target image is mirrored and pullable"], "command": "docker compose ps\nip -br addr show | grep {{value.edgeVip}}\nkeepalived --version" },
+        { "phase": "2. Drain", "title": "Move traffic off one node", "actions": ["Lower the VRRP priority or stop keepalived on the node being upgraded", "Confirm the VIP moved and sessions drained", "Upgrade the node that no longer holds the VIP"], "command": "systemctl stop keepalived\nip -br addr show | grep {{value.edgeVip}} || echo 'VIP moved'" },
+        { "phase": "3. Upgrade", "title": "Update the stack on that node", "actions": ["Update the image tags in the Compose file", "docker compose pull, then up -d", "Confirm the health endpoint answers locally"], "command": "cd /opt/edge && docker compose pull && docker compose up -d\ndocker compose ps\ncurl -fsS -o /dev/null -w '%{http_code}\\n' https://{{value.edgeVip}}/healthz" },
+        { "phase": "4. Repeat", "title": "Fail back and upgrade the second node", "actions": ["Start keepalived on the first node and confirm it takes the VIP back", "Repeat steps 2 and 3 on the second node", "Both nodes end on the same image tag"], "command": "systemctl start keepalived\nip -br addr show | grep {{value.edgeVip}}" },
+        { "phase": "5. Verify", "title": "End-to-end check through the VIP", "gate": true, "actions": ["TLS chain is valid through the VIP", "Backend health is green in the stats page", "VRRP state is stable with no flapping in the logs"], "command": "curl -sSI https://{{value.edgeVip}}/ | head -3\njournalctl -u keepalived --since '10 min ago' | grep -i state" }
+      ]
+    },
+    {
+      "id": "gpu",
+      "title": "GPU operator, driver and CUDA",
+      "component": "gpu",
+      "doc": "gpu-ai/drivers/compatibility-matrix.md",
+      "downtime": "The drained GPU node only. Inference capacity drops while the node is out.",
+      "rollback": "Reinstall the previous driver and operator versions on the drained node before uncordoning.",
+      "steps": [
+        { "phase": "1. Gate", "title": "Check the compatibility chain", "gate": true, "actions": ["Driver branch supports the target CUDA", "GPU Operator version supports the driver branch", "Every image is mirrored"], "command": "kubectl get pods -n gpu-operator\nnvidia-smi" },
+        { "phase": "2. Drain", "title": "Cordon and drain one GPU node", "actions": ["Cordon the node", "Drain with --ignore-daemonsets and --delete-emptydir-data", "Confirm no inference pod is still running there"], "command": "kubectl cordon {{value.nodePrefix}}-gpu-1\nkubectl drain {{value.nodePrefix}}-gpu-1 --ignore-daemonsets --delete-emptydir-data" },
+        { "phase": "3. Upgrade", "title": "Upgrade the operator, then the driver", "actions": ["Upgrade the operator chart first", "Let the operator roll the driver DaemonSet", "Do not hand-install a driver on a node the operator manages"], "command": "helm upgrade gpu-operator nvidia/gpu-operator -n gpu-operator \\\n  --version {{version.gpu-operator}} -f values.yaml\nkubectl -n gpu-operator rollout status ds/nvidia-driver-daemonset" },
+        { "phase": "4. Verify", "title": "Prove the node before uncordoning", "gate": true, "actions": ["nvidia-smi shows the target driver and no Xid errors", "A test pod requests a GPU and gets a MIG slice", "DCGM metrics report for the node"], "command": "kubectl uncordon {{value.nodePrefix}}-gpu-1\nkubectl run gpu-test --image={{value.registryHost}}/platform/cuda-test --restart=Never --limits=nvidia.com/gpu=1" }
+      ]
+    },
+    {
+      "id": "vault",
+      "title": "Vault and the PKI",
+      "component": "secrets",
+      "doc": "secrets-management/vault/hashicorp-vault-decision.md",
+      "downtime": "None in an HA setup: upgrade the standby first, then fail over, then the old active.",
+      "rollback": "Restore the raft snapshot on the upgraded node. Vault does not support downgrade in place.",
+      "steps": [
+        { "phase": "1. Gate", "title": "Snapshot and confirm the unseal path", "gate": true, "actions": ["Take a raft snapshot and verify it opens", "Confirm the unseal keys are available offline", "Confirm the audit device is writing"], "command": "vault operator raft snapshot save /backup/vault-$(date +%F).snap\nvault operator raft snapshot inspect /backup/vault-$(date +%F).snap" },
+        { "phase": "2. Standby", "title": "Upgrade the standby node", "actions": ["Stop the standby, upgrade the binary or image, start it", "Confirm it rejoins as standby and the leader is unchanged"], "command": "systemctl stop vault && <upgrade> && systemctl start vault\nvault operator raft list-peers" },
+        { "phase": "3. Failover", "title": "Step down and upgrade the old active", "actions": ["Step down the active so the upgraded standby takes over", "Upgrade the remaining node", "Confirm the cluster has one leader and two followers"], "command": "vault operator step-down\nvault status" },
+        { "phase": "4. Verify", "title": "Prove secrets, PKI and auth still work", "gate": true, "actions": ["Read a secret through the Kubernetes auth method", "Issue a certificate from the PKI mount", "Log in through OIDC if it is enabled", "Audit log shows the operations"], "command": "vault kv get {{value.vaultEngine}}/apps/{{value.appNamespace}}/demo\nvault write pki/issue/{{value.appNamespace}} common_name=test.{{value.domain}}" }
+      ]
+    },
+    {
+      "id": "ingress",
+      "title": "Ingress controller portfolio",
+      "component": "ingress",
+      "doc": "kubernetes/ingress/multi-controller-plan.md",
+      "downtime": "None if traffic is migrated per hostname before the old controller is removed.",
+      "rollback": "Move the hostname back to the previous controller. Both remain installed until the migration is complete.",
+      "steps": [
+        { "phase": "1. Gate", "title": "Check the lifecycle stage and the deprecation date", "gate": true, "actions": ["Controller is in Candidate, Supported or Deprecated", "No upstream retirement announcement since the last check", "The annotation set has a documented migration path"], "command": "kubectl get ingressclass\nkubectl -n <ns> get pods -l app.kubernetes.io/name=nginx-ingress" },
+        { "phase": "2. Prepare", "title": "Install the target controller in parallel", "actions": ["Install with a distinct IngressClass or GatewayClass", "Do not claim a hostname that the old controller still serves", "Mirror the controller image and the CRDs"], "command": "kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/{{version.kubespray}}/standard-install.yaml" },
+        { "phase": "3. Migrate", "title": "Move one hostname at a time", "actions": ["Create the equivalent Ingress or HTTPRoute on the new controller", "Switch DNS or the edge upstream for that hostname only", "Compare access logs and error rate for one business cycle"], "command": "kubectl get httproute -A\ncurl -sSI https://app.{{value.domain}}/ | head -3" },
+        { "phase": "4. Retire", "title": "Remove the old controller after the last hostname moves", "actions": ["Confirm no IngressClass references remain", "Remove the old controller and its CRDs", "Update the ADR and the lifecycle table"], "command": "kubectl get ingress -A -o wide\nkubectl delete -f <old-controller-manifests>" }
+      ]
+    },
+    {
+      "id": "helm",
+      "title": "Helm 3 to Helm 4",
+      "component": "clusterMethods",
+      "doc": "lifecycle/upgrades/upgrade-procedures.md",
+      "downtime": "None. Helm is a client; the cluster is untouched by the client upgrade.",
+      "rollback": "Keep the Helm 3 binary and the release secrets. Helm 4 writes its own storage format; do not downgrade a release that Helm 4 already modified.",
+      "steps": [
+        { "phase": "1. Gate", "title": "Confirm the deadline and the chart compatibility", "gate": true, "actions": ["Helm 3 security fixes end 2027-02-10", "Kubespray release-2.32 ships Helm 3.22.0 internally: do not replace it inside the release venv", "Every chart in use is tested under Helm 4"], "command": "helm version\nls /opt/kubespray/release-2.32/bin/ 2>/dev/null | grep helm" },
+        { "phase": "2. Install", "title": "Install Helm 4 alongside Helm 3", "actions": ["Install to a different path and name", "Alias explicitly; never rely on PATH order for a migration", "Argo CD keeps its own rendering path and is unaffected"], "command": "curl -fsSL {{value.filesRepo}}/get.helm.sh/helm-v4-linux-amd64.tar.gz | tar xz\ninstall -m 0755 linux-amd64/helm /usr/local/bin/helm4" },
+        { "phase": "3. Rehearse", "title": "Re-run every chart operation under Helm 4", "actions": ["helm4 template for every chart, compare the manifests", "helm4 list and helm4 get values in every namespace", "Upgrade one non-critical release with helm4 and diff the result"], "command": "helm4 list -A\nhelm4 template <release> <chart> -f values.yaml | diff - <(helm template <release> <chart> -f values.yaml)" },
+        { "phase": "4. Switch", "title": "Switch the pipelines and keep Helm 3 until the date", "gate": true, "actions": ["CI images use Helm 4", "No release is operated by both binaries", "Helm 3 binary stays available for one rollback window"], "command": "helm4 version\nhelm4 list -A --all-namespaces | wc -l" }
+      ]
+    }
+  ]
+}

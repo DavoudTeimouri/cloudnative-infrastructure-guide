@@ -1,38 +1,36 @@
 {
-  "catalogVersion": "1.0.0",
+  "catalogVersion": "2.0.0",
   "updated": "2026-10-22",
   "source": {
     "docs": "The repository is the source of truth. This catalog points at it; it never duplicates a procedure.",
     "versions": "compatibility/version-matrix.md — parsed at build time, so a version bump propagates without touching this file.",
     "adr": "decisions/ADR-*.md — the reasoning behind every option below."
   },
-
   "methods": [
     {
       "id": "baremetal",
       "title": "Bare metal",
-      "summary": "Physical servers, direct disk for storage and etcd, full control of the PCIe and NUMA topology.",
+      "summary": "Physical servers, direct disks for Ceph and etcd, full control of PCIe and NUMA topology.",
       "bestFor": "Ceph at scale, GPU inference, predictable IO latency, no hypervisor in the failure path.",
       "requirements": [
         "IPMI or BMC access for out-of-band installation",
-        "Local SSD for etcd, dedicated NVMe for Ceph journal and OSD DB",
+        "Local SSD for etcd, dedicated NVMe for the Ceph OSD DB and WAL",
         "RAID1 for the boot disk, or software RAID managed by the OS baseline"
       ]
     },
     {
       "id": "vm",
       "title": "Virtual machines",
-      "summary": "VMs on an existing hypervisor, with the caveats below.",
-      "bestFor": "Small sites, environments where hardware is not available, fast proof of concept.",
+      "summary": "VMs on an existing hypervisor.",
+      "bestFor": "Small sites, lab and staging, environments without hardware.",
       "requirements": [
         "Ceph OSD disks must be raw or SCSI-passthrough, never a shared virtual disk",
-        "etcd must sit on a local SSD with local vCPUs, not on shared storage",
-        "GPU workloads need passthrough; MIG is not virtualizable, so the whole card must be passed through",
-        "The hypervisor becomes part of the failure domain and must be in the DR plan"
+        "etcd on a local SSD with dedicated vCPUs, never on shared storage",
+        "GPU needs passthrough; MIG is not virtualizable, so pass the whole card",
+        "The hypervisor joins the failure domain and must be in the DR plan"
       ]
     }
   ],
-
   "clusterMethods": [
     {
       "id": "kubespray",
@@ -40,27 +38,247 @@
       "summary": "Version-pinned inventory, idempotent, offline-capable, five releases supported in parallel.",
       "default": true,
       "versions": {
-        "release-2.32": { "kubernetes": "v1.36.5", "etcd": "3.6.15", "containerd": "2.3.7", "cilium": "1.20.3", "calico": "3.31.7", "helm": "3.22.0", "ansible": "2.19.0", "python": "3.12" },
-        "release-2.31": { "kubernetes": "v1.35.9", "etcd": "3.6.15", "containerd": "2.2.10", "cilium": "1.19.3", "calico": "3.31.7", "helm": "3.18.4", "ansible": "2.18.0", "python": "3.12" },
-        "release-2.30": { "kubernetes": "v1.34.12", "etcd": "3.5.34", "containerd": "2.2.10", "cilium": "1.18.6", "calico": "3.30.7", "helm": "3.18.4", "ansible": "2.17.3", "python": "3.11" },
-        "release-2.29": { "kubernetes": "v1.33.10", "etcd": "3.5.29", "containerd": "2.1.6", "cilium": "1.18.5", "calico": "3.30.7", "helm": "3.18.4", "ansible": "2.17.3", "python": "3.11" },
-        "release-2.28": { "kubernetes": "v1.32.13", "etcd": "3.5.29", "containerd": "2.0.7", "cilium": "1.17.9", "calico": "3.29.7", "helm": "3.16.4", "ansible": "2.16.4", "python": "3.11" }
+        "release-2.32": {
+          "kubernetes": "v1.36.5",
+          "etcd": "3.6.15",
+          "containerd": "2.3.7",
+          "cilium": "1.20.3",
+          "calico": "3.31.7",
+          "helm": "3.22.0",
+          "ansible": "2.19.0",
+          "python": "3.12"
+        },
+        "release-2.31": {
+          "kubernetes": "v1.35.9",
+          "etcd": "3.6.15",
+          "containerd": "2.2.10",
+          "cilium": "1.19.3",
+          "calico": "3.31.7",
+          "helm": "3.18.4",
+          "ansible": "2.18.0",
+          "python": "3.12"
+        },
+        "release-2.30": {
+          "kubernetes": "v1.34.12",
+          "etcd": "3.5.34",
+          "containerd": "2.2.10",
+          "cilium": "1.18.6",
+          "calico": "3.30.7",
+          "helm": "3.18.4",
+          "ansible": "2.17.3",
+          "python": "3.11"
+        },
+        "release-2.29": {
+          "kubernetes": "v1.33.10",
+          "etcd": "3.5.29",
+          "containerd": "2.1.6",
+          "cilium": "1.18.5",
+          "calico": "3.30.7",
+          "helm": "3.18.4",
+          "ansible": "2.17.3",
+          "python": "3.11"
+        },
+        "release-2.28": {
+          "kubernetes": "v1.32.13",
+          "etcd": "3.5.29",
+          "containerd": "2.0.7",
+          "cilium": "1.17.9",
+          "calico": "3.29.7",
+          "helm": "3.16.4",
+          "ansible": "2.16.4",
+          "python": "3.11"
+        }
       },
       "doc": "kubespray/kubespray-deployment.md",
       "multiVersionDoc": "kubespray/multi-version-support.md"
     }
   ],
-
+  "pages": [
+    {
+      "id": "p1",
+      "title": "Deployment",
+      "subtitle": "Where this platform runs, and what it is called.",
+      "components": [],
+      "fields": [
+        "clusterName",
+        "env",
+        "domain"
+      ]
+    },
+    {
+      "id": "p2",
+      "title": "Application cluster",
+      "subtitle": "Control plane, workers and their sizes. Names and IPs are generated from the prefix and the first address.",
+      "components": [
+        "controlPlane",
+        "cni"
+      ],
+      "fields": [
+        "nodePrefix",
+        "appNodeIpStart",
+        "appCpCount",
+        "appCpCpu",
+        "appCpMemGb",
+        "appCpDiskGb",
+        "appWorkerCount",
+        "appWorkerCpu",
+        "appWorkerMemGb",
+        "appWorkerDiskGb",
+        "appWorkerDataDiskGb"
+      ]
+    },
+    {
+      "id": "p3",
+      "title": "Management cluster",
+      "subtitle": "Rancher, Keycloak and the directory integrations run here, sized separately from the workload clusters.",
+      "components": [
+        "management",
+        "identity",
+        "idpIntegration"
+      ],
+      "fields": [
+        "mgmtWorkerCount",
+        "mgmtIpStart",
+        "mgmtCpu",
+        "mgmtMemGb",
+        "mgmtDiskGb",
+        "directoryHost",
+        "directoryBaseDn"
+      ]
+    },
+    {
+      "id": "p4",
+      "title": "Operating system",
+      "subtitle": "Distribution baseline. Local accounts only: nodes are never joined to a directory.",
+      "components": [
+        "os"
+      ],
+      "fields": [
+        "caBundle"
+      ]
+    },
+    {
+      "id": "p5",
+      "title": "Storage",
+      "subtitle": "Ceph inside Kubernetes with Rook, or on dedicated hosts with cephadm on Podman or Docker.",
+      "components": [
+        "storage"
+      ],
+      "fields": [
+        "cephNodeCount",
+        "cephIpStart",
+        "cephCpu",
+        "cephMemGb",
+        "cephDataDiskGb",
+        "cephJournalDiskGb"
+      ]
+    },
+    {
+      "id": "p6",
+      "title": "Traffic",
+      "subtitle": "Edge load balancer, L7 ingress and in-cluster L4.",
+      "components": [
+        "edge",
+        "ingress",
+        "l4"
+      ],
+      "fields": [
+        "edgeCount",
+        "edgeIpStart",
+        "edgeVip",
+        "loadBalancerPool",
+        "dmzCidr",
+        "vrrpAuthPass"
+      ]
+    },
+    {
+      "id": "p7",
+      "title": "Network and offline artifacts",
+      "subtitle": "Address plan, registries and package repositories. Everything is mirrored; nothing is pulled from the internet.",
+      "components": [],
+      "fields": [
+        "mgmtCidr",
+        "cpCidr",
+        "podCidr",
+        "serviceCidr",
+        "storageCidr",
+        "gpuCidr",
+        "apiServerIp",
+        "adminCidr",
+        "registryHost",
+        "registryAddr",
+        "filesRepo",
+        "nexusHost",
+        "extraRegistries",
+        "extraRepos",
+        "registryAuth"
+      ]
+    },
+    {
+      "id": "p8",
+      "title": "Platform services",
+      "subtitle": "GitOps, secrets, observability, policy, mesh and GPU. Optional components can be switched off.",
+      "components": [
+        "gitops",
+        "secrets",
+        "observability",
+        "logging",
+        "policy",
+        "runtimeDetection",
+        "backup",
+        "serviceMesh",
+        "gpu"
+      ],
+      "fields": [
+        "appNamespace",
+        "vaultEngine",
+        "objectStorage",
+        "vaultHost",
+        "keycloakHost",
+        "gitlabHost",
+        "gpuCount",
+        "gpuCpu",
+        "gpuMemGb",
+        "gpuDiskGb"
+      ]
+    }
+  ],
   "components": [
     {
       "id": "os",
       "title": "Operating system",
       "required": true,
       "options": [
-        { "id": "ol9", "title": "Oracle Linux 9", "default": true, "kernel": "5.14", "packages": "dnf", "doc": "operating-systems/oracle-linux/baseline.md" },
-        { "id": "ubuntu2404", "title": "Ubuntu Server 24.04 LTS", "kernel": "6.6", "packages": "apt", "doc": "operating-systems/ubuntu/baseline.md" },
-        { "id": "ol8", "title": "Oracle Linux 8", "kernel": "4.18", "packages": "dnf", "doc": "operating-systems/oracle-linux/baseline.md", "warning": "Kernel 4.18 is below the 4.19 recommendation in the Kubespray kernel matrix." },
-        { "id": "ubuntu2204", "title": "Ubuntu Server 22.04 LTS", "kernel": "5.15", "packages": "apt", "doc": "operating-systems/ubuntu/baseline.md" }
+        {
+          "id": "ol9",
+          "title": "Oracle Linux 9",
+          "default": true,
+          "kernel": "5.14",
+          "packages": "dnf",
+          "doc": "operating-systems/oracle-linux/baseline.md"
+        },
+        {
+          "id": "ubuntu2404",
+          "title": "Ubuntu Server 24.04 LTS",
+          "kernel": "6.6",
+          "packages": "apt",
+          "doc": "operating-systems/ubuntu/baseline.md"
+        },
+        {
+          "id": "ol8",
+          "title": "Oracle Linux 8",
+          "kernel": "4.18",
+          "packages": "dnf",
+          "doc": "operating-systems/oracle-linux/baseline.md",
+          "warning": "Kernel 4.18 is below the 4.19 recommendation in the Kubespray kernel matrix."
+        },
+        {
+          "id": "ubuntu2204",
+          "title": "Ubuntu Server 22.04 LTS",
+          "kernel": "5.15",
+          "packages": "apt",
+          "doc": "operating-systems/ubuntu/baseline.md"
+        }
       ]
     },
     {
@@ -68,8 +286,20 @@
       "title": "Control plane",
       "required": true,
       "options": [
-        { "id": "cp3", "title": "3 control-plane nodes, stacked etcd", "default": true, "etcd": "3 members, 1 failure tolerated", "doc": "architecture/02-deployment-topology.md" },
-        { "id": "cp5", "title": "5 control-plane nodes, stacked etcd", "etcd": "5 members, 2 failures tolerated", "doc": "architecture/02-deployment-topology.md", "warning": "Longer maintenance windows and a third failure domain needed to justify it." }
+        {
+          "id": "cp3",
+          "title": "3 control-plane nodes, stacked etcd",
+          "default": true,
+          "etcd": "3 members, 1 failure tolerated",
+          "doc": "architecture/02-deployment-topology.md"
+        },
+        {
+          "id": "cp5",
+          "title": "5 control-plane nodes, stacked etcd",
+          "etcd": "5 members, 2 failures tolerated",
+          "doc": "architecture/02-deployment-topology.md",
+          "warning": "Longer maintenance windows, and a third failure domain is needed to justify it."
+        }
       ]
     },
     {
@@ -77,8 +307,20 @@
       "title": "Container network interface",
       "required": true,
       "options": [
-        { "id": "cilium", "title": "Cilium — eBPF, kube-proxy-free, Hubble", "default": true, "versionKey": "cilium", "doc": "kubernetes/networking/cilium.md" },
-        { "id": "calico", "title": "Calico — mature, rich policy, IPIP/VXLAN", "versionKey": "calico", "doc": "kubernetes/networking/cilium.md", "note": "The Calico deployment details live in the Kubespray inventory for the pinned release." }
+        {
+          "id": "cilium",
+          "title": "Cilium — eBPF, kube-proxy-free, Hubble",
+          "default": true,
+          "versionKey": "cilium",
+          "doc": "kubernetes/networking/cilium.md"
+        },
+        {
+          "id": "calico",
+          "title": "Calico — mature, rich policy, IPIP/VXLAN",
+          "versionKey": "calico",
+          "doc": "kubernetes/networking/cilium.md",
+          "note": "Calico is configured through the Kubespray inventory for the pinned release."
+        }
       ]
     },
     {
@@ -86,8 +328,27 @@
       "title": "Storage",
       "required": true,
       "options": [
-        { "id": "rook", "title": "Rook-Ceph inside the cluster", "default": true, "versionKey": "rook", "doc": "storage/rook-ceph/rook-ceph.md" },
-        { "id": "cephadm", "title": "Ceph via cephadm on dedicated hosts, consumed over the external CSI driver", "versionKey": "ceph", "doc": "storage/ceph/cephadm-deployment.md" }
+        {
+          "id": "rook",
+          "title": "Rook-Ceph inside the cluster",
+          "default": true,
+          "versionKey": "rook",
+          "doc": "storage/rook-ceph/rook-ceph.md"
+        },
+        {
+          "id": "cephadm-podman",
+          "title": "cephadm on dedicated hosts — Podman",
+          "versionKey": "ceph",
+          "doc": "storage/ceph/cephadm-deployment.md",
+          "note": "Upstream default engine. No container engine dependency inside Kubernetes."
+        },
+        {
+          "id": "cephadm-docker",
+          "title": "cephadm on dedicated hosts — Docker",
+          "versionKey": "ceph",
+          "doc": "storage/ceph/cephadm-deployment.md",
+          "warning": "Supported but second-class upstream. Pull the engine from the internal mirror; docker.io on Ubuntu is too old."
+        }
       ]
     },
     {
@@ -95,8 +356,19 @@
       "title": "External load balancer",
       "required": true,
       "options": [
-        { "id": "haproxy-nginx", "title": "HAProxy (L4, active health checks) + Nginx (L7, TLS), Keepalived, Docker Compose", "default": true, "versionKey": "haproxy", "doc": "network-matrix/external-load-balancer.md", "export": "edge-compose" },
-        { "id": "nginx-only", "title": "Nginx only (L4 passthrough + L7), Keepalived, Docker Compose", "versionKey": "nginx", "doc": "network-matrix/external-load-balancer.md", "export": "edge-compose" }
+        {
+          "id": "haproxy-nginx",
+          "title": "HAProxy (L4, active health checks) + Nginx (L7, TLS), Keepalived, Docker Compose",
+          "default": true,
+          "versionKey": "haproxy",
+          "doc": "network-matrix/external-load-balancer.md"
+        },
+        {
+          "id": "nginx-only",
+          "title": "Nginx only (L4 passthrough + L7), Keepalived, Docker Compose",
+          "versionKey": "nginx",
+          "doc": "network-matrix/external-load-balancer.md"
+        }
       ]
     },
     {
@@ -104,9 +376,25 @@
       "title": "L7 ingress controller",
       "required": true,
       "options": [
-        { "id": "nic", "title": "F5 NGINX Ingress Controller", "default": true, "versionKey": "nic", "doc": "kubernetes/ingress/nginx-ingress.md" },
-        { "id": "ngf", "title": "F5 NGINX Gateway Fabric (Gateway API native)", "versionKey": "ngf", "doc": "kubernetes/ingress/multi-controller-plan.md" },
-        { "id": "envoy", "title": "Envoy Gateway (Gateway API native, second implementation)", "versionKey": "envoy", "doc": "kubernetes/ingress/multi-controller-plan.md" }
+        {
+          "id": "nic",
+          "title": "F5 NGINX Ingress Controller",
+          "default": true,
+          "versionKey": "nic",
+          "doc": "kubernetes/ingress/nginx-ingress.md"
+        },
+        {
+          "id": "ngf",
+          "title": "F5 NGINX Gateway Fabric (Gateway API native)",
+          "versionKey": "ngf",
+          "doc": "kubernetes/ingress/multi-controller-plan.md"
+        },
+        {
+          "id": "envoy",
+          "title": "Envoy Gateway (Gateway API native, second implementation)",
+          "versionKey": "envoy",
+          "doc": "kubernetes/ingress/multi-controller-plan.md"
+        }
       ]
     },
     {
@@ -114,7 +402,13 @@
       "title": "In-cluster L4 load balancing",
       "required": true,
       "options": [
-        { "id": "metallb", "title": "MetalLB (L2 or BGP)", "default": true, "versionKey": "metallb", "doc": "kubernetes/networking/metallb.md" }
+        {
+          "id": "metallb",
+          "title": "MetalLB (L2 or BGP)",
+          "default": true,
+          "versionKey": "metallb",
+          "doc": "kubernetes/networking/metallb.md"
+        }
       ]
     },
     {
@@ -122,24 +416,13 @@
       "title": "Management cluster",
       "required": true,
       "options": [
-        { "id": "rancher", "title": "Rancher on a dedicated cluster", "default": true, "versionKey": "rancher", "doc": "management-cluster/rancher/rancher.md" }
-      ]
-    },
-    {
-      "id": "gitops",
-      "title": "GitOps and CI/CD",
-      "required": true,
-      "options": [
-        { "id": "argocd-gitlab", "title": "Argo CD + GitLab CI", "default": true, "versionKey": "argocd", "doc": "management-cluster/argocd/argocd.md" }
-      ]
-    },
-    {
-      "id": "secrets",
-      "title": "Secrets management",
-      "required": true,
-      "options": [
-        { "id": "vault", "title": "HashiCorp Vault (Community, BSL 1.1)", "default": true, "versionKey": "vault", "doc": "secrets-management/vault/vault-architecture.md", "decisionDoc": "secrets-management/vault/hashicorp-vault-decision.md" },
-        { "id": "openbao", "title": "OpenBao (MPL 2.0)", "versionKey": "openbao", "doc": "secrets-management/vault/vault-architecture.md", "note": "The deployment model is portable from Vault. Use this when the BSL is not acceptable." }
+        {
+          "id": "rancher",
+          "title": "Rancher on a dedicated cluster",
+          "default": true,
+          "versionKey": "rancher",
+          "doc": "management-cluster/rancher/rancher.md"
+        }
       ]
     },
     {
@@ -147,17 +430,100 @@
       "title": "Identity provider",
       "required": true,
       "options": [
-        { "id": "keycloak", "title": "Keycloak", "default": true, "versionKey": "keycloak", "doc": "management-cluster/keycloak/keycloak.md" }
+        {
+          "id": "keycloak",
+          "title": "Keycloak as the OIDC broker",
+          "default": true,
+          "versionKey": "keycloak",
+          "doc": "management-cluster/keycloak/keycloak.md"
+        }
       ]
     },
     {
-      "id": "directory",
-      "title": "Linux directory integration",
+      "id": "idpIntegration",
+      "title": "Directory integration",
       "required": false,
+      "multi": true,
+      "doc": "identity/directory-integration.md",
+      "note": "Application-level only. Nodes are never joined to a directory. Keycloak brokers OIDC so each service speaks one dialect.",
       "options": [
-        { "id": "none", "title": "Local accounts only (break-glass always present)", "default": true, "doc": "identity/sssd-realmd.md" },
-        { "id": "sssd-ad", "title": "SSSD against Active Directory", "doc": "identity/sssd-realmd.md" },
-        { "id": "sssd-ldap", "title": "SSSD against LDAP", "doc": "identity/sssd-realmd.md" }
+        {
+          "id": "none",
+          "title": "No directory integration (local accounts only)",
+          "default": true,
+          "doc": "identity/directory-integration.md"
+        },
+        {
+          "id": "rancher-ad",
+          "title": "Rancher — Active Directory auth provider",
+          "doc": "identity/directory-integration.md"
+        },
+        {
+          "id": "rancher-ldap",
+          "title": "Rancher — OpenLDAP auth provider",
+          "doc": "identity/directory-integration.md"
+        },
+        {
+          "id": "keycloak-federation",
+          "title": "Keycloak — LDAP/AD user federation, read-only",
+          "doc": "identity/directory-integration.md"
+        },
+        {
+          "id": "harbor-oidc",
+          "title": "Harbor — OIDC through Keycloak",
+          "doc": "identity/directory-integration.md"
+        },
+        {
+          "id": "gitlab-ldap",
+          "title": "GitLab — LDAP with group sync",
+          "doc": "identity/directory-integration.md"
+        },
+        {
+          "id": "argocd-oidc",
+          "title": "Argo CD — OIDC through Keycloak",
+          "doc": "identity/directory-integration.md"
+        },
+        {
+          "id": "vault-oidc",
+          "title": "Vault — OIDC through Keycloak",
+          "doc": "identity/directory-integration.md"
+        }
+      ]
+    },
+    {
+      "id": "gitops",
+      "title": "GitOps and CI/CD",
+      "required": true,
+      "options": [
+        {
+          "id": "argocd-gitlab",
+          "title": "Argo CD + GitLab CI",
+          "default": true,
+          "versionKey": "argocd",
+          "doc": "management-cluster/argocd/argocd.md"
+        }
+      ]
+    },
+    {
+      "id": "secrets",
+      "title": "Secrets management",
+      "required": true,
+      "options": [
+        {
+          "id": "vault",
+          "title": "HashiCorp Vault (Community, BSL 1.1)",
+          "default": true,
+          "versionKey": "vault",
+          "doc": "secrets-management/vault/vault-architecture.md",
+          "decisionDoc": "secrets-management/vault/hashicorp-vault-decision.md"
+        },
+        {
+          "id": "openbao",
+          "title": "OpenBao (MPL 2.0)",
+          "versionKey": "openbao",
+          "doc": "secrets-management/vault/vault-architecture.md",
+          "note": "The deployment model is portable from Vault. Use it when the BSL is not acceptable."
+        }
       ]
     },
     {
@@ -165,8 +531,19 @@
       "title": "Metrics and dashboards",
       "required": true,
       "options": [
-        { "id": "kps", "title": "kube-prometheus-stack + Grafana + Alertmanager", "default": true, "versionKey": "kube-prometheus-stack", "doc": "monitoring/prometheus.md" },
-        { "id": "kps-thanos", "title": "kube-prometheus-stack + Thanos (long-term retention)", "versionKey": "thanos", "doc": "monitoring/prometheus.md" }
+        {
+          "id": "kps",
+          "title": "kube-prometheus-stack + Grafana + Alertmanager",
+          "default": true,
+          "versionKey": "kube-prometheus-stack",
+          "doc": "monitoring/prometheus.md"
+        },
+        {
+          "id": "kps-thanos",
+          "title": "kube-prometheus-stack + Thanos (long-term retention)",
+          "versionKey": "thanos",
+          "doc": "monitoring/prometheus.md"
+        }
       ]
     },
     {
@@ -174,8 +551,24 @@
       "title": "Centralized logging",
       "required": false,
       "options": [
-        { "id": "loki", "title": "Fluent Bit + Loki", "default": true, "versionKey": "loki", "doc": "logging/log-pipeline.md" },
-        { "id": "opensearch", "title": "Fluent Bit + OpenSearch (full-text search)", "versionKey": "opensearch", "doc": "logging/log-pipeline.md" }
+        {
+          "id": "loki",
+          "title": "Fluent Bit + Loki",
+          "default": true,
+          "versionKey": "loki",
+          "doc": "logging/log-pipeline.md"
+        },
+        {
+          "id": "opensearch",
+          "title": "Fluent Bit + OpenSearch (full-text search)",
+          "versionKey": "opensearch",
+          "doc": "logging/log-pipeline.md"
+        },
+        {
+          "id": "none",
+          "title": "No central logging (not recommended for production)",
+          "doc": "logging/log-pipeline.md"
+        }
       ]
     },
     {
@@ -183,8 +576,19 @@
       "title": "Admission policy",
       "required": true,
       "options": [
-        { "id": "gatekeeper-kyverno", "title": "OPA Gatekeeper + Kyverno", "default": true, "versionKey": "gatekeeper", "doc": "kubernetes/security/security-controls.md" },
-        { "id": "gatekeeper", "title": "OPA Gatekeeper only", "versionKey": "gatekeeper", "doc": "kubernetes/security/security-controls.md" }
+        {
+          "id": "gatekeeper-kyverno",
+          "title": "OPA Gatekeeper + Kyverno",
+          "default": true,
+          "versionKey": "gatekeeper",
+          "doc": "kubernetes/security/security-controls.md"
+        },
+        {
+          "id": "gatekeeper",
+          "title": "OPA Gatekeeper only",
+          "versionKey": "gatekeeper",
+          "doc": "kubernetes/security/security-controls.md"
+        }
       ]
     },
     {
@@ -192,7 +596,18 @@
       "title": "Runtime threat detection",
       "required": false,
       "options": [
-        { "id": "falco", "title": "Falco with a tuned ruleset", "default": true, "versionKey": "falco", "doc": "kubernetes/security/security-controls.md" }
+        {
+          "id": "falco",
+          "title": "Falco with a tuned ruleset",
+          "default": true,
+          "versionKey": "falco",
+          "doc": "kubernetes/security/security-controls.md"
+        },
+        {
+          "id": "none",
+          "title": "None",
+          "doc": "kubernetes/security/security-controls.md"
+        }
       ]
     },
     {
@@ -200,16 +615,13 @@
       "title": "Backup",
       "required": true,
       "options": [
-        { "id": "velero", "title": "Velero with CSI snapshots to object storage", "default": true, "versionKey": "velero", "doc": "lifecycle/backup/backup-and-dr.md" }
-      ]
-    },
-    {
-      "id": "gpu",
-      "title": "GPU and AI inference",
-      "required": false,
-      "options": [
-        { "id": "none", "title": "No GPU workers", "default": true, "doc": "gpu-ai/gpu-ai-architecture.md" },
-        { "id": "mig", "title": "GPU workers with MIG isolation, vLLM serving", "versionKey": "gpu-operator", "doc": "gpu-ai/gpu-ai-architecture.md", "export": "gpu" }
+        {
+          "id": "velero",
+          "title": "Velero with CSI snapshots to object storage",
+          "default": true,
+          "versionKey": "velero",
+          "doc": "lifecycle/backup/backup-and-dr.md"
+        }
       ]
     },
     {
@@ -217,79 +629,779 @@
       "title": "Service mesh",
       "required": false,
       "options": [
-        { "id": "none", "title": "None (native networking plus network policy)", "default": true, "doc": "service-mesh/evaluation.md" },
-        { "id": "istio-ambient", "title": "Istio ambient (ztunnel per node, waypoints only where L7 is needed)", "versionKey": "istio", "doc": "service-mesh/istio/istio-deployment.md", "decisionDoc": "service-mesh/evaluation.md", "note": "Lower per-pod cost, but a ztunnel fault affects every pod on the node." },
-        { "id": "istio", "title": "Istio sidecar (Envoy per pod)", "versionKey": "istio", "doc": "service-mesh/istio/istio-deployment.md", "decisionDoc": "service-mesh/evaluation.md", "warning": "Adopt only when the threshold in service-mesh/evaluation.md is met. This adds a control plane and a new failure domain." }
+        {
+          "id": "none",
+          "title": "None (native networking plus network policy)",
+          "default": true,
+          "doc": "service-mesh/evaluation.md"
+        },
+        {
+          "id": "istio-ambient",
+          "title": "Istio ambient (ztunnel per node, waypoints where L7 is needed)",
+          "versionKey": "istio",
+          "doc": "service-mesh/istio/istio-deployment.md",
+          "decisionDoc": "service-mesh/evaluation.md",
+          "note": "Lower per-pod cost, but a ztunnel fault affects every pod on the node."
+        },
+        {
+          "id": "istio",
+          "title": "Istio sidecar (Envoy per pod)",
+          "versionKey": "istio",
+          "doc": "service-mesh/istio/istio-deployment.md",
+          "decisionDoc": "service-mesh/evaluation.md",
+          "warning": "Adopt only when the threshold in service-mesh/evaluation.md is met. Adds a control plane and a failure domain."
+        }
+      ]
+    },
+    {
+      "id": "gpu",
+      "title": "GPU and AI inference",
+      "required": false,
+      "options": [
+        {
+          "id": "none",
+          "title": "No GPU workers",
+          "default": true,
+          "doc": "gpu-ai/gpu-ai-architecture.md"
+        },
+        {
+          "id": "mig",
+          "title": "GPU workers with MIG isolation and vLLM serving",
+          "versionKey": "gpu-operator",
+          "doc": "gpu-ai/gpu-ai-architecture.md"
+        },
+        {
+          "id": "timeslicing",
+          "title": "GPU workers with time-slicing (development only, no VRAM isolation)",
+          "versionKey": "gpu-operator",
+          "doc": "gpu-ai/sharing/mig-and-time-slicing.md",
+          "warning": "No memory isolation between pods. Never for multi-tenant production."
+        }
       ]
     }
   ],
-
   "values": [
-    { "id": "clusterName", "label": "Cluster name", "type": "text", "default": "prod", "required": true, "hint": "Used in inventory names, labels and the generated plan." },
-    { "id": "env", "label": "Environment", "type": "select", "default": "staging", "options": ["staging", "production", "dr"], "required": true },
-    { "id": "domain", "label": "Internal DNS domain", "type": "text", "default": "internal.example.com", "required": true, "hint": "Used for every *.domain name in the generated configuration." },
-    { "id": "mgmtCidr", "label": "Management CIDR", "type": "text", "default": "10.10.0.0/24", "required": true },
-    { "id": "cpCidr", "label": "Control-plane CIDR", "type": "text", "default": "10.20.0.0/24", "required": true },
-    { "id": "podCidr", "label": "Pod CIDR", "type": "text", "default": "10.30.0.0/16", "required": true },
-    { "id": "serviceCidr", "label": "Service CIDR", "type": "text", "default": "10.32.0.0/16", "required": true },
-    { "id": "storageCidr", "label": "Storage (Ceph public) CIDR", "type": "text", "default": "10.40.0.0/24", "required": true },
-    { "id": "gpuCidr", "label": "GPU CIDR", "type": "text", "default": "10.50.0.0/24", "required": false },
-    { "id": "dmzCidr", "label": "DMZ CIDR", "type": "text", "default": "10.60.0.0/24", "required": true },
-    { "id": "loadBalancerPool", "label": "MetalLB address pool", "type": "text", "default": "10.61.0.10-10.61.0.30", "required": false },
-    { "id": "apiServerIp", "label": "Control-plane API VIP", "type": "text", "default": "10.20.0.100", "required": true },
-    { "id": "edgeVip", "label": "Edge load balancer VIP", "type": "text", "default": "10.60.0.10", "required": true },
-    { "id": "registryHost", "label": "Internal registry", "type": "text", "default": "harbor.internal", "required": true },
-    { "id": "nexusHost", "label": "Internal package repository", "type": "text", "default": "nexus.internal", "required": true },
-    { "id": "vaultHost", "label": "Vault address", "type": "text", "default": "https://vault.internal:8200", "required": true },
-    { "id": "keycloakHost", "label": "Keycloak address", "type": "text", "default": "https://keycloak.internal:8443", "required": true },
-    { "id": "gitlabHost", "label": "GitLab address", "type": "text", "default": "https://gitlab.internal", "required": true },
-    { "id": "adminCidr", "label": "Administrator workstation CIDR", "type": "text", "default": "10.10.0.0/24", "required": true },
-    { "id": "filesRepo", "label": "Internal file mirror base URL", "type": "text", "default": "https://files.internal/repo", "required": true, "hint": "Serves github.com/, dl.k8s.io/, storage.googleapis.com/, get.helm.sh/ for the offline Kubespray deploy." },
-    { "id": "registryAddr", "label": "Internal registry address (host:port)", "type": "text", "default": "harbor.internal:443", "required": true },
-    { "id": "edgeL1", "label": "First edge node address", "type": "text", "default": "10.60.0.1", "required": true },
-    { "id": "edgeL2", "label": "Second edge node address", "type": "text", "default": "10.60.0.2", "required": true },
-    { "id": "appNamespace", "label": "Application namespace for the Vault policy", "type": "text", "default": "apps", "required": true },
-    { "id": "vaultEngine", "label": "Vault secret engine path", "type": "text", "default": "secret", "required": true },
-    { "id": "registryAuth", "label": "Registry credentials (base64 user:password)", "type": "text", "default": "", "required": false, "secret": true, "hint": "Leave empty and fill it on the target host. It is never sent anywhere; it is rendered locally into the downloaded file." },
-    { "id": "vrrpAuthPass", "label": "VRRP authentication pass phrase", "type": "text", "default": "", "required": false, "secret": true, "hint": "Leave empty and set it on the node. Rendered locally into the downloaded file only." },
-    { "id": "controlPlaneNodes", "label": "Control-plane node names (comma separated)", "type": "text", "default": "k8s-cp-1,k8s-cp-2,k8s-cp-3", "required": true },
-    { "id": "workerNodes", "label": "Worker node names (comma separated)", "type": "text", "default": "k8s-w-1,k8s-w-2", "required": true },
-    { "id": "gpuNodes", "label": "GPU node names (comma separated)", "type": "text", "default": "k8s-gpu-1", "required": false },
-    { "id": "edgeNodes", "label": "Edge node names (comma separated)", "type": "text", "default": "lb-1,lb-2", "required": true },
-    { "id": "nodeCidrStart", "label": "First host address in the management segment", "type": "text", "default": "10.10.0.11", "required": true },
-    { "id": "objectStorage", "label": "Object storage for backups and models", "type": "text", "default": "https://rgw.internal", "required": true },
-    { "id": "caBundle", "label": "Internal CA bundle path on the nodes", "type": "text", "default": "/etc/pki/ca-trust/source/anchors/internal-ca.crt", "required": true }
+    {
+      "id": "clusterName",
+      "label": "Cluster name",
+      "type": "text",
+      "default": "prod",
+      "required": true
+    },
+    {
+      "id": "env",
+      "label": "Environment",
+      "type": "select",
+      "default": "staging",
+      "options": [
+        "staging",
+        "production",
+        "dr"
+      ],
+      "required": true
+    },
+    {
+      "id": "domain",
+      "label": "Internal DNS domain",
+      "type": "text",
+      "default": "internal.example.com",
+      "required": true
+    },
+    {
+      "id": "nodePrefix",
+      "label": "Node name prefix",
+      "type": "text",
+      "default": "k8s",
+      "required": true,
+      "hint": "Names are generated: <prefix>-cp-N, <prefix>-w-N, <prefix>-gpu-N."
+    },
+    {
+      "id": "appNodeIpStart",
+      "label": "First application-cluster node IP",
+      "type": "text",
+      "default": "10.20.0.11",
+      "required": true,
+      "hint": "Assigned in order: control plane, then workers, then GPU."
+    },
+    {
+      "id": "appCpCount",
+      "label": "Control-plane nodes",
+      "type": "number",
+      "default": 3,
+      "min": 1,
+      "max": 9,
+      "required": true
+    },
+    {
+      "id": "appCpCpu",
+      "label": "Control-plane vCPU per node",
+      "type": "number",
+      "default": 4,
+      "min": 2
+    },
+    {
+      "id": "appCpMemGb",
+      "label": "Control-plane RAM (GiB)",
+      "type": "number",
+      "default": 16,
+      "min": 4
+    },
+    {
+      "id": "appCpDiskGb",
+      "label": "Control-plane disk (GiB)",
+      "type": "number",
+      "default": 120,
+      "min": 40
+    },
+    {
+      "id": "appWorkerCount",
+      "label": "Worker nodes",
+      "type": "number",
+      "default": 3,
+      "min": 1,
+      "max": 200,
+      "required": true
+    },
+    {
+      "id": "appWorkerCpu",
+      "label": "Worker vCPU per node",
+      "type": "number",
+      "default": 8,
+      "min": 2
+    },
+    {
+      "id": "appWorkerMemGb",
+      "label": "Worker RAM (GiB)",
+      "type": "number",
+      "default": 32,
+      "min": 4
+    },
+    {
+      "id": "appWorkerDiskGb",
+      "label": "Worker boot disk (GiB)",
+      "type": "number",
+      "default": 120,
+      "min": 40
+    },
+    {
+      "id": "appWorkerDataDiskGb",
+      "label": "Worker data disk (GiB)",
+      "type": "number",
+      "default": 0,
+      "min": 0,
+      "hint": "0 means no local data disk. Images and logs stay on the boot disk."
+    },
+    {
+      "id": "mgmtWorkerCount",
+      "label": "Management cluster workers",
+      "type": "number",
+      "default": 3,
+      "min": 1,
+      "max": 9,
+      "required": true,
+      "hint": "Sized separately: Rancher, Keycloak, Argo CD, Harbor and Vault do not share the application cluster's capacity."
+    },
+    {
+      "id": "mgmtIpStart",
+      "label": "First management node IP",
+      "type": "text",
+      "default": "10.10.0.11",
+      "required": true
+    },
+    {
+      "id": "mgmtCpu",
+      "label": "Management worker vCPU",
+      "type": "number",
+      "default": 4,
+      "min": 2
+    },
+    {
+      "id": "mgmtMemGb",
+      "label": "Management worker RAM (GiB)",
+      "type": "number",
+      "default": 16,
+      "min": 4
+    },
+    {
+      "id": "mgmtDiskGb",
+      "label": "Management worker disk (GiB)",
+      "type": "number",
+      "default": 200,
+      "min": 60
+    },
+    {
+      "id": "directoryHost",
+      "label": "Directory server",
+      "type": "text",
+      "default": "ldaps://dc.internal:636",
+      "required": false
+    },
+    {
+      "id": "directoryBaseDn",
+      "label": "Directory base DN",
+      "type": "text",
+      "default": "OU=Platform,DC=corp,DC=internal",
+      "required": false
+    },
+    {
+      "id": "caBundle",
+      "label": "Internal CA bundle path on the nodes",
+      "type": "text",
+      "default": "/etc/pki/ca-trust/source/anchors/internal-ca.crt",
+      "required": true
+    },
+    {
+      "id": "cephNodeCount",
+      "label": "Ceph hosts (cephadm only)",
+      "type": "number",
+      "default": 3,
+      "min": 3,
+      "max": 64,
+      "hint": "Three is the minimum for a 3-replica pool with a host failure domain. Ignored for Rook."
+    },
+    {
+      "id": "cephIpStart",
+      "label": "First Ceph host IP",
+      "type": "text",
+      "default": "10.40.0.11"
+    },
+    {
+      "id": "cephCpu",
+      "label": "Ceph vCPU per host",
+      "type": "number",
+      "default": 8,
+      "min": 4
+    },
+    {
+      "id": "cephMemGb",
+      "label": "Ceph RAM per host (GiB)",
+      "type": "number",
+      "default": 32,
+      "min": 16
+    },
+    {
+      "id": "cephDataDiskGb",
+      "label": "Ceph data disk per host (GiB)",
+      "type": "number",
+      "default": 2000,
+      "min": 100
+    },
+    {
+      "id": "cephJournalDiskGb",
+      "label": "Ceph DB/WAL disk per host (GiB)",
+      "type": "number",
+      "default": 100,
+      "min": 0
+    },
+    {
+      "id": "edgeCount",
+      "label": "Edge nodes",
+      "type": "number",
+      "default": 2,
+      "min": 1,
+      "max": 8,
+      "required": true,
+      "hint": "Two is the minimum for a VIP that can move."
+    },
+    {
+      "id": "edgeIpStart",
+      "label": "First edge node IP",
+      "type": "text",
+      "default": "10.60.0.1"
+    },
+    {
+      "id": "edgeVip",
+      "label": "Edge VIP",
+      "type": "text",
+      "default": "10.60.0.10",
+      "required": true
+    },
+    {
+      "id": "loadBalancerPool",
+      "label": "MetalLB address pool",
+      "type": "text",
+      "default": "10.61.0.10-10.61.0.30"
+    },
+    {
+      "id": "dmzCidr",
+      "label": "DMZ CIDR",
+      "type": "text",
+      "default": "10.60.0.0/24",
+      "required": true
+    },
+    {
+      "id": "mgmtCidr",
+      "label": "Management CIDR",
+      "type": "text",
+      "default": "10.10.0.0/24",
+      "required": true
+    },
+    {
+      "id": "cpCidr",
+      "label": "Application node CIDR",
+      "type": "text",
+      "default": "10.20.0.0/24",
+      "required": true
+    },
+    {
+      "id": "podCidr",
+      "label": "Pod CIDR",
+      "type": "text",
+      "default": "10.30.0.0/16",
+      "required": true
+    },
+    {
+      "id": "serviceCidr",
+      "label": "Service CIDR",
+      "type": "text",
+      "default": "10.32.0.0/16",
+      "required": true
+    },
+    {
+      "id": "storageCidr",
+      "label": "Storage (Ceph public) CIDR",
+      "type": "text",
+      "default": "10.40.0.0/24",
+      "required": true
+    },
+    {
+      "id": "gpuCidr",
+      "label": "GPU CIDR",
+      "type": "text",
+      "default": "10.50.0.0/24",
+      "required": false
+    },
+    {
+      "id": "apiServerIp",
+      "label": "Control-plane API VIP",
+      "type": "text",
+      "default": "10.20.0.100",
+      "required": true
+    },
+    {
+      "id": "adminCidr",
+      "label": "Administrator workstation CIDR",
+      "type": "text",
+      "default": "10.10.0.0/24",
+      "required": true
+    },
+    {
+      "id": "registryHost",
+      "label": "Internal registry (image prefix)",
+      "type": "text",
+      "default": "harbor.internal",
+      "required": true
+    },
+    {
+      "id": "registryAddr",
+      "label": "Internal registry address (host:port)",
+      "type": "text",
+      "default": "harbor.internal:443",
+      "required": true
+    },
+    {
+      "id": "filesRepo",
+      "label": "Internal file mirror base URL",
+      "type": "text",
+      "default": "https://files.internal/repo",
+      "required": true,
+      "hint": "Serves github.com/, dl.k8s.io/, storage.googleapis.com/, get.helm.sh/ for the offline Kubespray deploy."
+    },
+    {
+      "id": "nexusHost",
+      "label": "Internal package repository",
+      "type": "text",
+      "default": "nexus.internal",
+      "required": true
+    },
+    {
+      "id": "extraRegistries",
+      "label": "Additional registries (one per line)",
+      "type": "lines",
+      "default": "",
+      "hint": "Keep the upstream repository path so no manifest rewrite is needed. One entry per line."
+    },
+    {
+      "id": "extraRepos",
+      "label": "Additional package repositories (one per line)",
+      "type": "lines",
+      "default": "",
+      "hint": "RPM, deb, PyPI, npm or Helm. Format: type name url"
+    },
+    {
+      "id": "registryAuth",
+      "label": "Registry credentials (base64 user:password)",
+      "type": "text",
+      "default": "",
+      "secret": true,
+      "hint": "Leave empty and fill it on the target host. Rendered locally into the downloaded file only."
+    },
+    {
+      "id": "appNamespace",
+      "label": "Application namespace",
+      "type": "text",
+      "default": "apps",
+      "required": true
+    },
+    {
+      "id": "vaultEngine",
+      "label": "Vault secret engine path",
+      "type": "text",
+      "default": "secret",
+      "required": true
+    },
+    {
+      "id": "objectStorage",
+      "label": "Object storage endpoint (Ceph RGW)",
+      "type": "text",
+      "default": "https://rgw.internal",
+      "required": true
+    },
+    {
+      "id": "vaultHost",
+      "label": "Vault address",
+      "type": "text",
+      "default": "https://vault.internal:8200",
+      "required": true
+    },
+    {
+      "id": "keycloakHost",
+      "label": "Keycloak address (OIDC issuer)",
+      "type": "text",
+      "default": "https://keycloak.internal:8443",
+      "required": true
+    },
+    {
+      "id": "gitlabHost",
+      "label": "GitLab address",
+      "type": "text",
+      "default": "https://gitlab.internal",
+      "required": true
+    },
+    {
+      "id": "gpuCount",
+      "label": "GPU nodes",
+      "type": "number",
+      "default": 1,
+      "min": 0,
+      "max": 64
+    },
+    {
+      "id": "gpuCpu",
+      "label": "GPU node vCPU",
+      "type": "number",
+      "default": 32,
+      "min": 4
+    },
+    {
+      "id": "gpuMemGb",
+      "label": "GPU node RAM (GiB)",
+      "type": "number",
+      "default": 256,
+      "min": 16
+    },
+    {
+      "id": "gpuDiskGb",
+      "label": "GPU node local NVMe (GiB)",
+      "type": "number",
+      "default": 2000,
+      "min": 100
+    },
+    {
+      "id": "vrrpAuthPass",
+      "label": "VRRP authentication pass phrase",
+      "type": "text",
+      "default": "",
+      "secret": true,
+      "hint": "Leave empty and set it on the node. Rendered locally into the downloaded file only."
+    }
   ],
-
   "steps": [
-    { "id": "s01", "phase": "1. Requirements", "title": "Confirm the requirements, assumptions and open decisions", "doc": "requirements/requirements-and-assumptions.md", "actions": ["Close every open decision D-01..D-14", "Confirm the site IP plan and the failure domains", "Confirm the legal position on the Vault license"] },
-    { "id": "s02", "phase": "1. Requirements", "title": "Read the architecture and the decisions", "doc": "architecture/00-overview.md", "extraDocs": ["architecture/03-failure-domains.md", "decisions/"], "actions": ["Review the architecture overview", "Review the failure-domain table for the components you selected"] },
-    { "id": "s03", "phase": "2. Offline artifacts", "title": "Stand up the internal repositories and mirror every artifact", "doc": "offline-artifacts/offline-artifact-architecture.md", "extraDocs": ["offline-artifacts/artifact-matrix.md"], "actions": ["Deploy Harbor and Nexus", "Run the staging workflow for every component you selected", "Verify offline package install, image pull and chart deploy on a throwaway node"] },
-    { "id": "s04", "phase": "3. Foundations", "title": "DNS, NTP, network, PKI, identity, load balancing", "doc": "network-matrix/network-communication-matrix.md", "extraDocs": ["network-matrix/firewall-rules-generation.md"], "actions": ["Deploy DNS and NTP", "Create the internal CA and distribute the trust bundle", "Deploy the edge load balancer", "Implement the firewall rules from the matrix"] },
-    { "id": "s05", "phase": "4. Automation", "title": "Automation Management Server, Ansible, AWX, GitLab, Vault", "doc": "automation/ansible/ansible-structure.md", "extraDocs": ["automation/gitlab-ci/pipeline.md", "secrets-management/vault/vault-architecture.md"], "actions": ["Install Ansible in a virtualenv with the pinned version", "Deploy AWX and register the runners", "Deploy Vault on dedicated hosts and test the unseal procedure"] },
-    { "id": "s06", "phase": "5. Operating system", "title": "Provision and harden the nodes", "doc": "operating-systems/oracle-linux/baseline.md", "altDoc": "operating-systems/ubuntu/baseline.md", "actions": ["Configure the internal repositories", "Apply sysctl, kernel modules and the security baseline", "Join the directory, if selected", "Install the monitoring and logging agents"] },
-    { "id": "s07", "phase": "6. Storage", "title": "Deploy the storage platform", "doc": "storage/rook-ceph/rook-ceph.md", "altDoc": "storage/ceph/cephadm-deployment.md", "actions": ["Create the CRUSH map with the host failure domain", "Create the pools, the filesystem and the object store", "Check Ceph HEALTH_OK before consuming any PVC"] },
-    { "id": "s08", "phase": "7. Kubernetes", "title": "Deploy the cluster with Kubespray", "doc": "kubespray/kubespray-deployment.md", "extraDocs": ["kubespray/multi-version-support.md"], "actions": ["Fill the inventory and the group vars", "Mirror the artifacts for the selected Kubespray release", "Run cluster.yml, then validate the control plane and etcd"] },
-    { "id": "s09", "phase": "8. Cluster services", "title": "CNI, ingress, load balancing, CSI", "doc": "kubernetes/networking/cilium.md", "extraDocs": ["kubernetes/networking/metallb.md", "kubernetes/ingress/nginx-ingress.md"], "actions": ["Install the CNI and confirm kube-proxy replacement", "Configure MetalLB and the ingress controller", "Configure the CSI driver and the StorageClasses", "Apply the Gateway API CRDs"] },
-    { "id": "s09b", "phase": "8b. Service mesh (optional)", "title": "Deploy Istio and enable mTLS in stages", "doc": "service-mesh/istio/istio-deployment.md", "extraDocs": ["service-mesh/evaluation.md", "kubernetes/ingress/multi-controller-plan.md"], "when": { "component": { "serviceMesh": ["istio", "istio-ambient"] } }, "actions": ["Confirm the adoption threshold in service-mesh/evaluation.md is actually met", "Extract and mirror every image the install and the dataplane need", "Decide the dataplane mode: ambient (per node) or sidecar (per pod)", "Install the control plane with Helm so Argo CD owns it", "Apply PeerAuthentication STRICT to one namespace, watch the metrics, then continue", "Apply the default-deny AuthorizationPolicy only after the allow rules exist", "Test a negative case: a pod that should be denied must be denied", "Wire Istio telemetry into the existing Prometheus stack"] },
-    { "id": "s10", "phase": "9. Management cluster", "title": "Rancher, Keycloak, Argo CD, backup", "doc": "management-cluster/rancher/rancher.md", "extraDocs": ["management-cluster/keycloak/keycloak.md", "management-cluster/argocd/argocd.md", "lifecycle/backup/backup-and-dr.md"], "actions": ["Install Rancher and register the Application Cluster", "Wire Keycloak OIDC and verify the groups claim", "Install Argo CD and sync the first application", "Install Velero and run a first backup"] },
-    { "id": "s11", "phase": "10. Secrets and security", "title": "Vault integration, admission policy, runtime detection", "doc": "secrets-management/kubernetes-integration/secret-delivery.md", "extraDocs": ["kubernetes/security/security-controls.md"], "actions": ["Bind the Vault role to the service account", "Deploy the admission controllers in audit mode, then enforce", "Enable the runtime detection ruleset", "Verify certificate renewal and secret rotation"] },
-    { "id": "s12", "phase": "11. Observability", "title": "Metrics, alerting, logs", "doc": "monitoring/prometheus.md", "extraDocs": ["logging/log-pipeline.md"], "actions": ["Install the monitoring stack and confirm every target is up", "Configure the alert routes and the runbook links", "Deploy the log pipeline and prove the redaction filter"] },
-    { "id": "s13", "phase": "12. GPU and AI", "title": "GPU workers, driver, sharing, serving", "doc": "gpu-ai/gpu-workers/gpu-worker-operations.md", "extraDocs": ["gpu-ai/inference/llm-serving.md", "gpu-ai/sharing/mig-and-time-slicing.md"], "when": { "component": { "gpu": "mig" } }, "actions": ["Install the driver and the GPU Operator", "Configure MIG and verify the isolation", "Mirror the model weights and start the inference server", "Validate the DCGM metrics"] },
-    { "id": "s14", "phase": "13. GitOps and CI/CD", "title": "Pipelines, approval gates, drift detection", "doc": "automation/gitlab-ci/pipeline.md", "actions": ["Wire the 14 pipeline stages", "Protect the branches and require the approvals", "Turn on the nightly drift job"] },
-    { "id": "s15", "phase": "14. Lifecycle and recovery", "title": "Upgrades, backups, restore, disaster recovery", "doc": "lifecycle/upgrades/upgrade-procedures.md", "extraDocs": ["lifecycle/backup/backup-and-dr.md"], "actions": ["Run the upgrade procedure on a staging copy", "Restore into a scratch namespace and measure the RTO", "Rebuild a node from the OS and Kubespray", "Exercise the full rebuild order offline"] },
-    { "id": "s16", "phase": "15. Acceptance and handover", "title": "Acceptance tests and handover", "doc": "requirements/acceptance-criteria.md", "actions": ["Execute every acceptance test and store the evidence", "Record the known limitations", "Hand over to the operations team"] }
-  ],
-
-  "upgradeSections": [
-    { "id": "u01", "title": "Before any upgrade", "doc": "lifecycle/upgrades/upgrade-procedures.md", "actions": ["Confirm the target version is in the version matrix", "Confirm the compatibility constraints for the component", "Mirror the target artifacts and pull-verify them", "Take and verify a backup", "Check the end-of-life watchlist for a forced exit"] },
-    { "id": "u02", "title": "Kubernetes and Kubespray", "doc": "lifecycle/upgrades/upgrade-procedures.md", "actions": ["One minor version at a time", "Control plane first, then the workers", "Run the target release's own virtualenv", "Kubernetes has no rollback: the restore path is the backup"] },
-    { "id": "u03", "title": "Ceph and Rook-Ceph", "doc": "lifecycle/upgrades/upgrade-procedures.md", "actions": ["Rook operator first, then Ceph, then the CSI driver", "The Rook release constrains the Ceph version", "Ceph has no rollback across a major version"] },
-    { "id": "u04", "title": "Helm 3 to Helm 4", "doc": "lifecycle/upgrades/upgrade-procedures.md", "actions": ["Helm 3 security fixes end 2027-02-10", "Install Helm 4 alongside Helm 3", "Re-run every chart operation under Helm 4", "Keep the Helm 3 binary until the date passes"] },
-    { "id": "u05", "title": "Edge load balancer", "doc": "network-matrix/external-load-balancer.md", "actions": ["Update the image tags in the Compose file", "Upgrade one node, verify, then the other", "Confirm the VRRP state and the health checks after each node"] },
-    { "id": "u06", "title": "GPU operator, driver and CUDA", "doc": "gpu-ai/drivers/compatibility-matrix.md", "actions": ["Drain one GPU node at a time", "Verify the driver, the toolkit and the operator versions line up", "Run nvidia-smi on the node and in a pod before uncordoning"] },
-    { "id": "u07", "title": "Ingress controller portfolio", "doc": "kubernetes/ingress/multi-controller-plan.md", "actions": ["Check the deprecation stage of each controller", "Upstream retirement forces Deprecated immediately", "Migrate the traffic share before removing a controller"] },
-    { "id": "u07b", "title": "Service mesh (Istio)", "doc": "service-mesh/istio/istio-deployment.md", "actions": ["One minor version at a time; Istio does not support skipping minors", "Install the new revision alongside the old one (canary control plane)", "Move namespaces one at a time by changing the istio.io/rev label, then restart", "Rollback exists only while the old revision is installed: move the label back", "Downgrade is not supported. Remove the old revision only after every namespace has moved", "Confirm the Kubernetes version window for the target Istio minor before starting"] },
-    { "id": "u08", "title": "Vault and the PKI", "doc": "secrets-management/vault/hashicorp-vault-decision.md", "actions": ["Snapshot the raft storage before the upgrade", "Upgrade the standby, then the active", "Verify the unseal procedure and the audit device after the upgrade"] }
+    {
+      "id": "s01",
+      "phase": "1. Requirements",
+      "title": "Confirm the requirements, assumptions and open decisions",
+      "doc": "requirements/requirements-and-assumptions.md",
+      "actions": [
+        "Close every open decision",
+        "Confirm the IP plan and the failure domains",
+        "Confirm the legal position on the Vault license"
+      ]
+    },
+    {
+      "id": "s02",
+      "phase": "1. Requirements",
+      "title": "Read the architecture and the decisions",
+      "doc": "architecture/00-overview.md",
+      "extraDocs": [
+        "architecture/03-failure-domains.md"
+      ],
+      "actions": [
+        "Review the architecture overview",
+        "Review the failure-domain table for the components you selected"
+      ]
+    },
+    {
+      "id": "s03",
+      "phase": "2. Offline artifacts",
+      "title": "Stand up the internal repositories and mirror every artifact",
+      "doc": "offline-artifacts/offline-artifact-architecture.md",
+      "extraDocs": [
+        "offline-artifacts/artifact-matrix.md"
+      ],
+      "actions": [
+        "Deploy Harbor and Nexus",
+        "Mirror every artifact for the selected components",
+        "Verify offline install, image pull and chart deploy on a throwaway node"
+      ]
+    },
+    {
+      "id": "s04",
+      "phase": "3. Foundations",
+      "title": "DNS, NTP, network, PKI, load balancing",
+      "doc": "network-matrix/network-communication-matrix.md",
+      "extraDocs": [
+        "network-matrix/firewall-rules-generation.md"
+      ],
+      "actions": [
+        "Deploy DNS and NTP",
+        "Create the internal CA and distribute the trust bundle",
+        "Deploy the edge load balancer",
+        "Implement the firewall rules from the matrix"
+      ]
+    },
+    {
+      "id": "s05",
+      "phase": "4. Automation",
+      "title": "Automation server, Ansible, AWX, GitLab, Vault",
+      "doc": "automation/ansible/ansible-structure.md",
+      "extraDocs": [
+        "automation/gitlab-ci/pipeline.md",
+        "secrets-management/vault/vault-architecture.md"
+      ],
+      "actions": [
+        "Install Ansible in a virtualenv with the pinned version",
+        "Deploy AWX and register the runners",
+        "Deploy Vault on dedicated hosts and test the unseal procedure"
+      ]
+    },
+    {
+      "id": "s06",
+      "phase": "5. Operating system",
+      "title": "Provision and harden the nodes",
+      "doc": "operating-systems/oracle-linux/baseline.md",
+      "altDoc": "operating-systems/ubuntu/baseline.md",
+      "actions": [
+        "Configure the internal repositories",
+        "Apply sysctl, kernel modules and the security baseline",
+        "Confirm the local break-glass account and key work with no network dependency",
+        "Install the monitoring and logging agents"
+      ]
+    },
+    {
+      "id": "s07",
+      "phase": "6. Storage",
+      "title": "Deploy the storage platform",
+      "doc": "storage/rook-ceph/rook-ceph.md",
+      "altDoc": "storage/ceph/cephadm-deployment.md",
+      "actions": [
+        "Create the CRUSH map with the host failure domain",
+        "Create the pools, the filesystem and the object store",
+        "Confirm Ceph HEALTH_OK before consuming any volume"
+      ]
+    },
+    {
+      "id": "s08",
+      "phase": "7. Kubernetes",
+      "title": "Deploy the application cluster with Kubespray",
+      "doc": "kubespray/kubespray-deployment.md",
+      "extraDocs": [
+        "kubespray/multi-version-support.md"
+      ],
+      "actions": [
+        "Fill the inventory and the group vars from the generated files",
+        "Mirror the artifacts for the selected Kubespray release",
+        "Run cluster.yml, then validate the control plane and etcd"
+      ]
+    },
+    {
+      "id": "s09",
+      "phase": "8. Cluster services",
+      "title": "CNI, ingress, load balancing, CSI",
+      "doc": "kubernetes/networking/cilium.md",
+      "extraDocs": [
+        "kubernetes/networking/metallb.md",
+        "kubernetes/ingress/nginx-ingress.md"
+      ],
+      "actions": [
+        "Install the CNI and confirm kube-proxy replacement",
+        "Configure MetalLB and the ingress controller",
+        "Configure the CSI driver and the StorageClasses",
+        "Apply the Gateway API CRDs"
+      ]
+    },
+    {
+      "id": "s09b",
+      "phase": "8b. Service mesh (optional)",
+      "title": "Deploy Istio and enable mTLS in stages",
+      "doc": "service-mesh/istio/istio-deployment.md",
+      "extraDocs": [
+        "service-mesh/evaluation.md"
+      ],
+      "when": {
+        "component": {
+          "serviceMesh": [
+            "istio",
+            "istio-ambient"
+          ]
+        }
+      },
+      "actions": [
+        "Confirm the adoption threshold in service-mesh/evaluation.md is met",
+        "Extract and mirror every image the install and the dataplane need",
+        "Decide the dataplane mode: ambient (per node) or sidecar (per pod)",
+        "Install the control plane with Helm so Argo CD owns it",
+        "Apply PeerAuthentication STRICT to one namespace, watch metrics, then continue",
+        "Apply the default-deny AuthorizationPolicy only after the allow rules exist",
+        "Test a negative case: a pod that should be denied must be denied",
+        "Wire Istio telemetry into the existing Prometheus stack"
+      ]
+    },
+    {
+      "id": "s10",
+      "phase": "9. Management cluster",
+      "title": "Rancher, Keycloak, Argo CD, backup",
+      "doc": "management-cluster/rancher/rancher.md",
+      "extraDocs": [
+        "management-cluster/keycloak/keycloak.md",
+        "management-cluster/argocd/argocd.md",
+        "lifecycle/backup/backup-and-dr.md"
+      ],
+      "actions": [
+        "Deploy the management cluster from its own inventory",
+        "Install Rancher and register the application cluster",
+        "Install Keycloak and wire OIDC for each service",
+        "Install Argo CD and sync the first application",
+        "Install Velero and run a first backup"
+      ]
+    },
+    {
+      "id": "s10b",
+      "phase": "9b. Directory integration (optional)",
+      "title": "Integrate the directory at the application layer",
+      "doc": "identity/directory-integration.md",
+      "when": {
+        "component": {
+          "idpIntegration": [
+            "rancher-ad",
+            "rancher-ldap",
+            "keycloak-federation",
+            "harbor-oidc",
+            "gitlab-ldap",
+            "argocd-oidc",
+            "vault-oidc"
+          ]
+        }
+      },
+      "actions": [
+        "Confirm the break-glass local account works with the directory unreachable",
+        "Create a read-only bind account and store its credential in Vault",
+        "Configure Keycloak user federation first, read-only",
+        "Create one OIDC client per service with explicit redirect URIs",
+        "Wire services in order: Argo CD, Rancher, Harbor, GitLab, Vault, Kubernetes API",
+        "Remove the local superuser path only after a federated admin login is verified",
+        "Alert on failed federated logins and on a zero-login drop during working hours"
+      ]
+    },
+    {
+      "id": "s11",
+      "phase": "10. Secrets and security",
+      "title": "Vault integration, admission policy, runtime detection",
+      "doc": "secrets-management/kubernetes-integration/secret-delivery.md",
+      "extraDocs": [
+        "kubernetes/security/security-controls.md"
+      ],
+      "actions": [
+        "Bind the Vault role to the service account",
+        "Deploy the admission controllers in audit mode, then enforce",
+        "Enable the runtime detection ruleset",
+        "Verify certificate renewal and secret rotation"
+      ]
+    },
+    {
+      "id": "s12",
+      "phase": "11. Observability",
+      "title": "Metrics, alerting, logs",
+      "doc": "monitoring/prometheus.md",
+      "extraDocs": [
+        "logging/log-pipeline.md"
+      ],
+      "actions": [
+        "Install the monitoring stack and confirm every target is up",
+        "Configure the alert routes and the runbook links",
+        "Deploy the log pipeline and prove the redaction filter"
+      ]
+    },
+    {
+      "id": "s13",
+      "phase": "12. GPU and AI",
+      "title": "GPU workers, driver, sharing, serving",
+      "doc": "gpu-ai/gpu-workers/gpu-worker-operations.md",
+      "extraDocs": [
+        "gpu-ai/inference/llm-serving.md",
+        "gpu-ai/sharing/mig-and-time-slicing.md"
+      ],
+      "when": {
+        "component": {
+          "gpu": [
+            "mig",
+            "timeslicing"
+          ]
+        }
+      },
+      "actions": [
+        "Install the driver and the GPU Operator",
+        "Configure MIG and verify the isolation",
+        "Mirror the model weights and start the inference server",
+        "Validate the DCGM metrics"
+      ]
+    },
+    {
+      "id": "s14",
+      "phase": "13. GitOps and CI/CD",
+      "title": "Pipelines, approval gates, drift detection",
+      "doc": "automation/gitlab-ci/pipeline.md",
+      "actions": [
+        "Wire the pipeline stages",
+        "Protect the branches and require the approvals",
+        "Turn on the nightly drift job"
+      ]
+    },
+    {
+      "id": "s15",
+      "phase": "14. Lifecycle and recovery",
+      "title": "Upgrades, backups, restore, disaster recovery",
+      "doc": "lifecycle/upgrades/upgrade-procedures.md",
+      "extraDocs": [
+        "lifecycle/backup/backup-and-dr.md"
+      ],
+      "actions": [
+        "Run the upgrade procedure on a staging copy",
+        "Restore into a scratch namespace and measure the RTO",
+        "Rebuild a node from the OS and Kubespray",
+        "Exercise the full rebuild order offline"
+      ]
+    },
+    {
+      "id": "s16",
+      "phase": "15. Acceptance and handover",
+      "title": "Acceptance tests and handover",
+      "doc": "requirements/acceptance-criteria.md",
+      "actions": [
+        "Execute every acceptance test and store the evidence",
+        "Record the known limitations",
+        "Hand over to the operations team"
+      ]
+    }
   ]
 }

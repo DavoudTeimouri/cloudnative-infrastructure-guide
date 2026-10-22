@@ -17,6 +17,17 @@ Rancher manages the lifecycle of the Application Clusters and provides the opera
 
 ## B. Deployment model
 
+**Its own cluster, its own inventory, its own capacity.** Rancher, Keycloak, Argo CD, Harbor and
+Vault run on a management cluster that is built with the same Kubespray release but a different
+inventory file, and sized independently from the application clusters it manages. Sharing worker
+nodes with a workload cluster means a workload can starve the console you need to fix it, and a
+management-cluster upgrade then shares a maintenance window with production.
+
+Node count, vCPU, RAM and disk are inputs, not constants: the site generates
+`hosts-mgmt.ini` from the management worker count and the first management address
+(`catalog/catalog.json`, page `p3`). Three workers is the default; one is acceptable for a lab and
+gives no rollout headroom for the Rancher upgrade itself.
+
 Rancher runs on its own dedicated cluster, not on an Application Cluster. Rationale: ADR-0010 and ADR-0011. If Rancher shares a cluster with workloads, a workload failure domain becomes a management failure domain.
 
 The Rancher cluster is built with Kubespray, like every other cluster, so it is reproducible from the same inventory and the same OS baseline.

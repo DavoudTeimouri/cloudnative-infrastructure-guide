@@ -12,7 +12,7 @@ Personal cloud-native knowledge base: on-premises, air-gapped, production-orient
 | Management | Rancher Management Cluster + independent Application Clusters |
 | Traffic | MetalLB (L4, in-cluster) + external active/active edge (HAProxy/Nginx + Keepalived on Docker Compose) + F5 NGINX Ingress Controller / NGINX Gateway Fabric / Envoy Gateway (L7) + Gateway API + Cilium |
 | GitOps | Argo CD, GitLab CI |
-| Identity | Keycloak, SSSD/realmd, AD/LDAP |
+| Identity | Keycloak as broker, OIDC/LDAP federation for Rancher, Harbor, GitLab, Argo CD, Vault, Kubernetes API. **No host-level AD join** |
 | Secrets | **HashiCorp Vault** (Community, BSL 1.1), cert-manager, External Secrets. OpenBao is the documented fallback |
 | Observability | Prometheus/Grafana/Alertmanager/Thanos, Loki/Fluent Bit |
 | Security | Pod Security Standards, OPA Gatekeeper, Kyverno, Falco, Trivy, Cosign, Syft |
@@ -63,35 +63,48 @@ sources, so the site cannot drift from the documents. Details: `site/README.md`.
 
 **Use it, step by step**
 
-1. Open the live URL above.
-2. Choose **bare metal** or **virtual machines**. Read the requirements: the VM option lists
-   what changes in the failure domain.
-3. Choose the **Kubespray release**. Five are supported in parallel; the pinned Kubernetes,
-   etcd, containerd and Ansible versions are shown, not guessed.
-4. Walk the **components**. Required components have no "none" option. Read every inline warning
-   before selecting.
-5. Fill the **site values** — CIDRs, node names, VIPs, registry and mirror endpoints. Everything
-   renders in your browser; nothing is transmitted. The two secret fields can be left empty.
-6. Read the **plan** top to bottom and open the document behind each step. The plan is a reading
-   order, not a script.
-7. Download the **exports** you need (inventory, group vars, MetalLB pool, Keepalived config,
-   edge Compose stack, Vault policy, GPU labels, vLLM Deployment) and review every file.
-8. Download the **runbook** and attach it to the change record.
-9. Read the **upgrades** section before any version change. Kubernetes and Ceph have no rollback;
-   the backup is the rollback.
+The configurator is a wizard: one page per group, then a review page.
+
+1. **Deployment** — bare metal or virtual machines, cluster name, environment, domain. Read the
+   requirements: the VM option lists what changes in the failure domain.
+2. **Application cluster** — control-plane count, worker count, GPU nodes, and vCPU/RAM/disk per
+   role. Node names and addresses are generated from the prefix and the first address; the page
+   shows the result.
+3. **Management cluster** — its own worker count and sizes, because Rancher, Keycloak, Argo CD,
+   Harbor and Vault do not share the workload cluster's capacity. Includes the directory
+   integrations (multi-select) and the directory endpoint.
+4. **Operating system** — Oracle Linux 9/8 or Ubuntu 24.04/22.04. Local accounts only; nodes are
+   never joined to a directory.
+5. **Storage** — Rook-Ceph inside the cluster, or cephadm on dedicated hosts with **Podman or
+   Docker**, with the Ceph host count, sizes and disks.
+6. **Traffic** — edge node count, edge VIP, MetalLB pool, DMZ CIDR, the VRRP pass phrase, and the
+   ingress controller.
+7. **Network and offline artifacts** — the seven CIDRs, the API VIP, registry and file-mirror
+   endpoints, additional registries and package repositories, and the registry credential.
+8. **Platform services** — GitOps, secrets, observability, logging, admission policy, runtime
+   detection, backup, service mesh, GPU.
+9. **Review** — sizing totals, every resolved version, the filtered implementation steps, and the
+   generated files: inventories for both clusters, Kubespray group vars, cephadm bootstrap and
+   service spec, MetalLB pool, Keepalived, edge Compose stack, bootstrap scripts, Istio manifests,
+   Vault policy, GPU manifests, the directory-integration checklist, and the runbook.
+10. **Upgrade** — a separate walkthrough. Pick the component and the target, and the site renders
+    the ordered steps with gate markers, the command for each step rendered against your values,
+    the downtime, and the rollback statement.
 
 **Change it, step by step**
 
 | Change | Edit | Then |
 |---|---|---|
 | A pinned version | `compatibility/version-matrix.md` | `python3 scripts/build_site.py` |
-| A component, option, step or value | `catalog/catalog.json` | `python3 scripts/build_site.py` |
+| A component, option, page or value | `catalog/catalog.json` | `python3 scripts/build_site.py` |
 | An export template | `catalog/exports.json` | `python3 scripts/build_site.py` |
+| An upgrade flow or a gate | `catalog/upgrades.json` | `python3 scripts/build_site.py` |
 | A document that a step links to | the document | nothing, unless the path moved |
 
 ```bash
 python3 scripts/build_site.py        # regenerate site/data.json
 python3 scripts/validate_catalog.py  # missing docs, bad placeholders, stale data
+python3 tests/test_site_render.py    # boots app.js and asserts the render (needs dukpy)
 python3 -m http.server 8080 --directory site   # preview at http://localhost:8080
 ```
 
@@ -116,7 +129,7 @@ kubernetes/              control-plane/ networking/ ingress/ csi/ security/
                          ingress/  nginx-ingress.md, multi-controller-plan.md
 storage/                 ceph/ rook-ceph/ alternatives/
 management-cluster/      rancher/ argocd/ keycloak/ platform-services/
-identity/                SSSD, realmd, Kerberos, AD integration
+identity/                application-level directory integration (no host join)
 secrets-management/      vault/ (architecture + HashiCorp product decision)
                          kubernetes-integration/ pki/ recovery/
 gpu-ai/                  gpu-ai-architecture, gpu-workers/ drivers/ scheduling/

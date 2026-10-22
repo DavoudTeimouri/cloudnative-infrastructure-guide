@@ -4,24 +4,23 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Enterprise Cloud-Native Infrastructure Guide</title>
-<meta name="description" content="Step-by-step guide for building a production cloud-native platform on premises: Kubernetes with Kubespray, Ceph, Rancher, Argo CD, Vault, Prometheus, offline artifact distribution, and GPU inference.">
+<meta name="description" content="Step-by-step configurator and upgrade walkthrough for an on-premises, air-gapped cloud-native platform: Kubernetes with Kubespray, Ceph (Rook or cephadm on Podman/Docker), Rancher, Argo CD, Vault, Prometheus, Istio and GPU inference.">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 <header class="top">
   <div class="wrap">
-    <a class="brand" href="#top">
+    <a class="brand" href="#/">
       <span class="brand-mark">CN</span>
       <span>
         <strong>Cloud-Native Infrastructure Guide</strong>
         <small>On-premises · air-gapped · production</small>
       </span>
     </a>
-    <nav>
-      <a href="#configure">Configure</a>
-      <a href="#plan">Plan</a>
-      <a href="#export">Export</a>
-      <a href="#upgrade">Upgrades</a>
+    <nav id="nav">
+      <a href="#/configure" data-view="wizard">Configure</a>
+      <a href="#/review" data-view="review">Review</a>
+      <a href="#/upgrade" data-view="upgrade">Upgrade</a>
       <a href="https://github.com/DavoudTeimouri/cloudnative-infrastructure-guide" rel="noopener">Repository</a>
     </nav>
   </div>
@@ -29,13 +28,13 @@
 
 <main class="wrap" id="top">
 
-  <section class="hero">
-    <h1>Build a cloud-native platform, step by step.</h1>
+  <section class="hero" id="hero">
+    <h1>Build a cloud-native platform, one page at a time.</h1>
     <p>
-      Pick your deployment method, choose the components, fill in the site values, and the guide
-      renders the ordered plan, the resolved versions, and ready-to-use configuration files.
-      Every version comes from the repository's compatibility matrix, so the site never drifts
-      from the documents.
+      Choose the deployment method, then walk the pages: application cluster, management cluster,
+      operating system, storage, traffic, network and offline artifacts, platform services.
+      Node names and addresses are generated from the counts you enter. The last page reviews the
+      plan and gives you the configuration files.
     </p>
     <p class="hero-meta">
       <span id="catalog-version">catalog —</span>
@@ -44,40 +43,22 @@
     </p>
   </section>
 
-  <section id="configure">
-    <h2>1. Configure</h2>
-
-    <div class="grid">
-      <fieldset class="card">
-        <legend>Deployment method</legend>
-        <div id="method-picker" class="options"></div>
-        <div id="method-detail" class="detail"></div>
-      </fieldset>
-
-      <fieldset class="card">
-        <legend>Cluster method</legend>
-        <div id="cluster-picker" class="options"></div>
-        <div id="cluster-detail" class="detail"></div>
-      </fieldset>
+  <!-- wizard -->
+  <section id="wizard" class="view">
+    <div class="wizard-bar">
+      <ol class="crumbs" id="crumbs"></ol>
+      <div class="wizard-actions">
+        <button id="prev" class="btn">Back</button>
+        <button id="next" class="btn primary">Next</button>
+      </div>
     </div>
 
-    <fieldset class="card">
-      <legend>Components</legend>
-      <div id="components" class="components"></div>
-    </fieldset>
-
-    <fieldset class="card">
-      <legend>Site values</legend>
-      <p class="hint">
-        Values are rendered locally in your browser. Nothing is sent anywhere. Secret fields are
-        marked, and their content is written only into the file you download.
-      </p>
-      <div id="values" class="values"></div>
-    </fieldset>
+    <div id="page" class="page"></div>
   </section>
 
-  <section id="plan">
-    <h2>2. Plan</h2>
+  <!-- review -->
+  <section id="review" class="view" hidden>
+    <h2>Review</h2>
     <div class="plan-head">
       <div>
         <strong id="plan-summary">—</strong>
@@ -89,29 +70,46 @@
       </div>
     </div>
 
+    <h3>Sizing</h3>
+    <table class="versions" id="sizing"><tbody></tbody></table>
+
     <h3>Resolved versions</h3>
     <table class="versions" id="versions"><tbody></tbody></table>
 
     <h3>Implementation steps</h3>
     <ol class="steps" id="steps"></ol>
-  </section>
 
-  <section id="export">
-    <h2>3. Export</h2>
-    <p class="hint">
-      Configuration files generated from your selection. Review every file before use: the
-      repository documents are the authority, not this page.
-    </p>
+    <h3>Generated files</h3>
     <div id="exports" class="exports"></div>
   </section>
 
-  <section id="upgrade">
-    <h2>4. Updating and upgrading</h2>
+  <!-- upgrade -->
+  <section id="upgrade" class="view" hidden>
+    <h2>Upgrade walkthrough</h2>
     <p class="hint">
-      Kept separate from the implementation plan. The order matters, and the rollback path
-      differs per component.
+      One component at a time, in order. A step marked <strong>gate</strong> must pass before the
+      next one starts. The rollback line states what is actually possible — for Kubernetes and
+      Ceph it is the backup, not a downgrade.
     </p>
-    <div id="upgrades" class="upgrades"></div>
+
+    <div class="card">
+      <div class="grid">
+        <div class="field">
+          <label for="flow">Component</label>
+          <select id="flow"></select>
+        </div>
+        <div class="field">
+          <label for="target">Target version</label>
+          <select id="target"></select>
+        </div>
+      </div>
+      <p class="hint" id="flow-meta"></p>
+      <div class="plan-actions">
+        <button id="download-upgrade" class="btn primary">Download upgrade runbook</button>
+      </div>
+    </div>
+
+    <div id="upgrade-body"></div>
   </section>
 
   <section id="sources">
@@ -130,9 +128,10 @@
         <h3>How it stays current</h3>
         <ul>
           <li>Versions are parsed from <code>compatibility/version-matrix.md</code> at build time.</li>
-          <li>Only rows marked VERIFIED are used. UNVERIFIED rows never reach the site.</li>
-          <li>Components, steps and exports come from <code>catalog/catalog.json</code>.</li>
+          <li>Only rows marked VERIFIED are used.</li>
+          <li>Pages, components, steps and upgrade flows come from <code>catalog/</code>.</li>
           <li>A build check fails when the generated data no longer matches the sources.</li>
+          <li>A renderer test boots this page's script in a JS engine and asserts the output.</li>
         </ul>
       </div>
     </div>

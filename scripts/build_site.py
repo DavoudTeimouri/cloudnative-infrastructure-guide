@@ -3,7 +3,7 @@
 
 Single source of truth: the repository. The site is generated from it, never
 edited by hand. A version bump in compatibility/version-matrix.md or a change
-in catalog/catalog.json propagates on the next build.
+in catalog/*.json propagates on the next build.
 
 Stdlib only. No network. No build dependencies.
 
@@ -19,6 +19,7 @@ import sys
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CATALOG = os.path.join(BASE, "catalog", "catalog.json")
 EXPORTS = os.path.join(BASE, "catalog", "exports.json")
+UPGRADES = os.path.join(BASE, "catalog", "upgrades.json")
 MATRIX = os.path.join(BASE, "compatibility", "version-matrix.md")
 OUT = os.path.join(BASE, "site", "data.json")
 
@@ -51,17 +52,15 @@ VERSION_ALIASES = {
     "kubespray": ["Kubespray"],
     "keepalived": ["Keepalived"],
     "vllm": ["vLLM"],
-    "ngf": ["NGINX Gateway Fabric"],
-    "envoy": ["Envoy Gateway"],
 }
 
 
 def parse_version_matrix(path):
     """Return {component_label: version} from every markdown table in the file.
 
-    Looks at the 'Version' or 'Verified version' column. Only rows whose
-    status column says VERIFIED are taken, so UNVERIFIED entries never leak
-    into the site as if they were confirmed.
+    Looks at the 'Version' or 'Verified version' column. Only rows whose status
+    says VERIFIED are taken, so UNVERIFIED entries never leak into the site as
+    if they were confirmed.
     """
     out = {}
     text = open(path, encoding="utf-8").read()
@@ -82,14 +81,12 @@ def parse_version_matrix(path):
             cells = [c.strip() for c in row.strip("|").split("|")]
             if len(cells) <= max(vi, ni):
                 continue
-            if si is not None and len(cells) > si:
-                if "VERIFIED" not in cells[si]:
-                    continue
+            if si is not None and len(cells) > si and "VERIFIED" not in cells[si]:
+                continue
             version = cells[vi].strip("`")
             if not version or version in ("n/a", "UNVERIFIED", "pin", "-"):
                 continue
-            label = cells[ni].strip("`")
-            out.setdefault(label, version)
+            out.setdefault(cells[ni].strip("`"), version)
     return out
 
 
@@ -103,44 +100,70 @@ def resolve_versions(matrix):
     return resolved
 
 
+def collect_doc_refs(catalog, exports, upgrades):
+    refs = []
+    for method in catalog.get("methods", []):
+        pass
+    for comp in catalog["components"]:
+        for key in ("doc",):
+            if comp.get(key):
+                refs.append(comp[key])
+        for opt in comp["options"]:
+            for key in ("doc", "decisionDoc"):
+                if opt.get(key):
+                    refs.append(opt[key])
+    for page in catalog.get("pages", []):
+        pass
+    for step in catalog["steps"]:
+        for key in ("doc", "altDoc"):
+            if step.get(key):
+                refs.append(step[key])
+        refs.extend(step.get("extraDocs", []))
+    for flow in upgrades:
+        if flow.get("doc"):
+            refs.append(flow["doc"])
+    return refs
+
+
 def main():
     check = "--check" in sys.argv
 
     catalog = json.load(open(CATALOG, encoding="utf-8"))
-    exports = json.load(open(EXPORTS, encoding="utf-8"))
+    exports = json.load(open(EXPORTS, encoding="utf-8"))["exports"]
+    upgrades = json.load(open(UPGRADES, encoding="utf-8"))["flows"]
     matrix = parse_version_matrix(MATRIX)
     versions = resolve_versions(matrix)
 
-    # Kubespray release data lives in the catalog, but the pinned release's
-    # component versions come from the matrix and the multi-version guide.
-    kubespray_versions = {}
+    # The pinned release's component versions come from the catalog; the matrix
+    # wins for anything it also defines.
     for release in catalog["clusterMethods"][0].get("versions", {}).values():
         for k, v in release.items():
-            kubespray_versions.setdefault(k, v)
-    versions.update({k: v for k, v in kubespray_versions.items() if k not in versions})
+            versions.setdefault(k, v)
 
     # Every doc the catalog points at must exist.
-    missing = []
-    for comp in catalog["components"]:
-        for opt in comp["options"]:
-            for key in ("doc", "decisionDoc"):
-                ref = opt.get(key)
-                if ref and not os.path.exists(os.path.join(BASE, ref)):
-                    missing.append(ref)
-    for step in catalog["steps"] + catalog["upgradeSections"]:
-        for key in ("doc", "altDoc"):
-            ref = step.get(key)
-            if ref and not os.path.exists(os.path.join(BASE, ref)):
-                missing.append(ref)
-        for ref in step.get("extraDocs", []):
-            if not os.path.exists(os.path.join(BASE, ref)):
-                missing.append(ref)
-    for method in catalog["methods"]:
-        pass
+    missing = [r for r in collect_doc_refs(catalog, exports, upgrades)
+               if r and not os.path.exists(os.path.join(BASE, r))]
     if missing:
         print("MISSING DOCS:")
         for m in sorted(set(missing)):
             print("  ", m)
+        return 1
+
+    # Every page field and component must exist.
+    comp_ids = {c["id"] for c in catalog["components"]}
+    value_ids = {v["id"] for v in catalog["values"]}
+    problems = []
+    for page in catalog.get("pages", []):
+        for c in page.get("components", []):
+            if c not in comp_ids:
+                problems.append(f"page {page['id']}: unknown component {c}")
+        for f in page.get("fields", []):
+            if f not in value_ids:
+                problems.append(f"page {page['id']}: unknown field {f}")
+    if problems:
+        print("PAGE ERRORS:")
+        for p in problems:
+            print("  ", p)
         return 1
 
     data = {
@@ -149,11 +172,12 @@ def main():
         "source": catalog["source"],
         "methods": catalog["methods"],
         "clusterMethods": catalog["clusterMethods"],
+        "pages": catalog.get("pages", []),
         "components": catalog["components"],
         "values": catalog["values"],
         "steps": catalog["steps"],
-        "upgradeSections": catalog["upgradeSections"],
-        "exports": exports["exports"],
+        "upgrades": upgrades,
+        "exports": exports,
         "versions": versions,
     }
 
@@ -171,9 +195,10 @@ def main():
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     with open(OUT, "w", encoding="utf-8") as fh:
         fh.write(payload)
-    print(f"wrote {OUT} ({len(payload)} bytes, {len(versions)} resolved versions)")
-    for k in sorted(versions):
-        print(f"  {k} = {versions[k]}")
+    print(f"wrote {OUT} ({len(payload)} bytes)")
+    print(f"  {len(versions)} versions, {len(catalog['components'])} components, "
+          f"{len(catalog['values'])} values, {len(catalog['pages'])} pages, "
+          f"{len(catalog['steps'])} steps, {len(upgrades)} upgrade flows, {len(exports)} exports")
     return 0
 
 

@@ -23,7 +23,7 @@ ansible/
 │   ├── base/                 # base OS, users, ssh, sudo
 │   ├── repositories/         # internal rpm/deb/pypi/helm
 │   ├── security/             # sysctl, sshd, firewall, audit
-│   ├── identity/             # sssd/realmd
+│   ├── identity/             # none: identity is application-level (ADR-0015)
 │   ├── monitoring/           # node_exporter, fluent-bit
 │   ├── containerd/           # runtime install and registry config
 │   ├── kubernetes/           # kubespray wrapper
@@ -175,7 +175,7 @@ Each play targets a host group, so a partial run is possible with `--limit`.
 |---|---|
 | `base` | OS baseline, packages, users |
 | `security` | sysctl, sshd, firewall, audit |
-| `identity` | SSSD/realmd |
+| `identity` | not used: no host-level directory join (ADR-0015) |
 | `monitoring` | node_exporter, Fluent Bit |
 | `containerd` | Runtime and registry configuration |
 | `kubernetes` | Kubespray cluster.yml |

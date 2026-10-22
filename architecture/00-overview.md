@@ -7,7 +7,7 @@
 | Physical | Servers, PDUs, switches | Node loss; storage designed to tolerate |
 | Offline distribution | Harbor, Nexus, RPM/DEB mirrors, GitLab | New deployments blocked; running workloads unaffected |
 | Automation | Automation Management Server, Ansible, AWX, GitLab Runner | Changes blocked; workloads unaffected |
-| Identity & secrets | Keycloak, SSSD/AD, Vault, internal CA | Login blocked; workloads keep running |
+| Identity & secrets | Keycloak (broker), OIDC/LDAP federation, Vault, internal CA | Login blocked; workloads keep running |
 | Storage | Ceph MON/MGR/OSD/MDS/RGW, Rook operator | PVC IO blocks; pod restart loop |
 | Kubernetes | Control plane, etcd, CNI, CSI | Scheduling/API blocked; running pods keep IP |
 | GitOps | Argo CD, GitLab | New/changed deploys blocked; no auto-revert |

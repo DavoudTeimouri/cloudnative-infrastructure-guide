@@ -4,6 +4,11 @@ Format for every component upgrade: source -> target, compatibility, pre-validat
 
 ## Rules that apply to every upgrade
 
+**This document is the authority; the site renders a configurable walkthrough of it.** Each flow
+in `catalog/upgrades.json` maps to a section here and carries the same gates, the same order, and
+the rollback statement. If the two disagree, fix the catalog — the site must not become a second
+source of truth.
+
 1. **Never skip a minor version.** Kubernetes supports one minor of skew; Ceph and Istio have explicit supported upgrade paths.
 2. **Pin, do not float.** The target version is added to `compatibility/version-matrix.md` with a source URL and a check date before the upgrade starts.
 3. **Mirror first, upgrade second.** Every artifact for the target version is in the internal registry and pull-verified before any node is touched.

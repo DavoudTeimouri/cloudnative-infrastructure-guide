@@ -1,5 +1,5 @@
 {
-  "catalogVersion": "1.0.0",
+  "catalogVersion": "2.0.0",
   "updated": "2026-10-22",
   "source": {
     "docs": "The repository is the source of truth. This catalog points at it; it never duplicates a procedure.",
@@ -10,24 +10,24 @@
     {
       "id": "baremetal",
       "title": "Bare metal",
-      "summary": "Physical servers, direct disk for storage and etcd, full control of the PCIe and NUMA topology.",
+      "summary": "Physical servers, direct disks for Ceph and etcd, full control of PCIe and NUMA topology.",
       "bestFor": "Ceph at scale, GPU inference, predictable IO latency, no hypervisor in the failure path.",
       "requirements": [
         "IPMI or BMC access for out-of-band installation",
-        "Local SSD for etcd, dedicated NVMe for Ceph journal and OSD DB",
+        "Local SSD for etcd, dedicated NVMe for the Ceph OSD DB and WAL",
         "RAID1 for the boot disk, or software RAID managed by the OS baseline"
       ]
     },
     {
       "id": "vm",
       "title": "Virtual machines",
-      "summary": "VMs on an existing hypervisor, with the caveats below.",
-      "bestFor": "Small sites, environments where hardware is not available, fast proof of concept.",
+      "summary": "VMs on an existing hypervisor.",
+      "bestFor": "Small sites, lab and staging, environments without hardware.",
       "requirements": [
         "Ceph OSD disks must be raw or SCSI-passthrough, never a shared virtual disk",
-        "etcd must sit on a local SSD with local vCPUs, not on shared storage",
-        "GPU workloads need passthrough; MIG is not virtualizable, so the whole card must be passed through",
-        "The hypervisor becomes part of the failure domain and must be in the DR plan"
+        "etcd on a local SSD with dedicated vCPUs, never on shared storage",
+        "GPU needs passthrough; MIG is not virtualizable, so pass the whole card",
+        "The hypervisor joins the failure domain and must be in the DR plan"
       ]
     }
   ],
@@ -93,6 +93,156 @@
       "multiVersionDoc": "kubespray/multi-version-support.md"
     }
   ],
+  "pages": [
+    {
+      "id": "p1",
+      "title": "Deployment",
+      "subtitle": "Where this platform runs, and what it is called.",
+      "components": [],
+      "fields": [
+        "clusterName",
+        "env",
+        "domain"
+      ]
+    },
+    {
+      "id": "p2",
+      "title": "Application cluster",
+      "subtitle": "Control plane, workers and their sizes. Names and IPs are generated from the prefix and the first address.",
+      "components": [
+        "controlPlane",
+        "cni"
+      ],
+      "fields": [
+        "nodePrefix",
+        "appNodeIpStart",
+        "appCpCount",
+        "appCpCpu",
+        "appCpMemGb",
+        "appCpDiskGb",
+        "appWorkerCount",
+        "appWorkerCpu",
+        "appWorkerMemGb",
+        "appWorkerDiskGb",
+        "appWorkerDataDiskGb"
+      ]
+    },
+    {
+      "id": "p3",
+      "title": "Management cluster",
+      "subtitle": "Rancher, Keycloak and the directory integrations run here, sized separately from the workload clusters.",
+      "components": [
+        "management",
+        "identity",
+        "idpIntegration"
+      ],
+      "fields": [
+        "mgmtWorkerCount",
+        "mgmtIpStart",
+        "mgmtCpu",
+        "mgmtMemGb",
+        "mgmtDiskGb",
+        "directoryHost",
+        "directoryBaseDn"
+      ]
+    },
+    {
+      "id": "p4",
+      "title": "Operating system",
+      "subtitle": "Distribution baseline. Local accounts only: nodes are never joined to a directory.",
+      "components": [
+        "os"
+      ],
+      "fields": [
+        "caBundle"
+      ]
+    },
+    {
+      "id": "p5",
+      "title": "Storage",
+      "subtitle": "Ceph inside Kubernetes with Rook, or on dedicated hosts with cephadm on Podman or Docker.",
+      "components": [
+        "storage"
+      ],
+      "fields": [
+        "cephNodeCount",
+        "cephIpStart",
+        "cephCpu",
+        "cephMemGb",
+        "cephDataDiskGb",
+        "cephJournalDiskGb"
+      ]
+    },
+    {
+      "id": "p6",
+      "title": "Traffic",
+      "subtitle": "Edge load balancer, L7 ingress and in-cluster L4.",
+      "components": [
+        "edge",
+        "ingress",
+        "l4"
+      ],
+      "fields": [
+        "edgeCount",
+        "edgeIpStart",
+        "edgeVip",
+        "loadBalancerPool",
+        "dmzCidr",
+        "vrrpAuthPass"
+      ]
+    },
+    {
+      "id": "p7",
+      "title": "Network and offline artifacts",
+      "subtitle": "Address plan, registries and package repositories. Everything is mirrored; nothing is pulled from the internet.",
+      "components": [],
+      "fields": [
+        "mgmtCidr",
+        "cpCidr",
+        "podCidr",
+        "serviceCidr",
+        "storageCidr",
+        "gpuCidr",
+        "apiServerIp",
+        "adminCidr",
+        "registryHost",
+        "registryAddr",
+        "filesRepo",
+        "nexusHost",
+        "extraRegistries",
+        "extraRepos",
+        "registryAuth"
+      ]
+    },
+    {
+      "id": "p8",
+      "title": "Platform services",
+      "subtitle": "GitOps, secrets, observability, policy, mesh and GPU. Optional components can be switched off.",
+      "components": [
+        "gitops",
+        "secrets",
+        "observability",
+        "logging",
+        "policy",
+        "runtimeDetection",
+        "backup",
+        "serviceMesh",
+        "gpu"
+      ],
+      "fields": [
+        "appNamespace",
+        "vaultEngine",
+        "objectStorage",
+        "vaultHost",
+        "keycloakHost",
+        "gitlabHost",
+        "gpuCount",
+        "gpuCpu",
+        "gpuMemGb",
+        "gpuDiskGb"
+      ]
+    }
+  ],
   "components": [
     {
       "id": "os",
@@ -148,7 +298,7 @@
           "title": "5 control-plane nodes, stacked etcd",
           "etcd": "5 members, 2 failures tolerated",
           "doc": "architecture/02-deployment-topology.md",
-          "warning": "Longer maintenance windows and a third failure domain needed to justify it."
+          "warning": "Longer maintenance windows, and a third failure domain is needed to justify it."
         }
       ]
     },
@@ -169,7 +319,7 @@
           "title": "Calico \u2014 mature, rich policy, IPIP/VXLAN",
           "versionKey": "calico",
           "doc": "kubernetes/networking/cilium.md",
-          "note": "The Calico deployment details live in the Kubespray inventory for the pinned release."
+          "note": "Calico is configured through the Kubespray inventory for the pinned release."
         }
       ]
     },
@@ -186,10 +336,18 @@
           "doc": "storage/rook-ceph/rook-ceph.md"
         },
         {
-          "id": "cephadm",
-          "title": "Ceph via cephadm on dedicated hosts, consumed over the external CSI driver",
+          "id": "cephadm-podman",
+          "title": "cephadm on dedicated hosts \u2014 Podman",
           "versionKey": "ceph",
-          "doc": "storage/ceph/cephadm-deployment.md"
+          "doc": "storage/ceph/cephadm-deployment.md",
+          "note": "Upstream default engine. No container engine dependency inside Kubernetes."
+        },
+        {
+          "id": "cephadm-docker",
+          "title": "cephadm on dedicated hosts \u2014 Docker",
+          "versionKey": "ceph",
+          "doc": "storage/ceph/cephadm-deployment.md",
+          "warning": "Supported but second-class upstream. Pull the engine from the internal mirror; docker.io on Ubuntu is too old."
         }
       ]
     },
@@ -203,15 +361,13 @@
           "title": "HAProxy (L4, active health checks) + Nginx (L7, TLS), Keepalived, Docker Compose",
           "default": true,
           "versionKey": "haproxy",
-          "doc": "network-matrix/external-load-balancer.md",
-          "export": "edge-compose"
+          "doc": "network-matrix/external-load-balancer.md"
         },
         {
           "id": "nginx-only",
           "title": "Nginx only (L4 passthrough + L7), Keepalived, Docker Compose",
           "versionKey": "nginx",
-          "doc": "network-matrix/external-load-balancer.md",
-          "export": "edge-compose"
+          "doc": "network-matrix/external-load-balancer.md"
         }
       ]
     },
@@ -270,6 +426,71 @@
       ]
     },
     {
+      "id": "identity",
+      "title": "Identity provider",
+      "required": true,
+      "options": [
+        {
+          "id": "keycloak",
+          "title": "Keycloak as the OIDC broker",
+          "default": true,
+          "versionKey": "keycloak",
+          "doc": "management-cluster/keycloak/keycloak.md"
+        }
+      ]
+    },
+    {
+      "id": "idpIntegration",
+      "title": "Directory integration",
+      "required": false,
+      "multi": true,
+      "doc": "identity/directory-integration.md",
+      "note": "Application-level only. Nodes are never joined to a directory. Keycloak brokers OIDC so each service speaks one dialect.",
+      "options": [
+        {
+          "id": "none",
+          "title": "No directory integration (local accounts only)",
+          "default": true,
+          "doc": "identity/directory-integration.md"
+        },
+        {
+          "id": "rancher-ad",
+          "title": "Rancher \u2014 Active Directory auth provider",
+          "doc": "identity/directory-integration.md"
+        },
+        {
+          "id": "rancher-ldap",
+          "title": "Rancher \u2014 OpenLDAP auth provider",
+          "doc": "identity/directory-integration.md"
+        },
+        {
+          "id": "keycloak-federation",
+          "title": "Keycloak \u2014 LDAP/AD user federation, read-only",
+          "doc": "identity/directory-integration.md"
+        },
+        {
+          "id": "harbor-oidc",
+          "title": "Harbor \u2014 OIDC through Keycloak",
+          "doc": "identity/directory-integration.md"
+        },
+        {
+          "id": "gitlab-ldap",
+          "title": "GitLab \u2014 LDAP with group sync",
+          "doc": "identity/directory-integration.md"
+        },
+        {
+          "id": "argocd-oidc",
+          "title": "Argo CD \u2014 OIDC through Keycloak",
+          "doc": "identity/directory-integration.md"
+        },
+        {
+          "id": "vault-oidc",
+          "title": "Vault \u2014 OIDC through Keycloak",
+          "doc": "identity/directory-integration.md"
+        }
+      ]
+    },
+    {
       "id": "gitops",
       "title": "GitOps and CI/CD",
       "required": true,
@@ -301,44 +522,7 @@
           "title": "OpenBao (MPL 2.0)",
           "versionKey": "openbao",
           "doc": "secrets-management/vault/vault-architecture.md",
-          "note": "The deployment model is portable from Vault. Use this when the BSL is not acceptable."
-        }
-      ]
-    },
-    {
-      "id": "identity",
-      "title": "Identity provider",
-      "required": true,
-      "options": [
-        {
-          "id": "keycloak",
-          "title": "Keycloak",
-          "default": true,
-          "versionKey": "keycloak",
-          "doc": "management-cluster/keycloak/keycloak.md"
-        }
-      ]
-    },
-    {
-      "id": "directory",
-      "title": "Linux directory integration",
-      "required": false,
-      "options": [
-        {
-          "id": "none",
-          "title": "Local accounts only (break-glass always present)",
-          "default": true,
-          "doc": "identity/sssd-realmd.md"
-        },
-        {
-          "id": "sssd-ad",
-          "title": "SSSD against Active Directory",
-          "doc": "identity/sssd-realmd.md"
-        },
-        {
-          "id": "sssd-ldap",
-          "title": "SSSD against LDAP",
-          "doc": "identity/sssd-realmd.md"
+          "note": "The deployment model is portable from Vault. Use it when the BSL is not acceptable."
         }
       ]
     },
@@ -379,6 +563,11 @@
           "title": "Fluent Bit + OpenSearch (full-text search)",
           "versionKey": "opensearch",
           "doc": "logging/log-pipeline.md"
+        },
+        {
+          "id": "none",
+          "title": "No central logging (not recommended for production)",
+          "doc": "logging/log-pipeline.md"
         }
       ]
     },
@@ -413,6 +602,11 @@
           "default": true,
           "versionKey": "falco",
           "doc": "kubernetes/security/security-controls.md"
+        },
+        {
+          "id": "none",
+          "title": "None",
+          "doc": "kubernetes/security/security-controls.md"
         }
       ]
     },
@@ -431,26 +625,6 @@
       ]
     },
     {
-      "id": "gpu",
-      "title": "GPU and AI inference",
-      "required": false,
-      "options": [
-        {
-          "id": "none",
-          "title": "No GPU workers",
-          "default": true,
-          "doc": "gpu-ai/gpu-ai-architecture.md"
-        },
-        {
-          "id": "mig",
-          "title": "GPU workers with MIG isolation, vLLM serving",
-          "versionKey": "gpu-operator",
-          "doc": "gpu-ai/gpu-ai-architecture.md",
-          "export": "gpu"
-        }
-      ]
-    },
-    {
       "id": "serviceMesh",
       "title": "Service mesh",
       "required": false,
@@ -463,7 +637,7 @@
         },
         {
           "id": "istio-ambient",
-          "title": "Istio ambient (ztunnel per node, waypoints only where L7 is needed)",
+          "title": "Istio ambient (ztunnel per node, waypoints where L7 is needed)",
           "versionKey": "istio",
           "doc": "service-mesh/istio/istio-deployment.md",
           "decisionDoc": "service-mesh/evaluation.md",
@@ -475,7 +649,33 @@
           "versionKey": "istio",
           "doc": "service-mesh/istio/istio-deployment.md",
           "decisionDoc": "service-mesh/evaluation.md",
-          "warning": "Adopt only when the threshold in service-mesh/evaluation.md is met. This adds a control plane and a new failure domain."
+          "warning": "Adopt only when the threshold in service-mesh/evaluation.md is met. Adds a control plane and a failure domain."
+        }
+      ]
+    },
+    {
+      "id": "gpu",
+      "title": "GPU and AI inference",
+      "required": false,
+      "options": [
+        {
+          "id": "none",
+          "title": "No GPU workers",
+          "default": true,
+          "doc": "gpu-ai/gpu-ai-architecture.md"
+        },
+        {
+          "id": "mig",
+          "title": "GPU workers with MIG isolation and vLLM serving",
+          "versionKey": "gpu-operator",
+          "doc": "gpu-ai/gpu-ai-architecture.md"
+        },
+        {
+          "id": "timeslicing",
+          "title": "GPU workers with time-slicing (development only, no VRAM isolation)",
+          "versionKey": "gpu-operator",
+          "doc": "gpu-ai/sharing/mig-and-time-slicing.md",
+          "warning": "No memory isolation between pods. Never for multi-tenant production."
         }
       ]
     }
@@ -486,8 +686,7 @@
       "label": "Cluster name",
       "type": "text",
       "default": "prod",
-      "required": true,
-      "hint": "Used in inventory names, labels and the generated plan."
+      "required": true
     },
     {
       "id": "env",
@@ -506,8 +705,229 @@
       "label": "Internal DNS domain",
       "type": "text",
       "default": "internal.example.com",
+      "required": true
+    },
+    {
+      "id": "nodePrefix",
+      "label": "Node name prefix",
+      "type": "text",
+      "default": "k8s",
       "required": true,
-      "hint": "Used for every *.domain name in the generated configuration."
+      "hint": "Names are generated: <prefix>-cp-N, <prefix>-w-N, <prefix>-gpu-N."
+    },
+    {
+      "id": "appNodeIpStart",
+      "label": "First application-cluster node IP",
+      "type": "text",
+      "default": "10.20.0.11",
+      "required": true,
+      "hint": "Assigned in order: control plane, then workers, then GPU."
+    },
+    {
+      "id": "appCpCount",
+      "label": "Control-plane nodes",
+      "type": "number",
+      "default": 3,
+      "min": 1,
+      "max": 9,
+      "required": true
+    },
+    {
+      "id": "appCpCpu",
+      "label": "Control-plane vCPU per node",
+      "type": "number",
+      "default": 4,
+      "min": 2
+    },
+    {
+      "id": "appCpMemGb",
+      "label": "Control-plane RAM (GiB)",
+      "type": "number",
+      "default": 16,
+      "min": 4
+    },
+    {
+      "id": "appCpDiskGb",
+      "label": "Control-plane disk (GiB)",
+      "type": "number",
+      "default": 120,
+      "min": 40
+    },
+    {
+      "id": "appWorkerCount",
+      "label": "Worker nodes",
+      "type": "number",
+      "default": 3,
+      "min": 1,
+      "max": 200,
+      "required": true
+    },
+    {
+      "id": "appWorkerCpu",
+      "label": "Worker vCPU per node",
+      "type": "number",
+      "default": 8,
+      "min": 2
+    },
+    {
+      "id": "appWorkerMemGb",
+      "label": "Worker RAM (GiB)",
+      "type": "number",
+      "default": 32,
+      "min": 4
+    },
+    {
+      "id": "appWorkerDiskGb",
+      "label": "Worker boot disk (GiB)",
+      "type": "number",
+      "default": 120,
+      "min": 40
+    },
+    {
+      "id": "appWorkerDataDiskGb",
+      "label": "Worker data disk (GiB)",
+      "type": "number",
+      "default": 0,
+      "min": 0,
+      "hint": "0 means no local data disk. Images and logs stay on the boot disk."
+    },
+    {
+      "id": "mgmtWorkerCount",
+      "label": "Management cluster workers",
+      "type": "number",
+      "default": 3,
+      "min": 1,
+      "max": 9,
+      "required": true,
+      "hint": "Sized separately: Rancher, Keycloak, Argo CD, Harbor and Vault do not share the application cluster's capacity."
+    },
+    {
+      "id": "mgmtIpStart",
+      "label": "First management node IP",
+      "type": "text",
+      "default": "10.10.0.11",
+      "required": true
+    },
+    {
+      "id": "mgmtCpu",
+      "label": "Management worker vCPU",
+      "type": "number",
+      "default": 4,
+      "min": 2
+    },
+    {
+      "id": "mgmtMemGb",
+      "label": "Management worker RAM (GiB)",
+      "type": "number",
+      "default": 16,
+      "min": 4
+    },
+    {
+      "id": "mgmtDiskGb",
+      "label": "Management worker disk (GiB)",
+      "type": "number",
+      "default": 200,
+      "min": 60
+    },
+    {
+      "id": "directoryHost",
+      "label": "Directory server",
+      "type": "text",
+      "default": "ldaps://dc.internal:636",
+      "required": false
+    },
+    {
+      "id": "directoryBaseDn",
+      "label": "Directory base DN",
+      "type": "text",
+      "default": "OU=Platform,DC=corp,DC=internal",
+      "required": false
+    },
+    {
+      "id": "caBundle",
+      "label": "Internal CA bundle path on the nodes",
+      "type": "text",
+      "default": "/etc/pki/ca-trust/source/anchors/internal-ca.crt",
+      "required": true
+    },
+    {
+      "id": "cephNodeCount",
+      "label": "Ceph hosts (cephadm only)",
+      "type": "number",
+      "default": 3,
+      "min": 3,
+      "max": 64,
+      "hint": "Three is the minimum for a 3-replica pool with a host failure domain. Ignored for Rook."
+    },
+    {
+      "id": "cephIpStart",
+      "label": "First Ceph host IP",
+      "type": "text",
+      "default": "10.40.0.11"
+    },
+    {
+      "id": "cephCpu",
+      "label": "Ceph vCPU per host",
+      "type": "number",
+      "default": 8,
+      "min": 4
+    },
+    {
+      "id": "cephMemGb",
+      "label": "Ceph RAM per host (GiB)",
+      "type": "number",
+      "default": 32,
+      "min": 16
+    },
+    {
+      "id": "cephDataDiskGb",
+      "label": "Ceph data disk per host (GiB)",
+      "type": "number",
+      "default": 2000,
+      "min": 100
+    },
+    {
+      "id": "cephJournalDiskGb",
+      "label": "Ceph DB/WAL disk per host (GiB)",
+      "type": "number",
+      "default": 100,
+      "min": 0
+    },
+    {
+      "id": "edgeCount",
+      "label": "Edge nodes",
+      "type": "number",
+      "default": 2,
+      "min": 1,
+      "max": 8,
+      "required": true,
+      "hint": "Two is the minimum for a VIP that can move."
+    },
+    {
+      "id": "edgeIpStart",
+      "label": "First edge node IP",
+      "type": "text",
+      "default": "10.60.0.1"
+    },
+    {
+      "id": "edgeVip",
+      "label": "Edge VIP",
+      "type": "text",
+      "default": "10.60.0.10",
+      "required": true
+    },
+    {
+      "id": "loadBalancerPool",
+      "label": "MetalLB address pool",
+      "type": "text",
+      "default": "10.61.0.10-10.61.0.30"
+    },
+    {
+      "id": "dmzCidr",
+      "label": "DMZ CIDR",
+      "type": "text",
+      "default": "10.60.0.0/24",
+      "required": true
     },
     {
       "id": "mgmtCidr",
@@ -518,7 +938,7 @@
     },
     {
       "id": "cpCidr",
-      "label": "Control-plane CIDR",
+      "label": "Application node CIDR",
       "type": "text",
       "default": "10.20.0.0/24",
       "required": true
@@ -552,20 +972,6 @@
       "required": false
     },
     {
-      "id": "dmzCidr",
-      "label": "DMZ CIDR",
-      "type": "text",
-      "default": "10.60.0.0/24",
-      "required": true
-    },
-    {
-      "id": "loadBalancerPool",
-      "label": "MetalLB address pool",
-      "type": "text",
-      "default": "10.61.0.10-10.61.0.30",
-      "required": false
-    },
-    {
       "id": "apiServerIp",
       "label": "Control-plane API VIP",
       "type": "text",
@@ -573,52 +979,24 @@
       "required": true
     },
     {
-      "id": "edgeVip",
-      "label": "Edge load balancer VIP",
+      "id": "adminCidr",
+      "label": "Administrator workstation CIDR",
       "type": "text",
-      "default": "10.60.0.10",
+      "default": "10.10.0.0/24",
       "required": true
     },
     {
       "id": "registryHost",
-      "label": "Internal registry",
+      "label": "Internal registry (image prefix)",
       "type": "text",
       "default": "harbor.internal",
       "required": true
     },
     {
-      "id": "nexusHost",
-      "label": "Internal package repository",
+      "id": "registryAddr",
+      "label": "Internal registry address (host:port)",
       "type": "text",
-      "default": "nexus.internal",
-      "required": true
-    },
-    {
-      "id": "vaultHost",
-      "label": "Vault address",
-      "type": "text",
-      "default": "https://vault.internal:8200",
-      "required": true
-    },
-    {
-      "id": "keycloakHost",
-      "label": "Keycloak address",
-      "type": "text",
-      "default": "https://keycloak.internal:8443",
-      "required": true
-    },
-    {
-      "id": "gitlabHost",
-      "label": "GitLab address",
-      "type": "text",
-      "default": "https://gitlab.internal",
-      "required": true
-    },
-    {
-      "id": "adminCidr",
-      "label": "Administrator workstation CIDR",
-      "type": "text",
-      "default": "10.10.0.0/24",
+      "default": "harbor.internal:443",
       "required": true
     },
     {
@@ -630,29 +1008,37 @@
       "hint": "Serves github.com/, dl.k8s.io/, storage.googleapis.com/, get.helm.sh/ for the offline Kubespray deploy."
     },
     {
-      "id": "registryAddr",
-      "label": "Internal registry address (host:port)",
+      "id": "nexusHost",
+      "label": "Internal package repository",
       "type": "text",
-      "default": "harbor.internal:443",
+      "default": "nexus.internal",
       "required": true
     },
     {
-      "id": "edgeL1",
-      "label": "First edge node address",
-      "type": "text",
-      "default": "10.60.0.1",
-      "required": true
+      "id": "extraRegistries",
+      "label": "Additional registries (one per line)",
+      "type": "lines",
+      "default": "",
+      "hint": "Keep the upstream repository path so no manifest rewrite is needed. One entry per line."
     },
     {
-      "id": "edgeL2",
-      "label": "Second edge node address",
+      "id": "extraRepos",
+      "label": "Additional package repositories (one per line)",
+      "type": "lines",
+      "default": "",
+      "hint": "RPM, deb, PyPI, npm or Helm. Format: type name url"
+    },
+    {
+      "id": "registryAuth",
+      "label": "Registry credentials (base64 user:password)",
       "type": "text",
-      "default": "10.60.0.2",
-      "required": true
+      "default": "",
+      "secret": true,
+      "hint": "Leave empty and fill it on the target host. Rendered locally into the downloaded file only."
     },
     {
       "id": "appNamespace",
-      "label": "Application namespace for the Vault policy",
+      "label": "Application namespace",
       "type": "text",
       "default": "apps",
       "required": true
@@ -665,71 +1051,69 @@
       "required": true
     },
     {
-      "id": "registryAuth",
-      "label": "Registry credentials (base64 user:password)",
+      "id": "objectStorage",
+      "label": "Object storage endpoint (Ceph RGW)",
       "type": "text",
-      "default": "",
-      "required": false,
-      "secret": true,
-      "hint": "Leave empty and fill it on the target host. It is never sent anywhere; it is rendered locally into the downloaded file."
+      "default": "https://rgw.internal",
+      "required": true
+    },
+    {
+      "id": "vaultHost",
+      "label": "Vault address",
+      "type": "text",
+      "default": "https://vault.internal:8200",
+      "required": true
+    },
+    {
+      "id": "keycloakHost",
+      "label": "Keycloak address (OIDC issuer)",
+      "type": "text",
+      "default": "https://keycloak.internal:8443",
+      "required": true
+    },
+    {
+      "id": "gitlabHost",
+      "label": "GitLab address",
+      "type": "text",
+      "default": "https://gitlab.internal",
+      "required": true
+    },
+    {
+      "id": "gpuCount",
+      "label": "GPU nodes",
+      "type": "number",
+      "default": 1,
+      "min": 0,
+      "max": 64
+    },
+    {
+      "id": "gpuCpu",
+      "label": "GPU node vCPU",
+      "type": "number",
+      "default": 32,
+      "min": 4
+    },
+    {
+      "id": "gpuMemGb",
+      "label": "GPU node RAM (GiB)",
+      "type": "number",
+      "default": 256,
+      "min": 16
+    },
+    {
+      "id": "gpuDiskGb",
+      "label": "GPU node local NVMe (GiB)",
+      "type": "number",
+      "default": 2000,
+      "min": 100
     },
     {
       "id": "vrrpAuthPass",
       "label": "VRRP authentication pass phrase",
       "type": "text",
       "default": "",
-      "required": false,
       "secret": true,
       "hint": "Leave empty and set it on the node. Rendered locally into the downloaded file only."
-    },
-    {
-      "id": "controlPlaneNodes",
-      "label": "Control-plane node names (comma separated)",
-      "type": "text",
-      "default": "k8s-cp-1,k8s-cp-2,k8s-cp-3",
-      "required": true
-    },
-    {
-      "id": "workerNodes",
-      "label": "Worker node names (comma separated)",
-      "type": "text",
-      "default": "k8s-w-1,k8s-w-2",
-      "required": true
-    },
-    {
-      "id": "gpuNodes",
-      "label": "GPU node names (comma separated)",
-      "type": "text",
-      "default": "k8s-gpu-1",
-      "required": false
-    },
-    {
-      "id": "edgeNodes",
-      "label": "Edge node names (comma separated)",
-      "type": "text",
-      "default": "lb-1,lb-2",
-      "required": true
-    },
-    {
-      "id": "nodeCidrStart",
-      "label": "First host address in the management segment",
-      "type": "text",
-      "default": "10.10.0.11",
-      "required": true
-    },
-    {
-      "id": "objectStorage",
-      "label": "Object storage for backups and models",
-      "type": "text",
-      "default": "https://rgw.internal",
-      "required": true
-    },
-    {
-      "id": "caBundle",
-      "label": "Internal CA bundle path on the nodes",
-      "type": "text",
-      "default": "/etc/pki/ca-trust/source/anchors/internal-ca.crt",
-      "required": true
     }
   ],
   "steps": [
@@ -739,8 +1123,8 @@
       "title": "Confirm the requirements, assumptions and open decisions",
       "doc": "requirements/requirements-and-assumptions.md",
       "actions": [
-        "Close every open decision D-01..D-14",
-        "Confirm the site IP plan and the failure domains",
+        "Close every open decision",
+        "Confirm the IP plan and the failure domains",
         "Confirm the legal position on the Vault license"
       ]
     },
@@ -750,8 +1134,7 @@
       "title": "Read the architecture and the decisions",
       "doc": "architecture/00-overview.md",
       "extraDocs": [
-        "architecture/03-failure-domains.md",
-        "decisions/"
+        "architecture/03-failure-domains.md"
       ],
       "actions": [
         "Review the architecture overview",
@@ -768,14 +1151,14 @@
       ],
       "actions": [
         "Deploy Harbor and Nexus",
-        "Run the staging workflow for every component you selected",
-        "Verify offline package install, image pull and chart deploy on a throwaway node"
+        "Mirror every artifact for the selected components",
+        "Verify offline install, image pull and chart deploy on a throwaway node"
       ]
     },
     {
       "id": "s04",
       "phase": "3. Foundations",
-      "title": "DNS, NTP, network, PKI, identity, load balancing",
+      "title": "DNS, NTP, network, PKI, load balancing",
       "doc": "network-matrix/network-communication-matrix.md",
       "extraDocs": [
         "network-matrix/firewall-rules-generation.md"
@@ -790,7 +1173,7 @@
     {
       "id": "s05",
       "phase": "4. Automation",
-      "title": "Automation Management Server, Ansible, AWX, GitLab, Vault",
+      "title": "Automation server, Ansible, AWX, GitLab, Vault",
       "doc": "automation/ansible/ansible-structure.md",
       "extraDocs": [
         "automation/gitlab-ci/pipeline.md",
@@ -811,7 +1194,7 @@
       "actions": [
         "Configure the internal repositories",
         "Apply sysctl, kernel modules and the security baseline",
-        "Join the directory, if selected",
+        "Confirm the local break-glass account and key work with no network dependency",
         "Install the monitoring and logging agents"
       ]
     },
@@ -824,19 +1207,19 @@
       "actions": [
         "Create the CRUSH map with the host failure domain",
         "Create the pools, the filesystem and the object store",
-        "Check Ceph HEALTH_OK before consuming any PVC"
+        "Confirm Ceph HEALTH_OK before consuming any volume"
       ]
     },
     {
       "id": "s08",
       "phase": "7. Kubernetes",
-      "title": "Deploy the cluster with Kubespray",
+      "title": "Deploy the application cluster with Kubespray",
       "doc": "kubespray/kubespray-deployment.md",
       "extraDocs": [
         "kubespray/multi-version-support.md"
       ],
       "actions": [
-        "Fill the inventory and the group vars",
+        "Fill the inventory and the group vars from the generated files",
         "Mirror the artifacts for the selected Kubespray release",
         "Run cluster.yml, then validate the control plane and etcd"
       ]
@@ -863,8 +1246,7 @@
       "title": "Deploy Istio and enable mTLS in stages",
       "doc": "service-mesh/istio/istio-deployment.md",
       "extraDocs": [
-        "service-mesh/evaluation.md",
-        "kubernetes/ingress/multi-controller-plan.md"
+        "service-mesh/evaluation.md"
       ],
       "when": {
         "component": {
@@ -875,11 +1257,11 @@
         }
       },
       "actions": [
-        "Confirm the adoption threshold in service-mesh/evaluation.md is actually met",
+        "Confirm the adoption threshold in service-mesh/evaluation.md is met",
         "Extract and mirror every image the install and the dataplane need",
         "Decide the dataplane mode: ambient (per node) or sidecar (per pod)",
         "Install the control plane with Helm so Argo CD owns it",
-        "Apply PeerAuthentication STRICT to one namespace, watch the metrics, then continue",
+        "Apply PeerAuthentication STRICT to one namespace, watch metrics, then continue",
         "Apply the default-deny AuthorizationPolicy only after the allow rules exist",
         "Test a negative case: a pod that should be denied must be denied",
         "Wire Istio telemetry into the existing Prometheus stack"
@@ -896,10 +1278,39 @@
         "lifecycle/backup/backup-and-dr.md"
       ],
       "actions": [
-        "Install Rancher and register the Application Cluster",
-        "Wire Keycloak OIDC and verify the groups claim",
+        "Deploy the management cluster from its own inventory",
+        "Install Rancher and register the application cluster",
+        "Install Keycloak and wire OIDC for each service",
         "Install Argo CD and sync the first application",
         "Install Velero and run a first backup"
+      ]
+    },
+    {
+      "id": "s10b",
+      "phase": "9b. Directory integration (optional)",
+      "title": "Integrate the directory at the application layer",
+      "doc": "identity/directory-integration.md",
+      "when": {
+        "component": {
+          "idpIntegration": [
+            "rancher-ad",
+            "rancher-ldap",
+            "keycloak-federation",
+            "harbor-oidc",
+            "gitlab-ldap",
+            "argocd-oidc",
+            "vault-oidc"
+          ]
+        }
+      },
+      "actions": [
+        "Confirm the break-glass local account works with the directory unreachable",
+        "Create a read-only bind account and store its credential in Vault",
+        "Configure Keycloak user federation first, read-only",
+        "Create one OIDC client per service with explicit redirect URIs",
+        "Wire services in order: Argo CD, Rancher, Harbor, GitLab, Vault, Kubernetes API",
+        "Remove the local superuser path only after a federated admin login is verified",
+        "Alert on failed federated logins and on a zero-login drop during working hours"
       ]
     },
     {
@@ -942,7 +1353,10 @@
       ],
       "when": {
         "component": {
-          "gpu": "mig"
+          "gpu": [
+            "mig",
+            "timeslicing"
+          ]
         }
       },
       "actions": [
@@ -958,7 +1372,7 @@
       "title": "Pipelines, approval gates, drift detection",
       "doc": "automation/gitlab-ci/pipeline.md",
       "actions": [
-        "Wire the 14 pipeline stages",
+        "Wire the pipeline stages",
         "Protect the branches and require the approvals",
         "Turn on the nightly drift job"
       ]
@@ -990,114 +1404,499 @@
       ]
     }
   ],
-  "upgradeSections": [
+  "upgrades": [
     {
-      "id": "u01",
-      "title": "Before any upgrade",
-      "doc": "lifecycle/upgrades/upgrade-procedures.md",
-      "actions": [
-        "Confirm the target version is in the version matrix",
-        "Confirm the compatibility constraints for the component",
-        "Mirror the target artifacts and pull-verify them",
-        "Take and verify a backup",
-        "Check the end-of-life watchlist for a forced exit"
-      ]
-    },
-    {
-      "id": "u02",
+      "id": "kubernetes",
       "title": "Kubernetes and Kubespray",
+      "component": "controlPlane",
       "doc": "lifecycle/upgrades/upgrade-procedures.md",
-      "actions": [
-        "One minor version at a time",
-        "Control plane first, then the workers",
-        "Run the target release's own virtualenv",
-        "Kubernetes has no rollback: the restore path is the backup"
+      "versionSource": "kubespray",
+      "downtime": "Control plane rolls one node at a time. Workloads keep running if PodDisruptionBudgets exist; without them, expect pod restarts.",
+      "rollback": "None. Kubernetes does not support downgrade. The restore path is the backup taken in step 1.",
+      "steps": [
+        {
+          "phase": "1. Gate",
+          "title": "Confirm compatibility and mirror the target artifacts",
+          "gate": true,
+          "actions": [
+            "Target release is in the supported set (five releases, release-2.28 .. release-2.32)",
+            "Target Kubernetes minor is exactly one above the current one",
+            "Kubelet, kube-proxy, CoreDNS, etcd and the CNI versions are compatible with the target",
+            "Every image and binary for the target is mirrored and pull-verified"
+          ],
+          "command": "python3 scripts/kubespray_release_matrix.py release-2.28 release-2.29 release-2.30 release-2.31 release-2.32"
+        },
+        {
+          "phase": "1. Gate",
+          "title": "Back up etcd and the cluster state",
+          "gate": true,
+          "actions": [
+            "Snapshot etcd on every control-plane node",
+            "Export the current inventory and group vars",
+            "Record the current versions for the rollback comparison"
+          ],
+          "command": "ETCDCTL_API=3 etcdctl --endpoints=https://127.0.0.1:2379 \\\n  --cacert=/etc/kubernetes/pki/etcd/ca.crt \\\n  --cert=/etc/kubernetes/pki/etcd/server.crt \\\n  --key=/etc/kubernetes/pki/etcd/server.key \\\n  snapshot save /backup/etcd-$(date +%F-%H%M).db"
+        },
+        {
+          "phase": "2. Prepare",
+          "title": "Create the target release's environment",
+          "actions": [
+            "Check out the target Kubespray release into its own directory",
+            "Create its own virtualenv with its pinned Ansible",
+            "Copy the inventory and re-apply the site group vars",
+            "Never reuse the previous release's virtualenv"
+          ],
+          "command": "git -C /opt/kubespray clone --branch release-2.32 --depth 1 \\\n  https://github.com/kubernetes-sigs/kubespray /opt/kubespray/release-2.32\npython3 -m venv /opt/kubespray/venv-release-2.32\n/opt/kubespray/venv-release-2.32/bin/pip install -r /opt/kubespray/release-2.32/requirements.txt"
+        },
+        {
+          "phase": "3. Execute",
+          "title": "Run the upgrade playbook",
+          "actions": [
+            "Run cluster.yml from the target release against the existing inventory",
+            "Watch the control plane first, then the workers, one node at a time",
+            "Stop at the first failed task; do not re-run blindly"
+          ],
+          "command": "cd /opt/kubespray/release-2.32 && \\\n/opt/kubespray/venv-release-2.32/bin/ansible-playbook -i /opt/kubespray/inventory/prod-staging/hosts.ini \\\n  -b --become-user=root cluster.yml -e kube_version={{version.kubernetes}}"
+        },
+        {
+          "phase": "4. Verify",
+          "title": "Validate before moving the next minor",
+          "gate": true,
+          "actions": [
+            "All nodes report the target version and Ready",
+            "etcd members are healthy and the leader is stable",
+            "CNI and CoreDNS pods are running on the new version",
+            "A test workload schedules, pulls an image and answers a request"
+          ],
+          "command": "kubectl get nodes -o wide\nkubectl -n kube-system get pods\nkubectl -n kube-system exec etcd-<node> -- etcdctl endpoint health --cluster"
+        },
+        {
+          "phase": "5. Close",
+          "title": "Record the new binding",
+          "actions": [
+            "Update the inventory's kubespray-release marker",
+            "Update the version matrix check date",
+            "Keep the previous release directory until the next upgrade succeeds"
+          ]
+        }
       ]
     },
     {
-      "id": "u03",
-      "title": "Ceph and Rook-Ceph",
+      "id": "ceph",
+      "title": "Ceph (Rook or cephadm)",
+      "component": "storage",
       "doc": "lifecycle/upgrades/upgrade-procedures.md",
-      "actions": [
-        "Rook operator first, then Ceph, then the CSI driver",
-        "The Rook release constrains the Ceph version",
-        "Ceph has no rollback across a major version"
+      "downtime": "No client downtime if the pools are healthy and one OSD at a time is drained.",
+      "rollback": "None across a major version. Downgrade within a minor is unsupported; the restore path is the backup.",
+      "steps": [
+        {
+          "phase": "1. Gate",
+          "title": "Health and capacity check",
+          "gate": true,
+          "actions": [
+            "ceph status is HEALTH_OK, not HEALTH_WARN",
+            "No degraded or backfilling placement groups",
+            "At least 25% free capacity in every pool",
+            "The Rook release supports the target Ceph version"
+          ],
+          "command": "ceph -s\nceph df\nceph osd tree"
+        },
+        {
+          "phase": "1. Gate",
+          "title": "Back up the cluster configuration",
+          "gate": true,
+          "actions": [
+            "Export the CRUSH map",
+            "Export the auth database",
+            "Snapshot the monitors' store (or the Rook config ConfigMap)"
+          ],
+          "command": "ceph osd getcrushmap -o /backup/crushmap.bin\nceph auth export -o /backup/auth.keyring\nceph config dump > /backup/ceph-config.json"
+        },
+        {
+          "phase": "2. Control",
+          "title": "Upgrade the orchestrator first",
+          "actions": [
+            "Rook: upgrade the operator, then CephCluster.spec.cephVersion",
+            "cephadm: run ceph orch upgrade start --ceph-version <target>",
+            "One daemon type at a time; wait for HEALTH_OK between types"
+          ],
+          "command": "helm upgrade rook-ceph rook-release/rook-ceph -n rook-ceph \\\n  --version {{version.rook}} -f values.yaml\nkubectl -n rook-ceph patch cephcluster rook-ceph --type merge \\\n  -p '{\"spec\":{\"cephVersion\":{\"image\":\"{{value.registryHost}}/ceph/ceph:{{version.ceph}}\"}}}'"
+        },
+        {
+          "phase": "3. Data path",
+          "title": "Watch the daemons converge",
+          "actions": [
+            "MONs first, then MGR, MDS, RGW, then OSDs",
+            "Do not start a second upgrade while a daemon is still restarting",
+            "Confirm each type reaches HEALTH_OK before the next"
+          ],
+          "command": "ceph orch ps --daemon-type mon\nceph orch ps --daemon-type osd\nwatch -n 10 ceph -s"
+        },
+        {
+          "phase": "4. Verify",
+          "title": "Prove the data path works",
+          "gate": true,
+          "actions": [
+            "Write and read a test object through RGW",
+            "Mount a CephFS volume and read a file",
+            "Create a PVC and confirm it binds",
+            "Run a CSI snapshot and restore"
+          ],
+          "command": "rados -p rbd bench 10 write --no-cleanup\nkubectl -n {{value.appNamespace}} get pvc"
+        }
       ]
     },
     {
-      "id": "u04",
-      "title": "Helm 3 to Helm 4",
-      "doc": "lifecycle/upgrades/upgrade-procedures.md",
-      "actions": [
-        "Helm 3 security fixes end 2027-02-10",
-        "Install Helm 4 alongside Helm 3",
-        "Re-run every chart operation under Helm 4",
-        "Keep the Helm 3 binary until the date passes"
-      ]
-    },
-    {
-      "id": "u05",
-      "title": "Edge load balancer",
-      "doc": "network-matrix/external-load-balancer.md",
-      "actions": [
-        "Update the image tags in the Compose file",
-        "Upgrade one node, verify, then the other",
-        "Confirm the VRRP state and the health checks after each node"
-      ]
-    },
-    {
-      "id": "u06",
-      "title": "GPU operator, driver and CUDA",
-      "doc": "gpu-ai/drivers/compatibility-matrix.md",
-      "actions": [
-        "Drain one GPU node at a time",
-        "Verify the driver, the toolkit and the operator versions line up",
-        "Run nvidia-smi on the node and in a pod before uncordoning"
-      ]
-    },
-    {
-      "id": "u07",
-      "title": "Ingress controller portfolio",
-      "doc": "kubernetes/ingress/multi-controller-plan.md",
-      "actions": [
-        "Check the deprecation stage of each controller",
-        "Upstream retirement forces Deprecated immediately",
-        "Migrate the traffic share before removing a controller"
-      ]
-    },
-    {
-      "id": "u07b",
-      "title": "Service mesh (Istio)",
+      "id": "istio",
+      "title": "Istio",
+      "component": "serviceMesh",
       "doc": "service-mesh/istio/istio-deployment.md",
-      "actions": [
-        "One minor version at a time; Istio does not support skipping minors",
-        "Install the new revision alongside the old one (canary control plane)",
-        "Move namespaces one at a time by changing the istio.io/rev label, then restart",
-        "Rollback exists only while the old revision is installed: move the label back",
-        "Downgrade is not supported. Remove the old revision only after every namespace has moved",
-        "Confirm the Kubernetes version window for the target Istio minor before starting"
+      "versionSource": "istio",
+      "downtime": "No data-plane downtime with a revision-based canary. Sidecar mode restarts pods as namespaces move.",
+      "rollback": "Available only while the old revision is installed: move the namespace label back. No downgrade.",
+      "steps": [
+        {
+          "phase": "1. Gate",
+          "title": "Confirm the version window and mirror the images",
+          "gate": true,
+          "actions": [
+            "Target minor is one above the current one",
+            "The Kubernetes minor is inside the target Istio's support window",
+            "Every image for the new revision is mirrored"
+          ],
+          "command": "istioctl version\nistioctl manifest generate --revision {{revision}} -f istio-operator.yaml | grep -E 'image: '"
+        },
+        {
+          "phase": "2. Control plane",
+          "title": "Install the new revision alongside the old one",
+          "actions": [
+            "Install with a revision name derived from the version",
+            "Both control planes run simultaneously",
+            "Do not remove the old revision yet"
+          ],
+          "command": "istioctl install --revision={{revision}} -f istio-operator.yaml\nkubectl -n istio-system get pods -l istio.io/rev={{revision}}"
+        },
+        {
+          "phase": "3. Data plane",
+          "title": "Move namespaces one at a time",
+          "actions": [
+            "Change the injection label to the new revision",
+            "Restart the workloads in that namespace only",
+            "Watch error rate and latency for one business cycle before the next namespace"
+          ],
+          "command": "kubectl label namespace {{value.appNamespace}} istio.io/rev={{revision}} --overwrite\nkubectl rollout restart deployment -n {{value.appNamespace}}"
+        },
+        {
+          "phase": "4. Verify",
+          "title": "Prove mTLS and policy still apply",
+          "gate": true,
+          "actions": [
+            "istioctl analyze reports no errors",
+            "A negative authorization test is still denied",
+            "Proxy version matches the new revision"
+          ],
+          "command": "istioctl analyze -A\nistioctl proxy-status"
+        },
+        {
+          "phase": "5. Close",
+          "title": "Remove the old revision",
+          "actions": [
+            "Only after every namespace has moved",
+            "Keep the old IstioOperator file in Git for reference",
+            "Record the new revision in the upgrade log"
+          ],
+          "command": "istioctl uninstall --revision=<old-revision>"
+        }
       ]
     },
     {
-      "id": "u08",
+      "id": "edge",
+      "title": "Edge load balancer",
+      "component": "edge",
+      "doc": "network-matrix/external-load-balancer.md",
+      "downtime": "None if the VIP moves cleanly. One node at a time, draining first.",
+      "rollback": "Revert the image tag in the Compose file and recreate the stack on the same node.",
+      "steps": [
+        {
+          "phase": "1. Gate",
+          "title": "Confirm the standby can hold the VIP",
+          "gate": true,
+          "actions": [
+            "VRRP state on both nodes is BACKUP/MASTER as expected",
+            "Health checks are passing on both",
+            "The target image is mirrored and pullable"
+          ],
+          "command": "docker compose ps\nip -br addr show | grep {{value.edgeVip}}\nkeepalived --version"
+        },
+        {
+          "phase": "2. Drain",
+          "title": "Move traffic off one node",
+          "actions": [
+            "Lower the VRRP priority or stop keepalived on the node being upgraded",
+            "Confirm the VIP moved and sessions drained",
+            "Upgrade the node that no longer holds the VIP"
+          ],
+          "command": "systemctl stop keepalived\nip -br addr show | grep {{value.edgeVip}} || echo 'VIP moved'"
+        },
+        {
+          "phase": "3. Upgrade",
+          "title": "Update the stack on that node",
+          "actions": [
+            "Update the image tags in the Compose file",
+            "docker compose pull, then up -d",
+            "Confirm the health endpoint answers locally"
+          ],
+          "command": "cd /opt/edge && docker compose pull && docker compose up -d\ndocker compose ps\ncurl -fsS -o /dev/null -w '%{http_code}\\n' https://{{value.edgeVip}}/healthz"
+        },
+        {
+          "phase": "4. Repeat",
+          "title": "Fail back and upgrade the second node",
+          "actions": [
+            "Start keepalived on the first node and confirm it takes the VIP back",
+            "Repeat steps 2 and 3 on the second node",
+            "Both nodes end on the same image tag"
+          ],
+          "command": "systemctl start keepalived\nip -br addr show | grep {{value.edgeVip}}"
+        },
+        {
+          "phase": "5. Verify",
+          "title": "End-to-end check through the VIP",
+          "gate": true,
+          "actions": [
+            "TLS chain is valid through the VIP",
+            "Backend health is green in the stats page",
+            "VRRP state is stable with no flapping in the logs"
+          ],
+          "command": "curl -sSI https://{{value.edgeVip}}/ | head -3\njournalctl -u keepalived --since '10 min ago' | grep -i state"
+        }
+      ]
+    },
+    {
+      "id": "gpu",
+      "title": "GPU operator, driver and CUDA",
+      "component": "gpu",
+      "doc": "gpu-ai/drivers/compatibility-matrix.md",
+      "downtime": "The drained GPU node only. Inference capacity drops while the node is out.",
+      "rollback": "Reinstall the previous driver and operator versions on the drained node before uncordoning.",
+      "steps": [
+        {
+          "phase": "1. Gate",
+          "title": "Check the compatibility chain",
+          "gate": true,
+          "actions": [
+            "Driver branch supports the target CUDA",
+            "GPU Operator version supports the driver branch",
+            "Every image is mirrored"
+          ],
+          "command": "kubectl get pods -n gpu-operator\nnvidia-smi"
+        },
+        {
+          "phase": "2. Drain",
+          "title": "Cordon and drain one GPU node",
+          "actions": [
+            "Cordon the node",
+            "Drain with --ignore-daemonsets and --delete-emptydir-data",
+            "Confirm no inference pod is still running there"
+          ],
+          "command": "kubectl cordon {{value.nodePrefix}}-gpu-1\nkubectl drain {{value.nodePrefix}}-gpu-1 --ignore-daemonsets --delete-emptydir-data"
+        },
+        {
+          "phase": "3. Upgrade",
+          "title": "Upgrade the operator, then the driver",
+          "actions": [
+            "Upgrade the operator chart first",
+            "Let the operator roll the driver DaemonSet",
+            "Do not hand-install a driver on a node the operator manages"
+          ],
+          "command": "helm upgrade gpu-operator nvidia/gpu-operator -n gpu-operator \\\n  --version {{version.gpu-operator}} -f values.yaml\nkubectl -n gpu-operator rollout status ds/nvidia-driver-daemonset"
+        },
+        {
+          "phase": "4. Verify",
+          "title": "Prove the node before uncordoning",
+          "gate": true,
+          "actions": [
+            "nvidia-smi shows the target driver and no Xid errors",
+            "A test pod requests a GPU and gets a MIG slice",
+            "DCGM metrics report for the node"
+          ],
+          "command": "kubectl uncordon {{value.nodePrefix}}-gpu-1\nkubectl run gpu-test --image={{value.registryHost}}/platform/cuda-test --restart=Never --limits=nvidia.com/gpu=1"
+        }
+      ]
+    },
+    {
+      "id": "vault",
       "title": "Vault and the PKI",
+      "component": "secrets",
       "doc": "secrets-management/vault/hashicorp-vault-decision.md",
-      "actions": [
-        "Snapshot the raft storage before the upgrade",
-        "Upgrade the standby, then the active",
-        "Verify the unseal procedure and the audit device after the upgrade"
+      "downtime": "None in an HA setup: upgrade the standby first, then fail over, then the old active.",
+      "rollback": "Restore the raft snapshot on the upgraded node. Vault does not support downgrade in place.",
+      "steps": [
+        {
+          "phase": "1. Gate",
+          "title": "Snapshot and confirm the unseal path",
+          "gate": true,
+          "actions": [
+            "Take a raft snapshot and verify it opens",
+            "Confirm the unseal keys are available offline",
+            "Confirm the audit device is writing"
+          ],
+          "command": "vault operator raft snapshot save /backup/vault-$(date +%F).snap\nvault operator raft snapshot inspect /backup/vault-$(date +%F).snap"
+        },
+        {
+          "phase": "2. Standby",
+          "title": "Upgrade the standby node",
+          "actions": [
+            "Stop the standby, upgrade the binary or image, start it",
+            "Confirm it rejoins as standby and the leader is unchanged"
+          ],
+          "command": "systemctl stop vault && <upgrade> && systemctl start vault\nvault operator raft list-peers"
+        },
+        {
+          "phase": "3. Failover",
+          "title": "Step down and upgrade the old active",
+          "actions": [
+            "Step down the active so the upgraded standby takes over",
+            "Upgrade the remaining node",
+            "Confirm the cluster has one leader and two followers"
+          ],
+          "command": "vault operator step-down\nvault status"
+        },
+        {
+          "phase": "4. Verify",
+          "title": "Prove secrets, PKI and auth still work",
+          "gate": true,
+          "actions": [
+            "Read a secret through the Kubernetes auth method",
+            "Issue a certificate from the PKI mount",
+            "Log in through OIDC if it is enabled",
+            "Audit log shows the operations"
+          ],
+          "command": "vault kv get {{value.vaultEngine}}/apps/{{value.appNamespace}}/demo\nvault write pki/issue/{{value.appNamespace}} common_name=test.{{value.domain}}"
+        }
+      ]
+    },
+    {
+      "id": "ingress",
+      "title": "Ingress controller portfolio",
+      "component": "ingress",
+      "doc": "kubernetes/ingress/multi-controller-plan.md",
+      "downtime": "None if traffic is migrated per hostname before the old controller is removed.",
+      "rollback": "Move the hostname back to the previous controller. Both remain installed until the migration is complete.",
+      "steps": [
+        {
+          "phase": "1. Gate",
+          "title": "Check the lifecycle stage and the deprecation date",
+          "gate": true,
+          "actions": [
+            "Controller is in Candidate, Supported or Deprecated",
+            "No upstream retirement announcement since the last check",
+            "The annotation set has a documented migration path"
+          ],
+          "command": "kubectl get ingressclass\nkubectl -n <ns> get pods -l app.kubernetes.io/name=nginx-ingress"
+        },
+        {
+          "phase": "2. Prepare",
+          "title": "Install the target controller in parallel",
+          "actions": [
+            "Install with a distinct IngressClass or GatewayClass",
+            "Do not claim a hostname that the old controller still serves",
+            "Mirror the controller image and the CRDs"
+          ],
+          "command": "kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/{{version.kubespray}}/standard-install.yaml"
+        },
+        {
+          "phase": "3. Migrate",
+          "title": "Move one hostname at a time",
+          "actions": [
+            "Create the equivalent Ingress or HTTPRoute on the new controller",
+            "Switch DNS or the edge upstream for that hostname only",
+            "Compare access logs and error rate for one business cycle"
+          ],
+          "command": "kubectl get httproute -A\ncurl -sSI https://app.{{value.domain}}/ | head -3"
+        },
+        {
+          "phase": "4. Retire",
+          "title": "Remove the old controller after the last hostname moves",
+          "actions": [
+            "Confirm no IngressClass references remain",
+            "Remove the old controller and its CRDs",
+            "Update the ADR and the lifecycle table"
+          ],
+          "command": "kubectl get ingress -A -o wide\nkubectl delete -f <old-controller-manifests>"
+        }
+      ]
+    },
+    {
+      "id": "helm",
+      "title": "Helm 3 to Helm 4",
+      "component": "clusterMethods",
+      "doc": "lifecycle/upgrades/upgrade-procedures.md",
+      "downtime": "None. Helm is a client; the cluster is untouched by the client upgrade.",
+      "rollback": "Keep the Helm 3 binary and the release secrets. Helm 4 writes its own storage format; do not downgrade a release that Helm 4 already modified.",
+      "steps": [
+        {
+          "phase": "1. Gate",
+          "title": "Confirm the deadline and the chart compatibility",
+          "gate": true,
+          "actions": [
+            "Helm 3 security fixes end 2027-02-10",
+            "Kubespray release-2.32 ships Helm 3.22.0 internally: do not replace it inside the release venv",
+            "Every chart in use is tested under Helm 4"
+          ],
+          "command": "helm version\nls /opt/kubespray/release-2.32/bin/ 2>/dev/null | grep helm"
+        },
+        {
+          "phase": "2. Install",
+          "title": "Install Helm 4 alongside Helm 3",
+          "actions": [
+            "Install to a different path and name",
+            "Alias explicitly; never rely on PATH order for a migration",
+            "Argo CD keeps its own rendering path and is unaffected"
+          ],
+          "command": "curl -fsSL {{value.filesRepo}}/get.helm.sh/helm-v4-linux-amd64.tar.gz | tar xz\ninstall -m 0755 linux-amd64/helm /usr/local/bin/helm4"
+        },
+        {
+          "phase": "3. Rehearse",
+          "title": "Re-run every chart operation under Helm 4",
+          "actions": [
+            "helm4 template for every chart, compare the manifests",
+            "helm4 list and helm4 get values in every namespace",
+            "Upgrade one non-critical release with helm4 and diff the result"
+          ],
+          "command": "helm4 list -A\nhelm4 template <release> <chart> -f values.yaml | diff - <(helm template <release> <chart> -f values.yaml)"
+        },
+        {
+          "phase": "4. Switch",
+          "title": "Switch the pipelines and keep Helm 3 until the date",
+          "gate": true,
+          "actions": [
+            "CI images use Helm 4",
+            "No release is operated by both binaries",
+            "Helm 3 binary stays available for one rollback window"
+          ],
+          "command": "helm4 version\nhelm4 list -A --all-namespaces | wc -l"
+        }
       ]
     }
   ],
   "exports": [
     {
       "id": "inventory",
-      "name": "Kubespray inventory (hosts.ini)",
+      "name": "Application cluster inventory (hosts.ini)",
       "component": "clusterMethods",
       "filename": "hosts.ini",
       "language": "ini",
-      "description": "Host groups for the selected cluster. Copy to kubespray/inventory/<env>/hosts.ini.",
-      "template": "# Generated by the cloud-native guide site\n# Cluster: {{value.clusterName}}   Environment: {{value.env}}\n# Kubespray release: {{choice.kubespray}}\n\n[all:vars]\nansible_user=ansible\nansible_become=yes\nansible_python_interpreter=/usr/bin/python3\n\n[control-plane]\n{{controlPlaneNodes}}\n\n[etcd]\n{{controlPlaneNodes}}\n\n[k8s-node]\n{{workerNodes}}\n{{gpuNodeGroup}}\n\n[kube-master]\ncontrol-plane\n\n[kube-node]\ncontrol-plane\nk8s-node\n\n[calico-node]\n\n[k8s-cluster:children]\ncontrol-plane\netcd\nk8s-node\n"
+      "description": "Host groups generated from the node prefix, the first address and the counts.",
+      "template": "# Generated by the cloud-native guide site\n# Cluster: {{value.clusterName}} ({{value.env}})   Kubespray: {{choice.kubespray}}\n\n[all:vars]\nansible_user=ansible\nansible_become=yes\nansible_python_interpreter=/usr/bin/python3\n\n[control-plane]\n{{appCpHosts}}\n\n[etcd]\n{{appCpHosts}}\n\n[k8s-node]\n{{appWorkerHosts}}\n{{gpuGroup}}\n\n[kube-master]\ncontrol-plane\n\n[kube-node]\ncontrol-plane\nk8s-node\n\n[calico-node]\n\n[k8s-cluster:children]\ncontrol-plane\netcd\nk8s-node\n"
+    },
+    {
+      "id": "mgmt-inventory",
+      "name": "Management cluster inventory (hosts.ini)",
+      "component": "clusterMethods",
+      "filename": "hosts-mgmt.ini",
+      "language": "ini",
+      "description": "Rancher, Keycloak, Argo CD, Harbor and Vault live here. Its own inventory, its own capacity.",
+      "template": "# Generated by the cloud-native guide site\n# Management cluster for {{value.clusterName}} ({{value.env}})\n\n[all:vars]\nansible_user=ansible\nansible_become=yes\nansible_python_interpreter=/usr/bin/python3\n\n[control-plane]\n{{mgmtHosts}}\n\n[etcd]\n{{mgmtHosts}}\n\n[kube-master]\ncontrol-plane\n\n[kube-node]\ncontrol-plane\n\n[k8s-cluster:children]\ncontrol-plane\netcd\n"
     },
     {
       "id": "k8s-cluster-vars",
@@ -1105,8 +1904,8 @@
       "component": "clusterMethods",
       "filename": "k8s-cluster.yml",
       "language": "yaml",
-      "description": "group_vars/k8s_cluster/k8s-cluster.yml for the selected Kubespray release.",
-      "template": "# Generated by the cloud-native guide site\n# Kubespray release: {{choice.kubespray}}\n\nkube_version: {{version.kubernetes}}\nkube_network_plugin: {{choice.cni}}\nkube_proxy_mode: \"\"\nkube_pods_subnet: \"{{value.podCidr}}\"\nkube_service_addresses: \"{{value.serviceCidr}}\"\nk8sServiceHost: \"{{value.apiServerIp}}\"\nk8sServicePort: 6443\nenable_coredns: true\n"
+      "description": "group_vars/k8s_cluster/k8s-cluster.yml for the selected release.",
+      "template": "# Generated by the cloud-native guide site\n# Kubespray: {{choice.kubespray}}\n\nkube_version: {{version.kubernetes}}\nkube_network_plugin: {{choice.cni}}\nkube_proxy_mode: \"\"\nkube_pods_subnet: \"{{value.podCidr}}\"\nkube_service_addresses: \"{{value.serviceCidr}}\"\nk8sServiceHost: \"{{value.apiServerIp}}\"\nk8sServicePort: 6443\nenable_coredns: true\n\n# Identity is application-level (ADR-0015). No SSSD, no realm join on any node.\nkube_apiserver_oidc_issuer_url: \"{{value.keycloakHost}}/realms/platform\"\nkube_apiserver_oidc_client_id: kube-apiserver\nkube_apiserver_oidc_username_claim: preferred_username\nkube_apiserver_oidc_groups_claim: groups\n"
     },
     {
       "id": "offline-vars",
@@ -1114,8 +1913,40 @@
       "component": "clusterMethods",
       "filename": "offline.yml",
       "language": "yaml",
-      "description": "group_vars/all/offline.yml pointing at the internal registry and file mirror.",
-      "template": "# Generated by the cloud-native guide site\n# Kubespray release: {{choice.kubespray}}\n\nkube_image_repo: \"{{value.registryHost}}\"\ngcr_image_repo: \"{{value.registryHost}}\"\ndocker_image_repo: \"{{value.registryHost}}\"\nquay_image_repo: \"{{value.registryHost}}\"\ngithub_image_repo: \"{{value.registryHost}}\"\n\ngithub_url: \"{{value.filesRepo}}/github.com\"\ndl_k8s_io_url: \"{{value.filesRepo}}/dl.k8s.io\"\nstorage_googleapis_url: \"{{value.filesRepo}}/storage.googleapis.com\"\nget_helm_url: \"{{value.filesRepo}}/get.helm.sh\"\n\ncontainerd_registries_mirrors:\n  - prefix: \"{{value.registryAddr}}\"\n    mirrors:\n      - host: \"https://{{value.registryAddr}}\"\n        capabilities: [\"pull\", \"resolve\"]\n        skip_verify: false\n        header:\n          Authorization: \"Basic {{registryAuth}}\"\n"
+      "description": "group_vars/all/offline.yml. Every artifact resolves through the internal registry and file mirror.",
+      "template": "# Generated by the cloud-native guide site\n# Kubespray: {{choice.kubespray}}\n\nregistry_host: \"{{value.registryHost}}\"\nregistry_addr: \"{{value.registryAddr}}\"\nfiles_repo: \"{{value.filesRepo}}\"\n\ngithub_url: \"{{value.filesRepo}}/github.com\"\ndl_k8s_io_url: \"{{value.filesRepo}}/dl.k8s.io\"\nstorage_googleapis_url: \"{{value.filesRepo}}/storage.googleapis.com\"\nget_helm_url: \"{{value.filesRepo}}/get.helm.sh\"\n\ncontainerd_registries_mirrors:\n  - prefix: \"{{value.registryAddr}}\"\n    mirrors:\n      - host: \"https://{{value.registryAddr}}\"\n        capabilities: [\"pull\", \"resolve\"]\n        skip_verify: false\n        header:\n          Authorization: \"Basic {{registryAuth}}\"\n{{extraRegistryMirrors}}\n"
+    },
+    {
+      "id": "ceph-bootstrap",
+      "name": "cephadm bootstrap script",
+      "component": "storage",
+      "when": {
+        "component": "storage",
+        "values": [
+          "cephadm-podman",
+          "cephadm-docker"
+        ]
+      },
+      "filename": "ceph-bootstrap.sh",
+      "language": "bash",
+      "description": "Prepares the engine and bootstraps the first monitor. Engine: {{choice.storage}}.",
+      "template": "#!/usr/bin/env bash\n# Generated by the cloud-native guide site\n# Engine: {{choice.storage}}   Ceph: {{version.ceph}}\n# Hosts: {{cephHostList}}\nset -euo pipefail\n\nMON_IP=\"{{cephMonIp}}\"\nENGINE=\"{{cephEngine}}\"\nREGISTRY=\"{{value.registryHost}}\"\n\n# 1. The container engine must exist before cephadm runs. cephadm will not install it.\nif [ \"$ENGINE\" = \"docker\" ]; then\n  dnf install -y docker-ce docker-ce-cli containerd.io || \\\n    apt-get install -y docker-ce docker-ce-cli containerd.io\n  systemctl enable --now docker\n  mkdir -p /etc/docker\n  cat >/etc/docker/daemon.json <<EOF\n{ \"registry-mirrors\": [\"https://${REGISTRY}\"], \"live-restore\": true }\nEOF\n  systemctl restart docker\nelse\n  dnf install -y podman || apt-get install -y podman\n  systemctl enable --now podman.socket\nfi\n\n# 2. cephadm itself.\ndnf install -y cephadm || apt-get install -y cephadm\n\n# 3. Bootstrap. --docker is passed only for the Docker engine.\ncephadm {{cephEngineFlag}} bootstrap \\\n  --mon-ip \"$MON_IP\" \\\n  --cluster-network {{value.storageCidr}} \\\n  --registry \"$REGISTRY\" \\\n  --log-to-file\n\n# 4. Copy the config and keyring to the other hosts, then add them.\n#    for h in {{cephOtherIps}}; do ssh root@$h mkdir -p /etc/ceph; \\\n#      scp /etc/ceph/ceph.conf /etc/ceph/ceph.client.admin.keyring root@$h:/etc/ceph/; done\ncephadm shell -- ceph -s\n"
+    },
+    {
+      "id": "ceph-spec",
+      "name": "Ceph service spec",
+      "component": "storage",
+      "when": {
+        "component": "storage",
+        "values": [
+          "cephadm-podman",
+          "cephadm-docker"
+        ]
+      },
+      "filename": "cluster-spec.yaml",
+      "language": "yaml",
+      "description": "Declarative placement for MON, MGR, OSD and RGW by host label, not by hostname.",
+      "template": "# Generated by the cloud-native guide site\n# Apply with: cephadm shell -- ceph orch apply -i /root/cluster-spec.yaml\nservice_type: mon\nplacement:\n  label: mon\n---\nservice_type: mgr\nplacement:\n  label: mgr\n---\nservice_type: osd\nservice_id: default\nplacement:\n  label: osd\ndata_devices:\n  all: true\n---\nservice_type: rgw\nservice_id: rgw\nplacement:\n  label: rgw\nspec:\n  rgw_frontend_port: 8080\n"
     },
     {
       "id": "metallb-pool",
@@ -1123,17 +1954,17 @@
       "component": "l4",
       "filename": "metallb-pool.yaml",
       "language": "yaml",
-      "description": "The address pool for LoadBalancer Services.",
+      "description": "Address pool for LoadBalancer Services.",
       "template": "# Generated by the cloud-native guide site\napiVersion: metallb.io/v1beta1\nkind: IPAddressPool\nmetadata:\n  name: default-pool\n  namespace: metallb-system\nspec:\n  addresses:\n    - {{value.loadBalancerPool}}\n---\napiVersion: metallb.io/v1beta1\nkind: L2Advertisement\nmetadata:\n  name: default-l2\n  namespace: metallb-system\nspec:\n  ipAddressPools:\n    - default-pool\n"
     },
     {
       "id": "edge-keepalived",
-      "name": "Keepalived configuration for the edge",
+      "name": "Keepalived configuration",
       "component": "edge",
       "filename": "keepalived.conf",
       "language": "conf",
-      "description": "VRRP instance for the edge VIP. Unicast peers, because the DMZ VLAN is assumed to filter multicast.",
-      "template": "# Generated by the cloud-native guide site\n# Edge nodes: {{value.edgeNodes}}\n\nglobal_defs {\n    router_id {{value.clusterName}}-lb-1\n    enable_script_security\n    script_user root\n    vrrp_skip_check_adv_addr\n}\n\nvrrp_script chk_haproxy {\n    script \"/etc/keepalived/keepalived.d/check_haproxy.sh\"\n    interval 2\n    weight -20\n    fall 2\n    rise 2\n}\n\nvrrp_instance VI_EDGE {\n    state BACKUP\n    interface bond0\n    virtual_router_id 51\n    priority 100\n    advert_int 1\n\n    authentication {\n        auth_type PASS\n        auth_pass {{vrrpAuthPass}}\n    }\n\n    unicast_src_ip {{value.edgeL1}}\n    unicast_peer {\n        {{value.edgeL2}}\n    }\n\n    virtual_ipaddress {\n        {{value.edgeVip}}/24\n    }\n\n    track_script {\n        chk_haproxy\n    }\n\n    notify_master \"/etc/keepalived/keepalived.d/notify.sh MASTER\"\n    notify_backup \"/etc/keepalived/keepalived.d/notify.sh BACKUP\"\n}\n"
+      "description": "VRRP instance for the edge VIP, unicast peers because the DMZ VLAN filters multicast.",
+      "template": "# Generated by the cloud-native guide site\n# Edge nodes: {{value.edgeCount}} ({{edgeHostList}})\n\nglobal_defs {\n    router_id {{value.clusterName}}-lb\n    enable_script_security\n    script_user root\n    vrrp_skip_check_adv_addr\n}\n\nvrrp_script chk_haproxy {\n    script \"/etc/keepalived/keepalived.d/check_haproxy.sh\"\n    interval 2\n    weight -20\n    fall 2\n    rise 2\n}\n\nvrrp_instance VI_EDGE {\n    state BACKUP\n    interface bond0\n    virtual_router_id 51\n    priority 100\n    advert_int 1\n\n    authentication {\n        auth_type PASS\n        auth_pass {{vrrpAuthPass}}\n    }\n\n    unicast_src_ip {{edgeL1}}\n    unicast_peer {\n{{edgePeerList}}\n    }\n\n    virtual_ipaddress {\n        {{value.edgeVip}}/24\n    }\n\n    track_script {\n        chk_haproxy\n    }\n\n    notify_master \"/etc/keepalived/keepalived.d/notify.sh MASTER\"\n    notify_backup \"/etc/keepalived/keepalived.d/notify.sh BACKUP\"\n}\n"
     },
     {
       "id": "edge-compose",
@@ -1141,7 +1972,7 @@
       "component": "edge",
       "filename": "docker-compose.yml",
       "language": "yaml",
-      "description": "The edge dataplane and VRRP, on the host network.",
+      "description": "Dataplane and VRRP on the host network.",
       "template": "# Generated by the cloud-native guide site\n# Dataplane: {{choice.edge}}\nname: edge\n\nservices:\n  haproxy:\n    image: {{value.registryHost}}/edge/haproxy:{{version.haproxy}}\n    container_name: edge-haproxy\n    network_mode: host\n    restart: unless-stopped\n    volumes:\n      - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro\n      - ./certs:/etc/haproxy/certs:ro\n    healthcheck:\n      test: [\"CMD\", \"haproxy\", \"-c\", \"-f\", \"/usr/local/etc/haproxy/haproxy.cfg\"]\n      interval: 30s\n      timeout: 5s\n      retries: 3\n    sysctls:\n      net.ipv4.ip_nonlocal_bind: \"1\"\n\n  nginx:\n    image: {{value.registryHost}}/edge/nginx:{{version.nginx}}\n    container_name: edge-nginx\n    network_mode: host\n    restart: unless-stopped\n    volumes:\n      - ./nginx.conf:/etc/nginx/nginx.conf:ro\n      - ./certs:/etc/nginx/certs:ro\n    healthcheck:\n      test: [\"CMD\", \"nginx\", \"-t\"]\n      interval: 30s\n      timeout: 5s\n      retries: 3\n    sysctls:\n      net.ipv4.ip_nonlocal_bind: \"1\"\n\n  keepalived:\n    image: {{value.registryHost}}/edge/keepalived:{{version.keepalived}}\n    container_name: edge-keepalived\n    network_mode: host\n    restart: unless-stopped\n    cap_add:\n      - NET_ADMIN\n      - NET_BROADCAST\n      - NET_RAW\n      - SYS_MODULE\n    volumes:\n      - ./keepalived.conf:/etc/keepalived/keepalived.conf:ro\n      - ./keepalived.d:/etc/keepalived/keepalived.d:ro\n    pid: host\n    sysctls:\n      net.ipv4.ip_nonlocal_bind: \"1\"\n"
     },
     {
@@ -1150,8 +1981,8 @@
       "component": "edge",
       "filename": "bootstrap-edge.sh",
       "language": "bash",
-      "description": "Prepares one edge node: kernel settings, directories, images, stack start. Run on both nodes.",
-      "template": "#!/usr/bin/env bash\n# Generated by the cloud-native guide site\n# Edge nodes: {{value.edgeNodes}}   VIP: {{value.edgeVip}}\nset -euo pipefail\n\nREGISTRY=\"{{value.registryAddr}}\"\nSTACK_DIR=/opt/edge\n\n# 1. Non-local bind, so the dataplane can listen on the VIP before it moves.\ncat >/etc/sysctl.d/90-edge.conf <<'EOF'\nnet.ipv4.ip_nonlocal_bind = 1\nnet.ipv4.ip_forward = 1\nEOF\nsysctl --system\n\n# 2. Unicast VRRP only. The DMZ VLAN is assumed to filter 224.0.0.18.\nfirewall-cmd --permanent --add-rich-rule='rule protocol value=\"vrrp\" accept' || true\nfirewall-cmd --permanent --add-port=8404/tcp || true\nfirewall-cmd --permanent --add-port=8443/tcp || true\nfirewall-cmd --reload || true\n\n# 3. Install the runtime from the internal mirror, never from the internet.\ndnf install -y docker-ce docker-compose-plugin || \\\n  apt-get install -y docker.io docker-compose-v2\nsystemctl enable --now docker\n\n# 4. Stack directory and the generated files.\ninstall -d -m 0750 \"$STACK_DIR\" \"$STACK_DIR/certs\" \"$STACK_DIR/keepalived.d\"\n# Copy docker-compose.yml, haproxy.cfg, nginx.conf, keepalived.conf and\n# keepalived.d/* into $STACK_DIR before starting the stack.\n\n# 5. Pull from the internal registry, then start.\ncd \"$STACK_DIR\"\ndocker compose pull\ndocker compose up -d\n\n# 6. Verify.\ndocker compose ps\ncurl -fsS -o /dev/null -w 'edge health: %{http_code}\\n' https://{{value.edgeVip}}/healthz || true\n"
+      "description": "Kernel settings, directories, images and stack start. Run on every edge node.",
+      "template": "#!/usr/bin/env bash\n# Generated by the cloud-native guide site\n# Edge nodes: {{edgeHostList}}   VIP: {{value.edgeVip}}\nset -euo pipefail\n\nREGISTRY=\"{{value.registryAddr}}\"\nSTACK_DIR=/opt/edge\n\n# 1. Non-local bind, so the dataplane can listen on the VIP before it moves.\ncat >/etc/sysctl.d/90-edge.conf <<'EOF'\nnet.ipv4.ip_nonlocal_bind = 1\nnet.ipv4.ip_forward = 1\nEOF\nsysctl --system\n\n# 2. Firewall: unicast VRRP, no multicast.\nfirewall-cmd --permanent --add-rich-rule='rule protocol value=\"vrrp\" accept' || true\nfirewall-cmd --permanent --add-port=8404/tcp || true\nfirewall-cmd --permanent --add-port=8443/tcp || true\nfirewall-cmd --reload || true\n\n# 3. Runtime from the internal mirror, never from the internet.\ndnf install -y docker-ce docker-compose-plugin || \\\n  apt-get install -y docker.io docker-compose-v2\nsystemctl enable --now docker\n\n# 4. Stack directory and the generated files.\ninstall -d -m 0750 \"$STACK_DIR\" \"$STACK_DIR/certs\" \"$STACK_DIR/keepalived.d\"\n# Copy docker-compose.yml, haproxy.cfg, nginx.conf, keepalived.conf and\n# keepalived.d/* into $STACK_DIR before starting the stack.\n\n# 5. Start and verify.\ncd \"$STACK_DIR\"\ndocker compose pull\ndocker compose up -d\ndocker compose ps\ncurl -fsS -o /dev/null -w 'edge health: %{http_code}\\n' https://{{value.edgeVip}}/healthz || true\n"
     },
     {
       "id": "kubespray-run",
@@ -1159,62 +1990,118 @@
       "component": "clusterMethods",
       "filename": "run-kubespray.sh",
       "language": "bash",
-      "description": "Runs the pinned release from its own checkout and virtualenv, offline, against the generated inventory.",
-      "template": "#!/usr/bin/env bash\n# Generated by the cloud-native guide site\n# Release: {{choice.kubespray}}   Kubernetes: {{version.kubernetes}}\nset -euo pipefail\n\nRELEASE=\"{{choice.kubespray}}\"\nBASE=/opt/kubespray\nSRC=\"$BASE/$RELEASE\"\nINV=\"$BASE/inventory/{{value.clusterName}}-{{value.env}}\"\n\n# One checkout and one virtualenv per release. Never share them across releases:\n# the Ansible and Python pins differ.\ntest -d \"$SRC\" || { echo \"missing checkout: $SRC\"; exit 1; }\ntest -d \"$INV\" || { echo \"missing inventory: $INV\"; exit 1; }\n\ncd \"$SRC\"\n# shellcheck disable=SC1091\nsource \"$BASE/venv-$RELEASE/bin/activate\"\n\nansible --version\n\n# Offline: every image and binary resolves through the internal mirror.\nansible-playbook -i \"$INV/hosts.ini\" cluster.yml \\\n  -b --become-user=root \\\n  -e @\"$INV/group_vars/all/offline.yml\" \\\n  -e kube_version=\"{{version.kubernetes}}\" \\\n  \"$@\"\n\n# Validate before handing the cluster over.\nkubectl --kubeconfig \"$INV/artifacts/admin.conf\" get nodes -o wide\nkubectl --kubeconfig \"$INV/artifacts/admin.conf\" -n kube-system get pods\n"
+      "description": "Runs the pinned release from its own checkout and virtualenv, offline.",
+      "template": "#!/usr/bin/env bash\n# Generated by the cloud-native guide site\n# Release: {{choice.kubespray}}   Kubernetes: {{version.kubernetes}}\nset -euo pipefail\n\nRELEASE=\"{{choice.kubespray}}\"\nBASE=/opt/kubespray\nSRC=\"$BASE/$RELEASE\"\nINV=\"$BASE/inventory/{{value.clusterName}}-{{value.env}}\"\n\n# One checkout and one virtualenv per release. The Ansible and Python pins differ.\ntest -d \"$SRC\" || { echo \"missing checkout: $SRC\"; exit 1; }\ntest -d \"$INV\" || { echo \"missing inventory: $INV\"; exit 1; }\n\ncd \"$SRC\"\n# shellcheck disable=SC1091\nsource \"$BASE/venv-$RELEASE/bin/activate\"\nansible --version\n\nansible-playbook -i \"$INV/hosts.ini\" cluster.yml \\\n  -b --become-user=root \\\n  -e @\"$INV/group_vars/all/offline.yml\" \\\n  -e kube_version=\"{{version.kubernetes}}\" \\\n  \"$@\"\n\nkubectl --kubeconfig \"$INV/artifacts/admin.conf\" get nodes -o wide\nkubectl --kubeconfig \"$INV/artifacts/admin.conf\" -n kube-system get pods\n"
     },
     {
       "id": "istio-operator",
       "name": "Istio install manifest (IstioOperator)",
       "component": "serviceMesh",
+      "when": {
+        "component": "serviceMesh",
+        "values": [
+          "istio",
+          "istio-ambient"
+        ]
+      },
       "filename": "istio-operator.yaml",
       "language": "yaml",
-      "description": "Control plane pinned to the mirrored registry. Revision-based, so a canary upgrade is possible.",
+      "description": "Control plane pinned to the mirrored registry, revision-based so a canary upgrade is possible.",
       "template": "# Generated by the cloud-native guide site\n# Istio {{version.istio}}   Mode: {{choice.serviceMesh}}\napiVersion: install.istio.io/v1alpha1\nkind: IstioOperator\nmetadata:\n  name: istio-{{revision}}\n  namespace: istio-system\nspec:\n  profile: {{istioProfile}}\n  revision: \"{{revision}}\"\n  hub: {{value.registryHost}}/istio\n  tag: \"{{version.istio}}\"\n  meshConfig:\n    accessLogFile: /dev/stdout\n    enablePrometheusMerge: true\n    defaultConfig:\n      terminationDrainDuration: 30s\n  components:\n    pilot:\n      k8s:\n        replicas: 2\n        resources:\n          requests: {cpu: 500m, memory: 2Gi}\n    ingressGateways:\n      - name: istio-ingressgateway\n        enabled: true\n        k8s:\n          hpaSpec:\n            minReplicas: 2\n            maxReplicas: 6\n  values:\n    global:\n      imagePullPolicy: IfNotPresent\n      proxy:\n        resources:\n          requests: {cpu: 100m, memory: 128Mi}\n          limits: {cpu: \"1\", memory: 512Mi}\n"
     },
     {
       "id": "istio-mtls",
       "name": "mTLS and authorization policies",
       "component": "serviceMesh",
+      "when": {
+        "component": "serviceMesh",
+        "values": [
+          "istio",
+          "istio-ambient"
+        ]
+      },
       "filename": "peer-authentication.yaml",
       "language": "yaml",
-      "description": "STRICT mTLS per namespace, default-deny, and the allow rules. Apply the deny rule only after the allows exist.",
-      "template": "# Generated by the cloud-native guide site\n# Namespace: {{value.appNamespace}}\n# Stage 1: permissive is the install default. Apply STRICT one namespace at a time,\n# watch the mesh metrics for rejected connections, then continue.\napiVersion: security.istio.io/v1\nkind: PeerAuthentication\nmetadata:\n  name: default\n  namespace: {{value.appNamespace}}\nspec:\n  mtls:\n    mode: STRICT\n---\n# Stage 2: default deny. Apply only after the allow rules below are in place.\napiVersion: security.istio.io/v1\nkind: AuthorizationPolicy\nmetadata:\n  name: default-deny\n  namespace: {{value.appNamespace}}\nspec: {}\n---\n# Stage 3: allow in-namespace traffic.\napiVersion: security.istio.io/v1\nkind: AuthorizationPolicy\nmetadata:\n  name: allow-same-namespace\n  namespace: {{value.appNamespace}}\nspec:\n  action: ALLOW\n  rules:\n    - from:\n        - source:\n            namespaces: [\"{{value.appNamespace}}\"]\n---\n# Stage 4: allow the ingress gateway namespace to reach the workload.\napiVersion: security.istio.io/v1\nkind: AuthorizationPolicy\nmetadata:\n  name: allow-ingress\n  namespace: {{value.appNamespace}}\nspec:\n  action: ALLOW\n  rules:\n    - from:\n        - source:\n            namespaces: [\"istio-ingress\"]\n"
+      "description": "STRICT mTLS per namespace, default deny, and the allow rules. Apply deny only after the allows exist.",
+      "template": "# Generated by the cloud-native guide site\n# Namespace: {{value.appNamespace}}\n# Stage 1: install defaults to permissive. Move one namespace at a time.\napiVersion: security.istio.io/v1\nkind: PeerAuthentication\nmetadata:\n  name: default\n  namespace: {{value.appNamespace}}\nspec:\n  mtls:\n    mode: STRICT\n---\n# Stage 2: default deny. Apply only after the allow rules below exist.\napiVersion: security.istio.io/v1\nkind: AuthorizationPolicy\nmetadata:\n  name: default-deny\n  namespace: {{value.appNamespace}}\nspec: {}\n---\napiVersion: security.istio.io/v1\nkind: AuthorizationPolicy\nmetadata:\n  name: allow-same-namespace\n  namespace: {{value.appNamespace}}\nspec:\n  action: ALLOW\n  rules:\n    - from:\n        - source:\n            namespaces: [\"{{value.appNamespace}}\"]\n---\napiVersion: security.istio.io/v1\nkind: AuthorizationPolicy\nmetadata:\n  name: allow-ingress\n  namespace: {{value.appNamespace}}\nspec:\n  action: ALLOW\n  rules:\n    - from:\n        - source:\n            namespaces: [\"istio-ingress\"]\n"
     },
     {
       "id": "istio-gateway",
       "name": "Gateway API route through the mesh",
       "component": "serviceMesh",
+      "when": {
+        "component": "serviceMesh",
+        "values": [
+          "istio",
+          "istio-ambient"
+        ]
+      },
       "filename": "istio-gateway.yaml",
       "language": "yaml",
-      "description": "One GatewayClass claim per hostname. Do not run this in front of a hostname another controller already serves.",
+      "description": "One GatewayClass claim per hostname. Do not put this in front of a hostname another controller serves.",
       "template": "# Generated by the cloud-native guide site\n# Istio {{version.istio}}   Host: app.{{value.domain}}\napiVersion: gateway.networking.k8s.io/v1\nkind: Gateway\nmetadata:\n  name: istio-gateway\n  namespace: istio-ingress\nspec:\n  gatewayClassName: istio\n  listeners:\n    - name: https\n      port: 443\n      protocol: HTTPS\n      hostname: \"app.{{value.domain}}\"\n      tls:\n        mode: Terminate\n        certificateRefs:\n          - kind: Secret\n            name: app-tls\n---\napiVersion: gateway.networking.k8s.io/v1\nkind: HTTPRoute\nmetadata:\n  name: app\n  namespace: {{value.appNamespace}}\nspec:\n  parentRefs:\n    - name: istio-gateway\n      namespace: istio-ingress\n  hostnames: [\"app.{{value.domain}}\"]\n  rules:\n    - matches:\n        - path: {type: PathPrefix, value: /}\n      backendRefs:\n        - name: app\n          port: 8080\n"
     },
     {
       "id": "vault-policy",
-      "name": "Vault policy for one application namespace",
+      "name": "Vault policy for one namespace",
       "component": "secrets",
       "filename": "vault-policy.hcl",
       "language": "hcl",
       "description": "Least-privilege policy for a single application namespace.",
-      "template": "# Generated by the cloud-native guide site\n# Namespace: {{value.appNamespace}}\n# Secret engine: {{value.vaultEngine}}\n\npath \"{{value.vaultEngine}}/apps/{{value.appNamespace}}/*\" {\n  capabilities = [\"read\"]\n}\n\npath \"database/creds/{{value.appNamespace}}/*\" {\n  capabilities = [\"read\"]\n}\n\npath \"pki/issue/{{value.appNamespace}}\" {\n  capabilities = [\"create\", \"update\"]\n}\n"
+      "template": "# Generated by the cloud-native guide site\n# Namespace: {{value.appNamespace}}   Engine: {{value.vaultEngine}}\n\npath \"{{value.vaultEngine}}/apps/{{value.appNamespace}}/*\" {\n  capabilities = [\"read\"]\n}\n\npath \"database/creds/{{value.appNamespace}}/*\" {\n  capabilities = [\"read\"]\n}\n\npath \"pki/issue/{{value.appNamespace}}\" {\n  capabilities = [\"create\", \"update\"]\n}\n"
+    },
+    {
+      "id": "idp-integration",
+      "name": "Directory integration checklist",
+      "component": "idpIntegration",
+      "when": {
+        "component": "idpIntegration",
+        "values": [
+          "rancher-ad",
+          "rancher-ldap",
+          "keycloak-federation",
+          "harbor-oidc",
+          "gitlab-ldap",
+          "argocd-oidc",
+          "vault-oidc"
+        ]
+      },
+      "filename": "idp-integration.md",
+      "language": "markdown",
+      "description": "Application-level only. Nodes are never joined to a directory (ADR-0015).",
+      "template": "# Directory integration \u2014 {{value.clusterName}} ({{value.env}})\n\nDirectory: `{{value.directoryHost}}`\nBase DN: `{{value.directoryBaseDn}}`\nOIDC issuer: `{{value.keycloakHost}}/realms/platform`\n\n**Scope: application layer only.** No SSSD, realmd, Kerberos membership or AD join on any Linux\nnode. Local break-glass account and offline key are the node recovery path.\n\n## Selected integrations\n\n{{idpTargets}}\n\n## Order of work\n\n1. Confirm the break-glass local account works with the directory unreachable.\n2. Create a read-only bind account; store its credential in Vault, never in Git.\n3. Configure Keycloak user federation first, `editMode=READ_ONLY`.\n4. Create one OIDC client per service, explicit redirect URI, no wildcard.\n5. Wire services in order: Argo CD, Rancher, Harbor, GitLab, Vault, Kubernetes API.\n6. Remove each service's local superuser path only after a federated admin login works.\n7. Alert on failed federated logins, bind failures, and a zero-login drop in working hours.\n\n## Group \u2192 role mapping\n\n| Group (DN) | Service | Role |\n|---|---|---|\n| CN=platform-admins | all | platform administrator |\n| CN=platform-operators | Rancher, Argo CD | operator, sync |\n| CN=platform-viewers | all | read-only |\n\nReference: `identity/directory-integration.md`\n"
     },
     {
       "id": "gpu-node-labels",
       "name": "GPU node labels and taints",
       "component": "gpu",
+      "when": {
+        "component": "gpu",
+        "values": [
+          "mig",
+          "timeslicing"
+        ]
+      },
       "filename": "gpu-node-labels.yaml",
       "language": "yaml",
       "description": "Labels and taints for the GPU worker pool.",
-      "template": "# Generated by the cloud-native guide site\n# GPU Operator: {{version.gpu-operator}}\napiVersion: v1\nkind: Node\nmetadata:\n  name: {{firstGpuNode}}\n  labels:\n    node-role.kubernetes.io/gpu: \"true\"\n    accelerator: nvidia\n    nvidia.com/gpu.present: \"true\"\nspec:\n  taints:\n    - key: nvidia.com/gpu\n      value: \"true\"\n      effect: NoSchedule\n"
+      "template": "# Generated by the cloud-native guide site\n# GPU Operator: {{version.gpu-operator}}   Nodes: {{gpuHostList}}\napiVersion: v1\nkind: Node\nmetadata:\n  name: {{firstGpuNode}}\n  labels:\n    node-role.kubernetes.io/gpu: \"true\"\n    accelerator: nvidia\n    nvidia.com/gpu.present: \"true\"\nspec:\n  taints:\n    - key: nvidia.com/gpu\n      value: \"true\"\n      effect: NoSchedule\n"
     },
     {
       "id": "vllm-deployment",
       "name": "vLLM inference deployment",
       "component": "gpu",
+      "when": {
+        "component": "gpu",
+        "values": [
+          "mig",
+          "timeslicing"
+        ]
+      },
       "filename": "vllm-deployment.yaml",
       "language": "yaml",
       "description": "OpenAI-compatible inference server with the model cache on local NVMe.",
-      "template": "# Generated by the cloud-native guide site\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: vllm\n  namespace: ai\nspec:\n  replicas: 2\n  selector:\n    matchLabels: {app: vllm}\n  template:\n    metadata:\n      labels: {app: vllm}\n    spec:\n      nodeSelector:\n        node-role.kubernetes.io/gpu: \"true\"\n      tolerations:\n        - key: nvidia.com/gpu\n          operator: Equal\n          value: \"true\"\n          effect: NoSchedule\n      containers:\n        - name: vllm\n          image: {{value.registryHost}}/platform/vllm:{{version.vllm}}\n          args:\n            - \"--model=/models/model\"\n            - \"--served-model-name=llama\"\n            - \"--port=8000\"\n            - \"--tensor-parallel-size=1\"\n            - \"--gpu-memory-utilization=0.90\"\n            - \"--max-model-len=8192\"\n            - \"--trust-remote-code=false\"\n          ports:\n            - containerPort: 8000\n          resources:\n            limits:\n              nvidia.com/gpu: 1\n          volumeMounts:\n            - {name: model-cache, mountPath: /models}\n      volumes:\n        - name: model-cache\n          hostPath: {path: /mnt/models, type: DirectoryOrCreate}\n"
+      "template": "# Generated by the cloud-native guide site\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: vllm\n  namespace: ai\nspec:\n  replicas: {{gpuReplicas}}\n  selector:\n    matchLabels: {app: vllm}\n  template:\n    metadata:\n      labels: {app: vllm}\n    spec:\n      nodeSelector:\n        node-role.kubernetes.io/gpu: \"true\"\n      tolerations:\n        - key: nvidia.com/gpu\n          operator: Equal\n          value: \"true\"\n          effect: NoSchedule\n      containers:\n        - name: vllm\n          image: {{value.registryHost}}/platform/vllm:{{version.vllm}}\n          args:\n            - \"--model=/models/model\"\n            - \"--served-model-name=llama\"\n            - \"--port=8000\"\n            - \"--tensor-parallel-size=1\"\n            - \"--gpu-memory-utilization=0.90\"\n            - \"--max-model-len=8192\"\n            - \"--trust-remote-code=false\"\n          ports:\n            - containerPort: 8000\n          resources:\n            limits:\n              nvidia.com/gpu: 1\n          volumeMounts:\n            - {name: model-cache, mountPath: /models}\n      volumes:\n        - name: model-cache\n          hostPath: {path: /mnt/models, type: DirectoryOrCreate}\n"
     }
   ],
   "versions": {

@@ -16,7 +16,7 @@ Implementation order. Every guide follows the section 24 template: A Purpose/Arc
 | 8 | Nexus | `offline-artifacts/nexus.md` | artifact staging | 2 |
 | 9 | Internal CA / PKI bootstrap | `secrets-management/pki/` | OS guide | 3 |
 | 10 | Keycloak | `management-cluster/keycloak/` | PKI | 3 |
-| 11 | Linux identity integration (SSSD/realmd) | `identity/` | AD/LDAP, OS guide | 5 |
+| 11 | Identity integration at the application layer (Rancher, Keycloak, Harbor, GitLab, Argo CD, Vault) | `identity/` | AD/LDAP, OIDC | 5 |
 | 12 | Load balancer (keepalived/haproxy) | `network-matrix/` | OS guide | 3 |
 | 13 | DNS + NTP | `operating-systems/` | OS guide | 3 |
 
