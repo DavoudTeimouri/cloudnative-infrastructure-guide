@@ -1,0 +1,91 @@
+name: edge
+
+# External load balancer stack: HAProxy (L4 + active health checks) and/or
+# Nginx (L7 policy and TLS termination), plus Keepalived for the VIP.
+#
+# All services use host networking:
+#   - VRRP advertisements must leave from the physical interface
+#   - the dataplane binds 0.0.0.0 and must hold its socket across a VIP move
+#
+# Set the profile env var to choose the shape:
+#   edge-nginx-only  -> Nginx terminates TLS, Keepalived owns the VIP
+#   edge-haproxy-only-> HAProxy owns the edge in mode tcp, Nginx runs L7 behind it
+#   edge-full        -> both, HAProxy in front of Nginx
+#
+# Deploy on every edge node with the same file. Node-specific values (unicast
+# peers, router_id, priority) come from keepalived.conf, which Ansible
+# renders per node from the inventory.
+
+services:
+  haproxy:
+    image: harbor.internal/edge/haproxy:3.2.26
+    container_name: edge-haproxy
+    network_mode: host
+    restart: unless-stopped
+    volumes:
+      - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+      - ./certs:/etc/haproxy/certs:ro
+    healthcheck:
+      test: ["CMD", "haproxy", "-c", "-f", "/usr/local/etc/haproxy/haproxy.cfg"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    sysctls:
+      net.ipv4.ip_nonlocal_bind: "1"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    labels:
+      app.kubernetes.io/part-of: edge
+      app.kubernetes.io/component: dataplane
+
+  nginx:
+    image: harbor.internal/edge/nginx:1.31.8
+    container_name: edge-nginx
+    network_mode: host
+    restart: unless-stopped
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./certs:/etc/nginx/certs:ro
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    sysctls:
+      net.ipv4.ip_nonlocal_bind: "1"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    labels:
+      app.kubernetes.io/part-of: edge
+      app.kubernetes.io/component: dataplane
+
+  keepalived:
+    image: harbor.internal/edge/keepalived:v2.4.3
+    container_name: edge-keepalived
+    network_mode: host
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+      - NET_BROADCAST
+      - NET_RAW
+      - SYS_MODULE
+    volumes:
+      - ./keepalived.conf:/etc/keepalived/keepalived.conf:ro
+      - ./keepalived.d:/etc/keepalived/keepalived.d:ro
+    pid: host
+    sysctls:
+      net.ipv4.ip_nonlocal_bind: "1"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    labels:
+      app.kubernetes.io/part-of: edge
+      app.kubernetes.io/component: vrrp
