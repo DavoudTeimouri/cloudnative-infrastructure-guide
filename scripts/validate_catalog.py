@@ -144,12 +144,94 @@ def test_built_data_is_current():
     assert res.returncode == 0, f"site/data.json is stale:\n{res.stdout}{res.stderr}"
 
 
+def render_export(template, data):
+    """Mirror site/app.js renderTemplate so the CI check and the browser agree."""
+    values = {v["id"]: v.get("default", "") for v in data["values"]}
+    choices = {}
+    for comp in data["components"]:
+        d = [o for o in comp["options"] if o.get("default")] or comp["options"]
+        choices[comp["id"]] = d[0]["id"]
+    chosen_cluster = data["clusterMethods"][0]["id"]
+
+    def csv(s):
+        return [x.strip() for x in str(s).split(",") if x.strip()]
+
+    derived = {
+        "controlPlaneNodes": "\n".join(csv(values["controlPlaneNodes"])),
+        "workerNodes": "\n".join(csv(values["workerNodes"])),
+        "gpuNodeGroup": (
+            "\n[k8s-node:children]\ngpu-node\n\n[gpu-node]\n" + "\n".join(csv(values["gpuNodes"]))
+            if csv(values["gpuNodes"]) else ""
+        ),
+        "registryAuth": "",
+        "vrrpAuthPass": "",
+        "firstGpuNode": (csv(values["gpuNodes"]) or [""])[0],
+        "firstWorkerNode": (csv(values["workerNodes"]) or [""])[0],
+        "firstControlPlaneNode": (csv(values["controlPlaneNodes"]) or [""])[0],
+    }
+
+    def sub_dotted(m):
+        ns, key = m.group(1), m.group(2)
+        if ns == "value":
+            return str(values.get(key, ""))
+        if ns == "choice":
+            if key in choices:
+                return choices[key]
+            for cm in data["clusterMethods"]:
+                if cm["id"] == key and cm["id"] == chosen_cluster:
+                    return key
+            return ""
+        if ns == "version":
+            return data["versions"].get(key, "UNVERIFIED")
+        return ""
+
+    out = re.sub(r"\{\{\s*(value|choice|version)\.([a-zA-Z0-9_-]+)\s*\}\}", sub_dotted, template)
+    out = re.sub(r"\{\{\s*([a-zA-Z0-9_-]+)\s*\}\}",
+                 lambda m: str(derived.get(m.group(1), "")), out)
+    return out
+
+
+def test_exports_render_cleanly():
+    """Every template must resolve against catalog defaults, with no placeholder left."""
+    if not os.path.exists(DATA):
+        raise AssertionError("site/data.json missing; run scripts/build_site.py first")
+    data = load(DATA)
+    problems = []
+    for exp in data["exports"]:
+        body = render_export(exp["template"], data)
+        left = re.findall(r"\{\{[^}]*\}\}", body)
+        if left:
+            problems.append(f"{exp['id']}: unresolved {left[:3]}")
+        if exp["filename"].endswith((".yaml", ".yml")):
+            try:
+                import yaml  # optional: absent in a minimal CI image
+            except ImportError:
+                continue
+            try:
+                list(yaml.safe_load_all(body))
+            except Exception as e:  # noqa: BLE001
+                problems.append(f"{exp['id']}: invalid YAML: {e}")
+    assert not problems, "; ".join(problems)
+
+
+def test_inventory_has_nodes():
+    data = load(DATA)
+    exp = [e for e in data["exports"] if e["id"] == "inventory"][0]
+    body = render_export(exp["template"], data)
+    for group in ("[control-plane]", "[etcd]", "[k8s-cluster:children]"):
+        assert group in body, f"inventory missing {group}"
+    cp = body.split("[control-plane]")[1].split("[etcd]")[0].strip().splitlines()
+    assert len(cp) == 3, f"expected 3 control-plane hosts, got {len(cp)}"
+
+
 def main():
     tests = [
         ("catalog has the required sections", test_catalog_shape),
         ("every component has exactly one default", test_component_defaults),
         ("every referenced document exists", test_docs_exist),
         ("export templates are well formed", test_export_templates),
+        ("export templates render without leftovers", test_exports_render_cleanly),
+        ("generated inventory has the expected groups", test_inventory_has_nodes),
         ("step conditions reference real components", test_steps_reference_real_components),
         ("site/data.json matches the sources", test_built_data_is_current),
     ]

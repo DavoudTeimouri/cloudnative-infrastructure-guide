@@ -101,10 +101,10 @@
       firstControlPlaneNode: csv(state.values.controlPlaneNodes)[0] || ""
     };
 
-    return tpl.replace(/\{\{\s*([a-zA-Z]+)\.([a-zA-Z0-9_]+)\s*\}\}/g, function (m, ns, key) {
+    return tpl.replace(/\{\{\s*([a-zA-Z]+)\.([a-zA-Z0-9_-]+)\s*\}\}/g, function (m, ns, key) {
       if (ctx[ns] && typeof ctx[ns] === "function") return ctx[ns](key);
       return "";
-    }).replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, function (m, key) {
+    }).replace(/\{\{\s*([a-zA-Z0-9_-]+)\s*\}\}/g, function (m, key) {
       return ctx[key] === undefined ? "" : String(ctx[key]);
     });
   }

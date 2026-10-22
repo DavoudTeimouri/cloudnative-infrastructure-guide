@@ -153,7 +153,7 @@ def main():
         "values": catalog["values"],
         "steps": catalog["steps"],
         "upgradeSections": catalog["upgradeSections"],
-        "exports": exports,
+        "exports": exports["exports"],
         "versions": versions,
     }
 
