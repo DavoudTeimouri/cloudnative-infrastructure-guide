@@ -1,0 +1,72 @@
+name: Site
+
+# The site is generated from the repository. It is never edited by hand.
+#   catalog/catalog.json            -> components, steps, values, export templates
+#   compatibility/version-matrix.md -> pinned versions (VERIFIED rows only)
+#   scripts/build_site.py           -> site/data.json
+#
+# A stale site fails the build. A version bump in the matrix propagates on
+# the next run without touching the catalog.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: site-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build and validate the site data
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build site data
+        run: python3 scripts/build_site.py
+
+      - name: Fail when the committed site data is stale
+        run: |
+          python3 scripts/build_site.py --check
+          if ! git diff --quiet -- site/data.json; then
+            echo "::error::site/data.json is stale. Run 'python3 scripts/build_site.py' and commit the result."
+            git diff -- site/data.json | head -50
+            exit 1
+          fi
+
+      - name: Repository self-check
+        run: python3 tests/test_repo_tools.py
+
+      - name: Catalog validation
+        run: python3 scripts/validate_catalog.py
+
+      - name: Upload the site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Enterprise Cloud-Native Infrastructure Guide</title>
+<meta name="description" content="Step-by-step guide for building a production cloud-native platform on premises: Kubernetes with Kubespray, Ceph, Rancher, Argo CD, Vault, Prometheus, offline artifact distribution, and GPU inference.">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="#top">
+      <span class="brand-mark">CN</span>
+      <span>
+        <strong>Cloud-Native Infrastructure Guide</strong>
+        <small>On-premises · air-gapped · production</small>
+      </span>
+    </a>
+    <nav>
+      <a href="#configure">Configure</a>
+      <a href="#plan">Plan</a>
+      <a href="#export">Export</a>
+      <a href="#upgrade">Upgrades</a>
+      <a href="https://github.com/DavoudTeimouri/cloudnative-infrastructure-guide" rel="noopener">Repository</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap" id="top">
+
+  <section class="hero">
+    <h1>Build a cloud-native platform, step by step.</h1>
+    <p>
+      Pick your deployment method, choose the components, fill in the site values, and the guide
+      renders the ordered plan, the resolved versions, and ready-to-use configuration files.
+      Every version comes from the repository's compatibility matrix, so the site never drifts
+      from the documents.
+    </p>
+    <p class="hero-meta">
+      <span id="catalog-version">catalog —</span>
+      <span id="catalog-updated">updated —</span>
+      <span id="version-count">— versions</span>
+    </p>
+  </section>
+
+  <section id="configure">
+    <h2>1. Configure</h2>
+
+    <div class="grid">
+      <fieldset class="card">
+        <legend>Deployment method</legend>
+        <div id="method-picker" class="options"></div>
+        <div id="method-detail" class="detail"></div>
+      </fieldset>
+
+      <fieldset class="card">
+        <legend>Cluster method</legend>
+        <div id="cluster-picker" class="options"></div>
+        <div id="cluster-detail" class="detail"></div>
+      </fieldset>
+    </div>
+
+    <fieldset class="card">
+      <legend>Components</legend>
+      <div id="components" class="components"></div>
+    </fieldset>
+
+    <fieldset class="card">
+      <legend>Site values</legend>
+      <p class="hint">
+        Values are rendered locally in your browser. Nothing is sent anywhere. Secret fields are
+        marked, and their content is written only into the file you download.
+      </p>
+      <div id="values" class="values"></div>
+    </fieldset>
+  </section>
+
+  <section id="plan">
+    <h2>2. Plan</h2>
+    <div class="plan-head">
+      <div>
+        <strong id="plan-summary">—</strong>
+        <p class="hint" id="plan-note"></p>
+      </div>
+      <div class="plan-actions">
+        <button id="copy-plan" class="btn">Copy plan</button>
+        <button id="download-runbook" class="btn primary">Download runbook</button>
+      </div>
+    </div>
+
+    <h3>Resolved versions</h3>
+    <table class="versions" id="versions"><tbody></tbody></table>
+
+    <h3>Implementation steps</h3>
+    <ol class="steps" id="steps"></ol>
+  </section>
+
+  <section id="export">
+    <h2>3. Export</h2>
+    <p class="hint">
+      Configuration files generated from your selection. Review every file before use: the
+      repository documents are the authority, not this page.
+    </p>
+    <div id="exports" class="exports"></div>
+  </section>
+
+  <section id="upgrade">
+    <h2>4. Updating and upgrading</h2>
+    <p class="hint">
+      Kept separate from the implementation plan. The order matters, and the rollback path
+      differs per component.
+    </p>
+    <div id="upgrades" class="upgrades"></div>
+  </section>
+
+  <section id="sources">
+    <h2>Sources and rules</h2>
+    <div class="grid">
+      <div class="card plain">
+        <h3>What this site is</h3>
+        <p>
+          A rendering of the documentation repository. The repository is the source of truth for
+          procedures, decisions, versions and matrices. The site is generated from it and carries
+          no independent knowledge.
+        </p>
+        <p id="source-note"></p>
+      </div>
+      <div class="card plain">
+        <h3>How it stays current</h3>
+        <ul>
+          <li>Versions are parsed from <code>compatibility/version-matrix.md</code> at build time.</li>
+          <li>Only rows marked VERIFIED are used. UNVERIFIED rows never reach the site.</li>
+          <li>Components, steps and exports come from <code>catalog/catalog.json</code>.</li>
+          <li>A build check fails when the generated data no longer matches the sources.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <span>Enterprise Cloud-Native Infrastructure Guide</span>
+    <span>Documentation as code. Every version sourced and dated.</span>
+  </div>
+</footer>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script src="app.js"></script>
+</body>
+</html>

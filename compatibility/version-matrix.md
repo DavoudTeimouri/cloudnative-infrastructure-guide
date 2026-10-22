@@ -58,6 +58,8 @@ For Kubernetes >= 1.32, the recommended 4.x LTS kernel is 4.19; any 5.x or 6.x i
 | MetalLB | v0.16.1 | 0.16.1 | `https://github.com/metallb/metallb/releases/tag/v0.16.1` | VERIFIED | Chart `metallb-0.16.1` from `https://metallb.github.io/metallb/charts/index.yaml` |
 | MetalLB (Kubespray-managed) | 0.13.9 | not adopted | Kubespray release-2.32 README | VERIFIED | Kubespray ships an older MetalLB; the platform installs its own chart instead |
 | NGINX Ingress Controller (F5) | 5.7.0 (chart nginx-ingress 2.8.0) | chart 2.8.0 | `https://github.com/nginx/kubernetes-ingress/releases` | VERIFIED | F5's commercial-grade controller. **This is the NGINX Ingress Controller, not the retired `kubernetes/ingress-nginx`** — see the retirement note below |
+| NGINX Gateway Fabric (F5) | 2.8.0 | 2.8.0 | `https://docs.nginx.com/nginx-gateway-fabric/overview/technical-specifications/` | VERIFIED | Gateway API conformant. Requires Kubernetes 1.32+. Gateway API 1.6.3 |
+| Envoy Gateway | v1.9.2 | v1.9.2 | `https://github.com/envoyproxy/gateway/releases` | VERIFIED | Gateway API implementation. v1.9 EOL 2027-02-14, v1.8 EOL 2026-11-08 |
 | kubernetes/ingress-nginx | v1.15.1 (chart 4.15.1) | **RETIRED — do not adopt** | `https://kubernetes.io/blog/2025/11/11/ingress-nginx-retirement/` | VERIFIED | Retired March 2026. Read-only repositories, no further releases or security fixes. Artifacts remain available for existing deployments only |
 | Traefik | v3.7.16 | not adopted | `https://github.com/traefik/traefik/releases/tag/v3.7.16` | VERIFIED | Alternative ingress |
 | Gateway API | v1.6.3 | v1.6.3 | `https://github.com/kubernetes-sigs/gateway-api/releases/tag/v1.6.3` | VERIFIED | v1.7.0-rc.1 exists; do not pin a pre-release |
@@ -170,6 +172,7 @@ For Kubernetes >= 1.32, the recommended 4.x LTS kernel is 4.19; any 5.x or 6.x i
 | CUDA Toolkit | 13.x with R595; 12.x supported by R580 | UNVERIFIED | Same driver matrix page | VERIFIED | Max CUDA major without forward-compat: CUDA 12 for R535, CUDA 13 for R580/R595/R610 |
 | H100/H200 minimum driver for MIG | CUDA 12, R450 (>= 450.80.02) or later | UNVERIFIED for deploy | NVIDIA MIG User Guide, supported GPUs table | VERIFIED | A production branch far above this minimum is required in practice |
 | vLLM | v0.32.0 | UNVERIFIED for deploy | `https://github.com/vllm-project/vllm/releases` | VERIFIED | v0.32.1rc0 exists; do not pin a pre-release |
+| Istio | 1.31.3 | UNVERIFIED for deploy | `https://github.com/istio/istio/releases` | VERIFIED | Only if the service mesh threshold in ADR-0009 is met |
 | Triton Inference Server | 2.73.0 (NGC 26.09) | UNVERIFIED | `https://github.com/triton-inference-server/server/releases` | VERIFIED | |
 | llama.cpp | b11819 (build tag) | UNVERIFIED | `https://github.com/ggml-org/llama.cpp/releases` | VERIFIED that the feed publishes build tags rather than semantic versions | Pin by build tag or by the container image digest; there is no semver to pin |
 | llama.cpp formats | GGUF (Q4/Q5/Q8 and K-quants) | n/a | llama.cpp documentation | VERIFIED | Not a version claim |

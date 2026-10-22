@@ -48,9 +48,58 @@ The decisions that shape everything else. Full reasoning in the ADR, referenced 
 | External load balancer | Tiered active/active edge: HAProxy (L4, active health checks) and Nginx (L7, TLS) on host network via Docker Compose, Keepalived with unicast peers. Tier 2 = two VIPs balanced by router ECMP/BGP; tier 3 = DNS/GSLB. A single VRRP VIP is active/standby, not active/active | ADR-0028, ADR-0004 |
 | Artifact distribution | Harbor for images and OCI charts, Nexus for packages, GitLab for source, Ceph RGW for model weights. One owner per artifact type | ADR-0024 |
 
+## Interactive guide site
+
+**<https://davoudteimouri.github.io/cloudnative-infrastructure-guide/>**
+
+A static site built from this repository. It turns the documents into a plan for one specific
+cluster: pick the deployment method, the Kubespray release and the components, fill in the site
+values, then read the ordered plan and download the configuration files.
+
+The site holds no independent knowledge. Components, steps and exports come from
+`catalog/catalog.json`; versions come from `compatibility/version-matrix.md`, and only rows
+marked `VERIFIED` are used. A build check fails when the generated data no longer matches the
+sources, so the site cannot drift from the documents. Details: `site/README.md`.
+
+**Use it, step by step**
+
+1. Open the live URL above.
+2. Choose **bare metal** or **virtual machines**. Read the requirements: the VM option lists
+   what changes in the failure domain.
+3. Choose the **Kubespray release**. Five are supported in parallel; the pinned Kubernetes,
+   etcd, containerd and Ansible versions are shown, not guessed.
+4. Walk the **components**. Required components have no "none" option. Read every inline warning
+   before selecting.
+5. Fill the **site values** — CIDRs, node names, VIPs, registry and mirror endpoints. Everything
+   renders in your browser; nothing is transmitted. The two secret fields can be left empty.
+6. Read the **plan** top to bottom and open the document behind each step. The plan is a reading
+   order, not a script.
+7. Download the **exports** you need (inventory, group vars, MetalLB pool, Keepalived config,
+   edge Compose stack, Vault policy, GPU labels, vLLM Deployment) and review every file.
+8. Download the **runbook** and attach it to the change record.
+9. Read the **upgrades** section before any version change. Kubernetes and Ceph have no rollback;
+   the backup is the rollback.
+
+**Change it, step by step**
+
+| Change | Edit | Then |
+|---|---|---|
+| A pinned version | `compatibility/version-matrix.md` | `python3 scripts/build_site.py` |
+| A component, option, step or value | `catalog/catalog.json` | `python3 scripts/build_site.py` |
+| An export template | `catalog/exports.json` | `python3 scripts/build_site.py` |
+| A document that a step links to | the document | nothing, unless the path moved |
+
+```bash
+python3 scripts/build_site.py        # regenerate site/data.json
+python3 scripts/validate_catalog.py  # missing docs, bad placeholders, stale data
+python3 -m http.server 8080 --directory site   # preview at http://localhost:8080
+```
+
 ## Repository map
 
 ```
+catalog/                 site data model: components, steps, values, export templates
+site/                    the static guide site (no build toolchain, no CDN, no server)
 USER.md                   communication and work style contract
 MEMORY.md                 fact-store contract: facts live in memory + skills, not here
 architecture/            logical topology, deployment topology, failure domains
@@ -146,6 +195,10 @@ python3 scripts/kubespray_ansible_matrix.py release-2.28 release-2.29 release-2.
 
 # Regenerate the ADRs after editing the generator
 python3 scripts/gen_adrs.py
+
+# Regenerate and validate the guide site
+python3 scripts/build_site.py
+python3 scripts/validate_catalog.py
 
 # Self-check the repository (offline)
 python3 tests/test_repo_tools.py
