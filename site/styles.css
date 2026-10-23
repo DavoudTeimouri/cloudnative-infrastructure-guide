@@ -95,6 +95,19 @@ h3 { font-size: 15px; margin: 24px 0 10px; color: var(--fg); }
 .comp h4 .req { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
 .comp .options { gap: 6px; }
 
+
+
+/* role tabs */
+.role-tabs { border: 1px solid var(--line); border-radius: 8px; background: var(--card); margin: 12px 0; overflow: hidden; }
+.role-tabs .options { display: flex; gap: 0; border-bottom: 1px solid var(--line); }
+.role-tabs .opt { flex: 1; border: none; border-radius: 0; margin: 0; text-align: center; }
+.role-tabs .opt.on { border-bottom: 2px solid var(--accent); background: var(--accent-10); }
+.role-tabs .opt.dim { opacity: .55; cursor: default; }
+.role-tabs .opt.dim input { cursor: not-allowed; }
+.role-tabs .opt-body .opt-title { font-size: 13px; font-weight: 600; }
+.role-panel { padding: 12px 14px; }
+.role-panel .field { grid-column: span 2; }
+
 /* values */
 .values { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
 .field { display: flex; flex-direction: column; gap: 4px; }

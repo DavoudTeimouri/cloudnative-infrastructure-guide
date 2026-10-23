@@ -1,5 +1,5 @@
 {
-  "catalogVersion": "3.1.2",
+  "catalogVersion": "3.1.3",
   "updated": "2026-10-22",
   "source": {
     "docs": "The repository is the source of truth. This catalog points at it; it never duplicates a procedure.",
@@ -165,28 +165,18 @@
     {
       "id": "p4",
       "title": "Operating system",
-      "subtitle": "Operating system baseline, per role. Select the node roles this export covers; each role inherits the baseline and overrides the inputs that matter to it.",
+      "subtitle": "Common OS baseline (all roles). Role-specific overrides live in the tabs below \u2014 master, worker, Ceph OSD/MON, load balancers, operation server and others.",
       "components": [
         "os",
         "hostRoles"
       ],
       "fields": [
-        "adminUser",
-        "sshPort",
-        "sshPasswordAuth",
-        "sudoNopasswd",
         "osTimezone",
         "osLocale",
-        "ntpServers",
         "dnsServers",
         "dnsSearchDomain",
-        "kernelArgs",
         "swapDisabled",
-        "transparentHugePages",
-        "maxPodsPerNode",
-        "fileDescriptorsMax",
         "selinuxMode",
-        "firewallBackend",
         "auditRetentionDays",
         "unattendedSecurityUpdates",
         "caBundle"
@@ -1888,6 +1878,26 @@
       "default": 120,
       "min": 60,
       "required": false
+    },
+    {
+      "id": "pidMax",
+      "type": "number",
+      "default": 4194304
+    },
+    {
+      "id": "vmSwappiness",
+      "type": "number",
+      "default": 1
+    },
+    {
+      "id": "cpuManagerPolicy",
+      "type": "select",
+      "default": "none",
+      "options": [
+        "none",
+        "static",
+        "best-effort"
+      ]
     }
   ],
   "steps": [

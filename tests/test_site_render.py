@@ -238,6 +238,9 @@ __g.state.values.kubesprayRelease = "release-2.29";
 __g.gotoPage(1);
 var p2 = __byId["page"].textContent;
 __g.renderReview();
+__g.gotoPage(3);
+var p4 = __byId["page"].textContent;
+__g.renderReview();
 var v31 = {
   files: filenames(),
   bodies: exportBodies().join("\n"),
@@ -245,7 +248,12 @@ var v31 = {
   runbook: __g.buildRunbook(),
   derived: __g.derived(),
   p2HasWindows: p2.indexOf("Windows worker") !== -1,
-  p2HasAddCluster: p2.indexOf("Add application cluster") !== -1
+  p2HasAddCluster: p2.indexOf("Add application cluster") !== -1,
+  p4HasTabs: p4.indexOf("Per-role configuration") !== -1,
+  p4HasMaster: p4.indexOf("Master (control plane)") !== -1,
+  p4HasOsd: p4.indexOf("Ceph OSD") !== -1,
+  p4HasOps: p4.indexOf("Operation server") !== -1,
+  p4Json: JSON.stringify(p4 || "")
 };
 
 // Upgrade walkthrough.
@@ -293,7 +301,13 @@ JSON.stringify({
           runbookHasWindows: v31.runbook.indexOf("windows") !== -1,
           runbookLeftovers: (v31.runbook.match(/\{\{/g) || []).length,
           windowsCount: v31.derived.windowsCount,
-          expectedK8s: DATA.clusterMethods[0].versions["release-2.29"].kubernetes },
+          expectedK8s: DATA.clusterMethods[0].versions["release-2.29"].kubernetes,
+          hostRolesYaml: v31.derived.hostRolesYaml,
+          p4HasTabs: v31.p4HasTabs,
+          p4HasMaster: v31.p4HasMaster,
+          p4HasOsd: v31.p4HasOsd,
+          p4HasOps: v31.p4HasOps,
+          p4Json: JSON.stringify(v31.p4Json || "") },
   upgrade: { firstSteps: upFirst.split("gate").length - 1,
              k8sHasCommand: upK8s.indexOf("ansible-playbook") !== -1,
              k8sHasGate: upK8s.indexOf("gate") !== -1,
@@ -409,6 +423,18 @@ def main():
         failures.append(f"windows runbook has {v31['runbookLeftovers']} unresolved placeholders")
     if v31["k8sVersion"] != v31["expectedK8s"]:
         failures.append(f"k8s version {v31['k8sVersion']} does not match release-2.29 ({v31['expectedK8s']})")
+    if not v31["p4HasTabs"]:
+        failures.append("page 4 has no per-role tabs. p4 text: " + v31.get("p4Json","")[:400])
+    if not v31["p4HasMaster"]:
+        failures.append("master tab missing")
+    if not v31["p4HasOsd"]:
+        failures.append("ceph-osd tab missing")
+    if not v31["p4HasOps"]:
+        failures.append("operation-server tab missing")
+    if not v31["hostRolesYaml"]:
+        failures.append("host-config export missing roles yaml")
+    elif "master:" not in v31["hostRolesYaml"] or "pidMax: 4194304" not in v31["hostRolesYaml"]:
+        failures.append("host-config export missing master overrides")
 
     up = result["upgrade"]
     if up["runbookLeftovers"]:

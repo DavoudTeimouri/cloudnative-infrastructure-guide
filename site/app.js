@@ -18,6 +18,7 @@
     values: {},
     clusters: [],
     page: 0,
+    roleTab: "",
     view: "wizard",
     upgrade: { flow: null, target: "" }
   };
@@ -415,6 +416,15 @@
           lines.push("    maxPodsPerNode: 20");
         } else if (r === "ceph-mds-rgw") {
           lines.push("    fileDescriptorsMax: 1048576");
+        } else if (r === "worker") {
+          lines.push("    reservedSystemMem: \"" + (state.values.reservedSystemMem || "") + "\"");
+          lines.push("    cpuManagerPolicy: \"" + (state.values.cpuManagerPolicy || "none") + "\"");
+        } else if (r === "ceph-osd") {
+          lines.push("    vmSwappiness: " + (state.values.vmSwappiness || 1));
+        } else if (r === "gpu") {
+          lines.push("    kernelArgs: \"" + (state.values.kernelArgs || "") + "\"");
+        } else if (r === "load-balancer") {
+          lines.push("    vrrpAuthPass: \"" + (state.values.vrrpAuthPass || "") + "\"");
         }
         return "  " + r + ":\n" + lines.join("\n");
       }).join("\n") || "  []",
@@ -661,6 +671,69 @@
     ]);
   }
 
+  function fieldById(id) {
+    var v = DATA.values.filter(function (x) { return x.id === id; })[0];
+    return v ? fieldNode(v) : null;
+  }
+
+  var ROLE_FIELDS = {
+    master: ["fileDescriptorsMax", "pidMax", "ntpServers"],
+    worker: ["maxPodsPerNode", "reservedSystemCpu", "reservedSystemMem", "cpuManagerPolicy"],
+    "ceph-osd": ["transparentHugePages", "vmSwappiness", "fileDescriptorsMax"],
+    "ceph-mon": ["ntpServers", "fileDescriptorsMax"],
+    "load-balancer": ["firewallBackend", "vrrpAuthPass"],
+    "operation-server": ["adminUser", "sshPort", "sshPasswordAuth", "sudoNopasswd"],
+    gpu: ["kernelArgs"],
+    edge: ["maxPodsPerNode"],
+    "ceph-mds-rgw": ["fileDescriptorsMax"]
+  };
+
+  var ROLE_TITLE = {
+    master: "Master (control plane)", worker: "Worker",
+    "ceph-osd": "Ceph OSD", "ceph-mon": "Ceph MON",
+    "load-balancer": "Load balancer", "operation-server": "Operation server",
+    gpu: "GPU", edge: "Edge", "ceph-mds-rgw": "Ceph MDS / RGW"
+  };
+
+  function roleTabSection() {
+    var chosen = state.choices.hostRoles || [];
+    var box = el("div", { class: "card" });
+    box.appendChild(el("h3", { text: "Per-role configuration" }));
+    box.appendChild(el("p", { class: "hint", text: "Each tab overrides the common baseline for that role. Unselected roles are not exported." }));
+    var tabs = el("div", { class: "options" });
+    var panels = el("div", { class: "role-tabs" });
+    var show = function (id) {
+      state.roleTab = id;
+      renderPage();
+    };
+    var roles = Object.keys(ROLE_TITLE);
+    roles.forEach(function (r) {
+      var sel = chosen.indexOf(r) !== -1;
+      tabs.appendChild(el("label", {
+        class: "opt" + (state.roleTab === r ? " on" : "") + (sel ? "" : " dim"),
+        onclick: function () { show(r); }
+      }, [
+        el("input", {
+          type: "radio", name: "role-tab", value: r,
+          checked: state.roleTab === r ? "checked" : null
+        }),
+        el("div", { class: "opt-body" }, [
+          el("div", { class: "opt-title", text: ROLE_TITLE[r] }),
+          el("div", { class: "opt-note", text: sel ? "selected" : "not selected for export" })
+        ])
+      ]));
+    });
+    box.appendChild(tabs);
+    var active = state.roleTab || roles[0];
+    if (chosen.indexOf(active) === -1) active = chosen[0] || roles[0];
+    var panel = el("div", { class: "role-panel" });
+    ROLE_FIELDS[active].forEach(function (id) {
+      panel.appendChild(fieldById(id));
+    });
+    box.appendChild(panel);
+    return box;
+  }
+
   function renderPage() {
     var page = DATA.pages[state.page];
     var box = $("page");
@@ -770,6 +843,9 @@
        ["MDS", roles.mds], ["RGW", roles.rgw]].forEach(function (r) {
         box.appendChild(nodeListCard("Ceph " + r[0] + " hosts generated", r[1]));
       });
+    }
+    if (page.id === "p4") {
+      box.appendChild(roleTabSection());
     }
     if (page.id === "p6") {
       box.appendChild(nodeListCard("Edge nodes generated", t.edge));

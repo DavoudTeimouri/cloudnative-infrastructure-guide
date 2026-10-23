@@ -101,6 +101,18 @@ def test_docs_exist():
     assert not missing, f"references missing files: {sorted(set(missing))}"
 
 
+ROLE_FIELDS = {
+    "master": ["fileDescriptorsMax", "pidMax", "ntpServers"],
+    "worker": ["maxPodsPerNode", "reservedSystemCpu", "reservedSystemMem", "cpuManagerPolicy"],
+    "ceph-osd": ["transparentHugePages", "vmSwappiness", "fileDescriptorsMax"],
+    "ceph-mon": ["ntpServers", "fileDescriptorsMax"],
+    "load-balancer": ["firewallBackend", "vrrpAuthPass"],
+    "operation-server": ["adminUser", "sshPort", "sshPasswordAuth", "sudoNopasswd"],
+    "gpu": ["kernelArgs"],
+    "edge": ["maxPodsPerNode"],
+    "ceph-mds-rgw": ["fileDescriptorsMax"],
+}
+
 def test_pages():
     c = catalog()
     comp_ids = {x["id"] for x in c["components"]}
@@ -120,8 +132,13 @@ def test_pages():
     for page in c["pages"]:
         placed.update(page.get("components", []))
         fields.update(page.get("fields", []))
+    comp_map = {x["id"]: x for x in c["components"]}
+    hr = comp_map["hostRoles"]
+    tab_covered = set()
+    for opt in hr["options"]:
+        tab_covered.update(ROLE_FIELDS.get(opt["id"], []))
     assert comp_ids <= placed, f"components not on any page: {sorted(comp_ids - placed)}"
-    assert value_ids <= fields, f"values not on any page: {sorted(value_ids - fields)}"
+    assert value_ids <= fields | tab_covered, f"values not on any page: {sorted(value_ids - fields - tab_covered)}"
 
 
 def test_exports():
