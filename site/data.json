@@ -1,5 +1,5 @@
 {
-  "catalogVersion": "3.0.0",
+  "catalogVersion": "3.1.0",
   "updated": "2026-10-22",
   "source": {
     "docs": "The repository is the source of truth. This catalog points at it; it never duplicates a procedure.",
@@ -102,16 +102,21 @@
       "fields": [
         "clusterName",
         "env",
-        "domain"
+        "domain",
+        "kubesprayRelease",
+        "kubernetesVersion",
+        "cephRelease",
+        "cephImage"
       ]
     },
     {
       "id": "p2",
       "title": "Application cluster",
-      "subtitle": "Control plane, workers and their sizes. Names and addresses are generated from the prefix and the first address.",
+      "subtitle": "Control plane, Linux and Windows workers, and the resources kept for the OS and the agents. Node names and addresses are generated from the prefix and the first address.",
       "components": [
         "controlPlane",
-        "cni"
+        "cni",
+        "windowsNodes"
       ],
       "fields": [
         "nodePrefix",
@@ -124,15 +129,27 @@
         "appWorkerCpu",
         "appWorkerMemGb",
         "appWorkerDiskGb",
-        "appWorkerDataDiskGb"
+        "appWorkerDataDiskGb",
+        "windowsWorkerCount",
+        "windowsWorkerCpu",
+        "windowsWorkerMemGb",
+        "windowsWorkerDiskGb",
+        "reservedSystemCpu",
+        "reservedSystemMem",
+        "reservedKubeCpu",
+        "reservedKubeMem",
+        "evictionHardMem",
+        "evictionHardNodefs",
+        "additionalClusters"
       ]
     },
     {
       "id": "p3",
       "title": "Management cluster",
-      "subtitle": "Rancher, Keycloak and the directory integrations run here, sized separately from the workload clusters.",
+      "subtitle": "Rancher or an alternative management UI, optional in-cluster storage, Keycloak and the directory integrations, sized separately from the workload clusters.",
       "components": [
         "management",
+        "mgmtStorage",
         "identity",
         "idpIntegration"
       ],
@@ -226,7 +243,7 @@
     {
       "id": "p7",
       "title": "Network and offline artifacts",
-      "subtitle": "Address plan, registries and package repositories. Everything is mirrored; nothing is pulled from the internet.",
+      "subtitle": "Address plan, CoreDNS forwarding, registries and package repositories. Everything is mirrored; nothing is pulled from the internet.",
       "components": [],
       "fields": [
         "mgmtCidr",
@@ -243,7 +260,10 @@
         "nexusHost",
         "extraRegistries",
         "extraRepos",
-        "registryAuth"
+        "registryAuth",
+        "corednsForwarders",
+        "corednsForwardPolicy",
+        "corednsCacheTtl"
       ]
     },
     {
@@ -474,6 +494,11 @@
           "default": true,
           "versionKey": "rancher",
           "doc": "management-cluster/rancher/rancher.md"
+        },
+        {
+          "id": "headlamp",
+          "title": "Headlamp + Argo CD (no Rancher)",
+          "doc": "management-cluster/alternatives.md"
         }
       ]
     },
@@ -895,6 +920,50 @@
           "title": "OpenTelemetry Collector DaemonSet",
           "versionKey": "otel-operator",
           "doc": "addons/platform-addons.md"
+        }
+      ]
+    },
+    {
+      "id": "mgmtStorage",
+      "title": "Management cluster storage",
+      "required": false,
+      "doc": "storage/rook-ceph/rook-ceph.md",
+      "options": [
+        {
+          "id": "none",
+          "title": "No storage in the management cluster",
+          "default": true,
+          "doc": "management-cluster/alternatives.md"
+        },
+        {
+          "id": "rook",
+          "title": "Rook-Ceph inside the management cluster",
+          "versionKey": "rook",
+          "doc": "storage/rook-ceph/rook-ceph.md"
+        },
+        {
+          "id": "shared",
+          "title": "Use the application cluster's Ceph",
+          "doc": "storage/ceph/cephadm-deployment.md"
+        }
+      ]
+    },
+    {
+      "id": "windowsNodes",
+      "title": "Windows worker nodes",
+      "required": false,
+      "doc": "kubernetes/windows-workers.md",
+      "options": [
+        {
+          "id": "none",
+          "title": "No Windows nodes",
+          "default": true,
+          "doc": "kubernetes/windows-workers.md"
+        },
+        {
+          "id": "enabled",
+          "title": "Windows Server 2022 workers (Calico required)",
+          "doc": "kubernetes/windows-workers.md"
         }
       ]
     }
@@ -1612,6 +1681,158 @@
       "type": "text",
       "default": "tempo.observability.svc:4317",
       "required": false
+    },
+    {
+      "id": "kubesprayRelease",
+      "label": "Kubespray release",
+      "type": "select",
+      "default": "release-2.32",
+      "options": [
+        "release-2.28",
+        "release-2.29",
+        "release-2.30",
+        "release-2.31",
+        "release-2.32"
+      ],
+      "required": false
+    },
+    {
+      "id": "kubernetesVersion",
+      "label": "Kubernetes version override",
+      "type": "text",
+      "default": "",
+      "hint": "Empty uses the release default. Never skip a minor on an upgrade.",
+      "required": false
+    },
+    {
+      "id": "cephRelease",
+      "label": "Ceph release",
+      "type": "select",
+      "default": "Tentacle 20.x",
+      "options": [
+        "Tentacle 20.x",
+        "Squid 19.x"
+      ],
+      "hint": "The repository you mirror decides the exact build; this records the intent.",
+      "required": false
+    },
+    {
+      "id": "cephImage",
+      "label": "Ceph container image override",
+      "type": "text",
+      "default": "",
+      "hint": "Empty uses the distribution package. Only set a pinned digest when the mirror requires it.",
+      "required": false
+    },
+    {
+      "id": "reservedSystemCpu",
+      "label": "System reserved CPU",
+      "type": "text",
+      "default": "500m",
+      "required": false
+    },
+    {
+      "id": "reservedSystemMem",
+      "label": "System reserved memory",
+      "type": "text",
+      "default": "1Gi",
+      "required": false
+    },
+    {
+      "id": "reservedKubeCpu",
+      "label": "Kube reserved CPU",
+      "type": "text",
+      "default": "500m",
+      "required": false
+    },
+    {
+      "id": "reservedKubeMem",
+      "label": "Kube reserved memory",
+      "type": "text",
+      "default": "1Gi",
+      "required": false
+    },
+    {
+      "id": "evictionHardMem",
+      "label": "Eviction threshold: memory",
+      "type": "text",
+      "default": "100Mi",
+      "required": false
+    },
+    {
+      "id": "evictionHardNodefs",
+      "label": "Eviction threshold: node filesystem",
+      "type": "text",
+      "default": "10%",
+      "required": false
+    },
+    {
+      "id": "corednsForwarders",
+      "label": "CoreDNS upstream servers",
+      "type": "text",
+      "default": "10.10.0.53 10.10.0.54",
+      "hint": "Space separated. Cluster DNS forwards everything outside cluster.local here.",
+      "required": false
+    },
+    {
+      "id": "corednsForwardPolicy",
+      "label": "CoreDNS forward policy",
+      "type": "select",
+      "default": "sequential",
+      "options": [
+        "sequential",
+        "random"
+      ],
+      "required": false
+    },
+    {
+      "id": "corednsCacheTtl",
+      "label": "CoreDNS cache TTL (seconds)",
+      "type": "number",
+      "default": 30,
+      "min": 0,
+      "required": false
+    },
+    {
+      "id": "windowsWorkerCount",
+      "label": "Windows worker nodes",
+      "type": "number",
+      "default": 0,
+      "min": 0,
+      "max": 50,
+      "required": false
+    },
+    {
+      "id": "windowsWorkerCpu",
+      "label": "Windows worker vCPU",
+      "type": "number",
+      "default": 8,
+      "min": 2,
+      "required": false
+    },
+    {
+      "id": "windowsWorkerMemGb",
+      "label": "Windows worker RAM (GiB)",
+      "type": "number",
+      "default": 32,
+      "min": 8,
+      "required": false
+    },
+    {
+      "id": "windowsWorkerDiskGb",
+      "label": "Windows worker disk (GiB)",
+      "type": "number",
+      "default": 120,
+      "min": 60,
+      "required": false
+    },
+    {
+      "id": "additionalClusters",
+      "label": "Additional application clusters",
+      "type": "lines",
+      "default": "",
+      "hint": "One per line: name,controlPlaneCount,workerCount,podCidr,serviceCidr",
+      "required": false
     }
   ],
   "steps": [
@@ -1723,6 +1944,38 @@
         "Fill the inventory and the group vars from the generated files",
         "Mirror the artifacts for the selected Kubespray release",
         "Run cluster.yml, then validate the control plane and etcd"
+      ]
+    },
+    {
+      "id": "s05b",
+      "phase": "7b. Windows workers (optional)",
+      "title": "Join the Windows node pool",
+      "doc": "kubernetes/windows-workers.md",
+      "when": {
+        "component": {
+          "windowsNodes": [
+            "enabled"
+          ]
+        }
+      },
+      "actions": [
+        "Calico is the CNI: confirm kube_network_plugin is calico before the Windows play runs",
+        "WinRM over HTTPS reachable from the Ansible host, account in the local Administrators group",
+        "Container runtime and the Containers feature installed on every Windows node",
+        "Same Kubernetes minor as the control plane; the generated vars pin kube_version",
+        "No Ceph RBD on Windows: keep stateful workloads on Linux"
+      ]
+    },
+    {
+      "id": "s05c",
+      "phase": "7c. Additional clusters (optional)",
+      "title": "Build the extra application clusters",
+      "doc": "kubernetes/multiple-clusters.md",
+      "actions": [
+        "Each cluster needs its own pod and service CIDR, API VIP and inventory",
+        "Run deploy.sh again with that cluster's nodes.tsv and k8s-cluster.yml",
+        "Register each cluster in Argo CD with its own Secret, labelled secret-type=cluster",
+        "One ApplicationSet per cluster so a bad sync cannot reach the other clusters"
       ]
     },
     {
@@ -1945,6 +2198,19 @@
         "Execute every acceptance test and store the evidence",
         "Record the known limitations",
         "Hand over to the operations team"
+      ]
+    },
+    {
+      "id": "s17",
+      "phase": "16. User access",
+      "title": "Give users working access from Linux and Windows",
+      "doc": "kubernetes/access/end-user-access.md",
+      "actions": [
+        "kubectl and kubelogin on the user machine: winget on Windows, the signed binary on Linux",
+        "One kubeconfig per user or group with the OIDC exec plugin; never a shared client certificate",
+        "Merge into KUBECONFIG, never overwrite ~/.kube/config",
+        "Automation tokens come from kubectl create token with a short duration, stored in the CI secret store",
+        "Verify: kubectl auth whoami, kubectl get nodes, kubectl auth can-i --list"
       ]
     }
   ],
@@ -2431,7 +2697,7 @@
       "filename": "hosts.ini",
       "language": "ini",
       "description": "Host groups generated from the node prefix, the first address and the counts.",
-      "template": "# Generated by the cloud-native guide site\n# Cluster: {{value.clusterName}} ({{value.env}})   Kubespray: {{choice.kubespray}}\n\n[all:vars]\nansible_user=ansible\nansible_become=yes\nansible_python_interpreter=/usr/bin/python3\n\n[control-plane]\n{{appCpHosts}}\n\n[etcd]\n{{appCpHosts}}\n\n[k8s-node]\n{{appWorkerHosts}}\n{{gpuGroup}}\n\n[kube-master]\ncontrol-plane\n\n[kube-node]\ncontrol-plane\nk8s-node\n\n[calico-node]\n\n[k8s-cluster:children]\ncontrol-plane\netcd\nk8s-node\n"
+      "template": "# Generated by the cloud-native guide site\n# Cluster: {{value.clusterName}} ({{value.env}})   Kubespray: {{value.kubesprayRelease}}\n\n[all:vars]\nansible_user=ansible\nansible_become=yes\nansible_python_interpreter=/usr/bin/python3\n\n[control-plane]\n{{appCpHosts}}\n\n[etcd]\n{{appCpHosts}}\n\n[k8s-node]\n{{appWorkerHosts}}\n{{gpuGroup}}\n{{windowsGroup}}\n\n[kube-master]\ncontrol-plane\n\n[kube-node]\ncontrol-plane\nk8s-node\n\n[calico-node]\n\n[k8s-cluster:children]\ncontrol-plane\netcd\nk8s-node\n"
     },
     {
       "id": "mgmt-inventory",
@@ -2449,7 +2715,7 @@
       "filename": "k8s-cluster.yml",
       "language": "yaml",
       "description": "group_vars/k8s_cluster/k8s-cluster.yml for the selected release.",
-      "template": "# Generated by the cloud-native guide site\n# Kubespray: {{choice.kubespray}}\n\nkube_version: {{version.kubernetes}}\nkube_network_plugin: {{choice.cni}}\nkube_proxy_mode: \"\"\nkube_pods_subnet: \"{{value.podCidr}}\"\nkube_service_addresses: \"{{value.serviceCidr}}\"\nk8sServiceHost: \"{{value.apiServerIp}}\"\nk8sServicePort: 6443\nenable_coredns: true\n\n# Identity is application-level (ADR-0015). No SSSD, no realm join on any node.\nkube_apiserver_oidc_issuer_url: \"{{value.keycloakHost}}/realms/platform\"\nkube_apiserver_oidc_client_id: kube-apiserver\nkube_apiserver_oidc_username_claim: preferred_username\nkube_apiserver_oidc_groups_claim: groups\n"
+      "template": "# Generated by the cloud-native guide site\n# Kubespray: {{value.kubesprayRelease}}   Kubernetes: {{k8sVersion}}\n\nkube_version: {{k8sVersion}}\nkube_network_plugin: {{choice.cni}}\nkube_proxy_mode: \"\"\nkube_pods_subnet: \"{{value.podCidr}}\"\nkube_service_addresses: \"{{value.serviceCidr}}\"\nk8sServiceHost: \"{{value.apiServerIp}}\"\nk8sServicePort: 6443\nenable_coredns: true\n\n# CoreDNS forwards everything outside cluster.local to the internal resolvers.\nupstream_dns_servers:\n{{corednsForwarderList}}\n\n# Resources kept for the OS and the Kubernetes agents, per node.\nkubelet_custom_flags:\n  - \"--system-reserved=cpu={{value.reservedSystemCpu}},memory={{value.reservedSystemMem}}\"\n  - \"--kube-reserved=cpu={{value.reservedKubeCpu}},memory={{value.reservedKubeMem}}\"\n  - \"--eviction-hard=memory.available<{{value.evictionHardMem}},nodefs.available<{{value.evictionHardNodefs}}\"\n\n# Identity is application-level (ADR-0015). No SSSD, no realm join on any node.\nkube_apiserver_oidc_issuer_url: \"{{value.keycloakHost}}/realms/platform\"\nkube_apiserver_oidc_client_id: kube-apiserver\nkube_apiserver_oidc_username_claim: preferred_username\nkube_apiserver_oidc_groups_claim: groups\n\n# Windows node group: same minor version, Calico only.\nkubelet_max_pods: {{value.maxPodsPerNode}}\n"
     },
     {
       "id": "offline-vars",
@@ -2459,6 +2725,167 @@
       "language": "yaml",
       "description": "group_vars/all/offline.yml. Every artifact resolves through the internal registry and file mirror.",
       "template": "# Generated by the cloud-native guide site\n# Kubespray: {{choice.kubespray}}\n\nregistry_host: \"{{value.registryHost}}\"\nregistry_addr: \"{{value.registryAddr}}\"\nfiles_repo: \"{{value.filesRepo}}\"\n\ngithub_url: \"{{value.filesRepo}}/github.com\"\ndl_k8s_io_url: \"{{value.filesRepo}}/dl.k8s.io\"\nstorage_googleapis_url: \"{{value.filesRepo}}/storage.googleapis.com\"\nget_helm_url: \"{{value.filesRepo}}/get.helm.sh\"\n\ncontainerd_registries_mirrors:\n  - prefix: \"{{value.registryAddr}}\"\n    mirrors:\n      - host: \"https://{{value.registryAddr}}\"\n        capabilities: [\"pull\", \"resolve\"]\n        skip_verify: false\n        header:\n          Authorization: \"Basic {{registryAuth}}\"\n{{extraRegistryMirrors}}\n"
+    },
+    {
+      "id": "node-reservation",
+      "name": "Kubelet reservation",
+      "filename": "kubelet-reservation.yaml",
+      "description": "System and kube reserved CPU/RAM plus eviction thresholds, as flags and as the config-file equivalent.",
+      "template": "# Generated by the cloud-native guide site\n# Kubelet reservation, as flags (Kubespray kubelet_custom_flags) and as the\n# equivalent config-file block. Apply one, not both.\nkubelet_custom_flags:\n  - \"--system-reserved=cpu={{value.reservedSystemCpu}},memory={{value.reservedSystemMem}}\"\n  - \"--kube-reserved=cpu={{value.reservedKubeCpu}},memory={{value.reservedKubeMem}}\"\n  - \"--eviction-hard=memory.available<{{value.evictionHardMem}},nodefs.available<{{value.evictionHardNodefs}}\"\n---\n# kubelet config file equivalent, for clusters that no longer accept flags\nsystemReserved:\n  cpu: \"{{value.reservedSystemCpu}}\"\n  memory: \"{{value.reservedSystemMem}}\"\nkubeReserved:\n  cpu: \"{{value.reservedKubeCpu}}\"\n  memory: \"{{value.reservedKubeMem}}\"\nevictionHard:\n  memory.available: \"{{value.evictionHardMem}}\"\n  nodefs.available: \"{{value.evictionHardNodefs}}\"\n"
+    },
+    {
+      "id": "coredns-config",
+      "name": "CoreDNS Corefile",
+      "filename": "coredns-configmap.yaml",
+      "description": "Cluster DNS with a forward to the internal resolvers, cache TTL and the loop guard.",
+      "template": "# Generated by the cloud-native guide site\n# Apply: kubectl -n kube-system apply -f coredns-configmap.yaml\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: coredns\n  namespace: kube-system\ndata:\n  Corefile: |\n    .:53 {\n        errors\n        health {\n            lameduck 5s\n        }\n        ready\n        kubernetes cluster.local in-addr.arpa ip6.arpa {\n            pods insecure\n            fallthrough in-addr.arpa ip6.arpa\n            ttl {{value.corednsCacheTtl}}\n        }\n        prometheus :9153\n        forward . {{value.corednsForwarders}} {\n            policy {{value.corednsForwardPolicy}}\n            max_concurrent 1000\n        }\n        cache {{value.corednsCacheTtl}}\n        loop\n        reload\n        loadbalance\n    }\n"
+    },
+    {
+      "id": "cni-cilium",
+      "name": "Cilium values",
+      "filename": "cilium-values.yaml",
+      "description": "kube-proxy replacement, native routing, Hubble. For a Cilium install outside Kubespray.",
+      "when": {
+        "component": "cni",
+        "values": [
+          "cilium"
+        ]
+      },
+      "template": "# Generated by the cloud-native guide site \u2014 Cilium {{version.cilium}}\n# Helm values for a Kubespray-independent install. Kubespray writes its own values;\n# use this file when Cilium is managed as an add-on.\nkubeProxyReplacement: true\nk8sServiceHost: \"{{value.apiServerIp}}\"\nk8sServicePort: 6443\nipam:\n  mode: kubernetes\nroutingMode: native\nautoDirectNodeRoutes: true\nipv4NativeRoutingCIDR: \"{{value.podCidr}}\"\nhubble:\n  enabled: true\n  relay:\n    enabled: true\n  ui:\n    enabled: true\noperator:\n  replicas: 2\nprometheus:\n  enabled: true\n"
+    },
+    {
+      "id": "cni-calico",
+      "name": "Calico group vars",
+      "filename": "calico-vars.yaml",
+      "description": "VXLAN backend, MTU and pool size. Required when Windows nodes exist.",
+      "when": {
+        "component": "cni",
+        "values": [
+          "calico"
+        ]
+      },
+      "template": "# Generated by the cloud-native guide site \u2014 Calico {{version.calico}}\n# Kubespray group vars for the Calico path.\ncalico_backend: vxlan\ncalico_ipip_mode: Never\ncalico_vxlan_mode: Always\ncalico_network_backend: vxlan\ncalico_mtu: 1450\ncalico_ipv4pool_cidr: \"{{value.podCidr}}\"\ncalico_ipv4pool_block_size: 26\n# Windows nodes require Calico. Cilium and a mixed cluster are not supported here.\n"
+    },
+    {
+      "id": "storageclass",
+      "name": "Ceph CSI StorageClasses",
+      "filename": "storageclass.yaml",
+      "description": "Block and filesystem StorageClasses with expansion enabled.",
+      "when": {
+        "component": "storage",
+        "values": [
+          "rook",
+          "cephadm-podman",
+          "cephadm-docker"
+        ]
+      },
+      "template": "# Generated by the cloud-native guide site\n# Ceph CSI StorageClasses for the application cluster.\napiVersion: storage.k8s.io/v1\nkind: StorageClass\nmetadata:\n  name: {{value.rookBlockClass}}\nprovisioner: rook-ceph.rbd.csi.ceph.com\nparameters:\n  clusterID: rook-ceph\n  pool: replicapool\n  imageFormat: \"2\"\n  imageFeatures: layering\n  csi.storage.k8s.io/fstype: ext4\nreclaimPolicy: Delete\nallowVolumeExpansion: true\nvolumeBindingMode: Immediate\n---\napiVersion: storage.k8s.io/v1\nkind: StorageClass\nmetadata:\n  name: {{value.rookFsClass}}\nprovisioner: rook-ceph.cephfs.csi.ceph.com\nparameters:\n  clusterID: rook-ceph\n  fsName: myfs\n  pool: myfs-data0\nreclaimPolicy: Delete\nallowVolumeExpansion: true\nvolumeBindingMode: Immediate\n"
+    },
+    {
+      "id": "ingress-nic",
+      "name": "NGINX Ingress values",
+      "filename": "ingress-nginx-values.yaml",
+      "description": "Two replicas, LoadBalancer with Local traffic policy, TLS 1.2 floor, metrics and a PDB.",
+      "when": {
+        "component": "ingress",
+        "values": [
+          "nic"
+        ]
+      },
+      "template": "# Generated by the cloud-native guide site \u2014 NGINX Ingress Controller {{version.nic}}\ncontroller:\n  replicaCount: 2\n  ingressClassResource:\n    name: nginx\n    default: true\n  service:\n    type: LoadBalancer\n    externalTrafficPolicy: Local\n  config:\n    proxy-body-size: \"16m\"\n    ssl-protocols: \"TLSv1.2 TLSv1.3\"\n    use-forwarded-headers: \"true\"\n  metrics:\n    enabled: true\n  podDisruptionBudget:\n    enabled: true\n"
+    },
+    {
+      "id": "ingress-ngf",
+      "name": "NGINX Gateway Fabric values",
+      "filename": "ingress-ngf-values.yaml",
+      "description": "Gateway API dataplane: two replicas, LoadBalancer, telemetry.",
+      "when": {
+        "component": "ingress",
+        "values": [
+          "ngf"
+        ]
+      },
+      "template": "# Generated by the cloud-native guide site \u2014 NGINX Gateway Fabric {{version.ngf}}\nnginx:\n  replicaCount: 2\n  service:\n    type: LoadBalancer\n    externalTrafficPolicy: Local\n  config:\n    telemetry:\n      enabled: true\n  podDisruptionBudget:\n    enabled: true\n"
+    },
+    {
+      "id": "ingress-envoy",
+      "name": "Envoy Gateway values",
+      "filename": "ingress-envoy-values.yaml",
+      "description": "Two replicas with a PDB and info-level logging.",
+      "when": {
+        "component": "ingress",
+        "values": [
+          "envoy"
+        ]
+      },
+      "template": "# Generated by the cloud-native guide site \u2014 Envoy Gateway {{version.envoy}}\nconfig:\n  envoyGateway:\n    provider:\n      type: Kubernetes\n    logging:\n      level:\n        default: info\ndeployment:\n  replicas: 2\n  podDisruptionBudget:\n    minAvailable: 1\n"
+    },
+    {
+      "id": "mgmt-rook",
+      "name": "Management cluster Rook-Ceph",
+      "filename": "mgmt-rook-cluster.yaml",
+      "description": "A small Ceph cluster for console state, not application data.",
+      "when": {
+        "component": "mgmtStorage",
+        "values": [
+          "rook"
+        ]
+      },
+      "template": "# Generated by the cloud-native guide site\n# Rook-Ceph in the management cluster. Keep it small: this stores console state,\n# not application data.\napiVersion: ceph.rook.io/v1\nkind: CephCluster\nmetadata:\n  name: rook-ceph\n  namespace: rook-ceph\nspec:\n  cephVersion:\n    image: {{value.registryHost}}/ceph/ceph:{{version.ceph}}\n  dataDirHostPath: /var/lib/rook\n  mon:\n    count: 3\n    allowMultiplePerNode: false\n  mgr:\n    count: 2\n  dashboard:\n    enabled: false\n  storage:\n    useAllNodes: false\n    useAllDevices: false\n    nodes:\n      - name: \"{{firstMgmtNode}}\"\n        devices: [{name: \"{{value.rookDeviceFilter}}\"}]\n"
+    },
+    {
+      "id": "headlamp",
+      "name": "Headlamp values",
+      "filename": "headlamp-values.yaml",
+      "description": "Management UI alternative to Rancher: OIDC login, no cluster-admin service account.",
+      "when": {
+        "component": "management",
+        "values": [
+          "headlamp"
+        ]
+      },
+      "template": "# Generated by the cloud-native guide site\n# Headlamp as the management UI. OIDC login, no cluster-admin service account.\nconfig:\n  oidc:\n    clientID: headlamp\n    issuerURL: \"{{value.keycloakHost}}/realms/platform\"\n    scopes: \"openid profile email groups\"\n  inCluster: false\nserviceAccount:\n  create: false\nreplicaCount: 2\nresources:\n  requests: {cpu: 50m, memory: 128Mi}\n  limits: {memory: 512Mi}\n"
+    },
+    {
+      "id": "windows-vars",
+      "name": "Windows node group vars",
+      "filename": "windows-vars.yaml",
+      "description": "Pinned Kubernetes version, Calico and the Windows group switch.",
+      "when": {
+        "component": "windowsNodes",
+        "values": [
+          "enabled"
+        ]
+      },
+      "template": "# Generated by the cloud-native guide site\n# Kubespray group vars for the Windows node pool.\nkube_version: {{k8sVersion}}\nkube_network_plugin: calico\nwindows_nodes: true\nkubelet_max_pods: {{value.maxPodsPerNode}}\n# No Ceph RBD on Windows. Stateful workloads stay on the Linux workers.\n"
+    },
+    {
+      "id": "extra-clusters",
+      "name": "Additional clusters",
+      "filename": "additional-clusters.yaml",
+      "description": "One record per extra application cluster with its counts and CIDRs.",
+      "template": "# Generated by the cloud-native guide site\n# One record per additional application cluster. Each needs its own inventory,\n# its own CIDRs and its own deploy.sh run.\nclusters:\n{{additionalClustersYaml}}\n"
+    },
+    {
+      "id": "argocd-clusters",
+      "name": "Argo CD cluster Secrets",
+      "filename": "argocd-cluster-secrets.yaml",
+      "description": "One cluster Secret per additional cluster, labelled for Argo CD.",
+      "template": "# Generated by the cloud-native guide site\n# One Argo CD cluster Secret per additional cluster. Fill the CA from that\n# cluster's admin.conf before applying.\n{{argocdClusterSecrets}}\n"
+    },
+    {
+      "id": "user-access",
+      "name": "User access guide",
+      "filename": "user-access.md",
+      "description": "Linux and Windows install commands, kubeconfig merge, OIDC login and the automation token.",
+      "template": "# Cluster access \u2014 {{value.clusterName}} ({{value.env}})\n\nAPI server: `https://{{value.apiServerIp}}:6443`\nOIDC issuer: `{{value.keycloakHost}}/realms/platform`\nKubeconfig context: `{{value.clusterName}}`\n\n## Linux\n\n```bash\ncurl -fsSLO \"https://dl.k8s.io/release/{{k8sVersion}}/bin/linux/amd64/kubectl\"\ninstall -m 0755 kubectl ~/.local/bin/kubectl\nmkdir -p ~/.kube/config.d\ncp {{value.clusterName}}-{{value.env}}.yaml ~/.kube/config.d/{{value.clusterName}}.yaml\nchmod 600 ~/.kube/config.d/{{value.clusterName}}.yaml\nexport KUBECONFIG=\"$HOME/.kube/config:$HOME/.kube/config.d/{{value.clusterName}}.yaml\"\nkubectl config use-context {{value.clusterName}}\nkubectl auth whoami && kubectl get nodes\n```\n\n## Windows (PowerShell)\n\n```powershell\nwinget install -e --id Kubernetes.kubectl\nwinget install -e --id Azure.kubelogin\nNew-Item -ItemType Directory -Force -Path \"$env:USERPROFILE\\.kube\\config.d\" | Out-Null\nCopy-Item \"$env:USERPROFILE\\Downloads\\{{value.clusterName}}-{{value.env}}.yaml\" \"$env:USERPROFILE\\.kube\\config.d\\{{value.clusterName}}.yaml\"\n$env:KUBECONFIG = \"$env:USERPROFILE\\.kube\\config;$env:USERPROFILE\\.kube\\config.d\\{{value.clusterName}}.yaml\"\nkubectl config use-context {{value.clusterName}}\nkubectl auth whoami && kubectl get nodes\n```\n\n## Automation token\n\n```bash\nkubectl -n {{value.appNamespace}} create serviceaccount ci-deploy\nkubectl -n {{value.appNamespace}} create rolebinding ci-deploy \\\n  --clusterrole=edit --serviceaccount={{value.appNamespace}}:ci-deploy\nkubectl -n {{value.appNamespace}} create token ci-deploy --duration=1h\n```\n\nBearer credential: CI secret store only. Never in Git, never in shell history.\n\nFull procedure, including the OIDC exec block and troubleshooting:\n`kubernetes/access/end-user-access.md`.\n"
+    },
+    {
+      "id": "kubeconfig",
+      "name": "Per-user kubeconfig",
+      "filename": "kubeconfig.yaml",
+      "description": "OIDC exec plugin, no embedded certificate. Fill the CA before handing it out.",
+      "template": "# Generated by the cloud-native guide site\n# Per-user kubeconfig: OIDC exec plugin, no embedded client certificate.\napiVersion: v1\nkind: Config\nclusters:\n  - name: {{value.clusterName}}\n    cluster:\n      server: \"https://{{value.apiServerIp}}:6443\"\n      certificate-authority-data: \"<PASTE BASE64 CA HERE>\"\ncontexts:\n  - name: {{value.clusterName}}\n    context:\n      cluster: {{value.clusterName}}\n      user: {{value.clusterName}}-oidc\n      namespace: {{value.appNamespace}}\ncurrent-context: {{value.clusterName}}\nusers:\n  - name: {{value.clusterName}}-oidc\n    user:\n      exec:\n        apiVersion: client.authentication.k8s.io/v1\n        command: kubelogin\n        args:\n          - get-token\n          - --login\n          - devicecode\n          - --issuer-url\n          - \"{{value.keycloakHost}}/realms/platform\"\n          - --client-id\n          - kubectl\n          - --scopes\n          - openid,groups\n        interactiveMode: IfAvailable\n"
     },
     {
       "id": "deploy",
@@ -2544,7 +2971,7 @@
       "filename": "ceph-bootstrap.sh",
       "language": "bash",
       "description": "Prepares the engine and bootstraps the first monitor. Engine: {{choice.storage}}.",
-      "template": "#!/usr/bin/env bash\n# Generated by the cloud-native guide site\n# Engine: {{choice.storage}}   Ceph: {{version.ceph}}\n# Roles: MON [{{cephMonNames}}]\n#        MGR [{{cephMgrNames}}]\n#        OSD [{{cephOsdNames}}]\n#        MDS [{{cephMdsNames}}]\n#        RGW [{{cephRgwNames}}]\n# Runs on the first MON host. deploy.sh copies it there.\nset -euo pipefail\n\nMON_IP=\"{{cephMonIp}}\"\nENGINE=\"{{cephEngine}}\"\nREGISTRY=\"{{value.registryHost}}\"\n\n# 1. The container engine must exist before cephadm runs. cephadm will not install it.\nif [ \"$ENGINE\" = \"docker\" ]; then\n  dnf install -y docker-ce docker-ce-cli containerd.io || \\\n    apt-get install -y docker-ce docker-ce-cli containerd.io\n  systemctl enable --now docker\n  mkdir -p /etc/docker\n  cat >/etc/docker/daemon.json <<EOF\n{ \"registry-mirrors\": [\"https://${REGISTRY}\"], \"live-restore\": true }\nEOF\n  systemctl restart docker\nelse\n  dnf install -y podman || apt-get install -y podman\n  systemctl enable --now podman.socket\nfi\n\n# 2. cephadm itself, from the internal repository.\ndnf install -y cephadm || apt-get install -y cephadm\n\n# 3. Bootstrap. --docker is passed only for the Docker engine.\ncephadm {{cephEngineFlag}} bootstrap \\\n  --mon-ip \"$MON_IP\" \\\n  --cluster-network {{value.storageCidr}} \\\n  --registry \"$REGISTRY\" \\\n  --log-to-file\n\ncephadm shell -- ceph -s\necho \"Bootstrap done. Run 20-ceph.sh from the admin host to add the other role hosts.\"\n"
+      "template": "#!/usr/bin/env bash\n# Generated by the cloud-native guide site\n# Engine: {{choice.storage}}   Ceph: {{version.ceph}} ({{value.cephRelease}})\n# Roles: MON [{{cephMonNames}}]\n#        MGR [{{cephMgrNames}}]\n#        OSD [{{cephOsdNames}}]\n#        MDS [{{cephMdsNames}}]\n#        RGW [{{cephRgwNames}}]\n# Runs on the first MON host. deploy.sh copies it there.\nset -euo pipefail\n\nMON_IP=\"{{cephMonIp}}\"\nENGINE=\"{{cephEngine}}\"\nREGISTRY=\"{{value.registryHost}}\"\n\n# 1. The container engine must exist before cephadm runs. cephadm will not install it.\nif [ \"$ENGINE\" = \"docker\" ]; then\n  dnf install -y docker-ce docker-ce-cli containerd.io || \\\n    apt-get install -y docker-ce docker-ce-cli containerd.io\n  systemctl enable --now docker\n  mkdir -p /etc/docker\n  cat >/etc/docker/daemon.json <<EOF\n{ \"registry-mirrors\": [\"https://${REGISTRY}\"], \"live-restore\": true }\nEOF\n  systemctl restart docker\nelse\n  dnf install -y podman || apt-get install -y podman\n  systemctl enable --now podman.socket\nfi\n\n# 2. cephadm itself, from the internal repository.\ndnf install -y cephadm || apt-get install -y cephadm\n\n# 3. Bootstrap. --docker is passed only for the Docker engine.\nCEPH_IMAGE=\"{{value.cephImage}}\"\nIMAGE_FLAG=\"\"\n[ -z \"$CEPH_IMAGE\" ] || IMAGE_FLAG=\"--image $CEPH_IMAGE\"\n\ncephadm {{cephEngineFlag}} bootstrap $IMAGE_FLAG \\\n  --mon-ip \"$MON_IP\" \\\n  --cluster-network {{value.storageCidr}} \\\n  --registry \"$REGISTRY\" \\\n  --log-to-file\n\ncephadm shell -- ceph -s\necho \"Bootstrap done. Run 20-ceph.sh from the admin host to add the other role hosts.\"\n"
     },
     {
       "id": "ceph-spec",
@@ -2605,7 +3032,7 @@
       "filename": "run-kubespray.sh",
       "language": "bash",
       "description": "Runs the pinned release from its own checkout and virtualenv, offline.",
-      "template": "#!/usr/bin/env bash\n# Generated by the cloud-native guide site\n# Release: {{choice.kubespray}}   Kubernetes: {{version.kubernetes}}\nset -euo pipefail\n\nRELEASE=\"{{choice.kubespray}}\"\nBASE=/opt/kubespray\nSRC=\"$BASE/$RELEASE\"\nINV=\"$BASE/inventory/{{value.clusterName}}-{{value.env}}\"\n\n# One checkout and one virtualenv per release. The Ansible and Python pins differ.\ntest -d \"$SRC\" || { echo \"missing checkout: $SRC\"; exit 1; }\ntest -d \"$INV\" || { echo \"missing inventory: $INV\"; exit 1; }\n\ncd \"$SRC\"\n# shellcheck disable=SC1091\nsource \"$BASE/venv-$RELEASE/bin/activate\"\nansible --version\n\nansible-playbook -i \"$INV/hosts.ini\" cluster.yml \\\n  -b --become-user=root \\\n  -e @\"$INV/group_vars/all/offline.yml\" \\\n  -e kube_version=\"{{version.kubernetes}}\" \\\n  \"$@\"\n\nkubectl --kubeconfig \"$INV/artifacts/admin.conf\" get nodes -o wide\nkubectl --kubeconfig \"$INV/artifacts/admin.conf\" -n kube-system get pods\n"
+      "template": "#!/usr/bin/env bash\n# Generated by the cloud-native guide site\n# Release: {{value.kubesprayRelease}}   Kubernetes: {{version.kubernetes}}\nset -euo pipefail\n\nRELEASE=\"{{value.kubesprayRelease}}\"\nBASE=/opt/kubespray\nSRC=\"$BASE/$RELEASE\"\nINV=\"$BASE/inventory/{{value.clusterName}}-{{value.env}}\"\n\n# One checkout and one virtualenv per release. The Ansible and Python pins differ.\ntest -d \"$SRC\" || { echo \"missing checkout: $SRC\"; exit 1; }\ntest -d \"$INV\" || { echo \"missing inventory: $INV\"; exit 1; }\n\ncd \"$SRC\"\n# shellcheck disable=SC1091\nsource \"$BASE/venv-$RELEASE/bin/activate\"\nansible --version\n\nansible-playbook -i \"$INV/hosts.ini\" cluster.yml \\\n  -b --become-user=root \\\n  -e @\"$INV/group_vars/all/offline.yml\" \\\n  -e kube_version=\"{{k8sVersion}}\" \\\n  \"$@\"\n\nkubectl --kubeconfig \"$INV/artifacts/admin.conf\" get nodes -o wide\nkubectl --kubeconfig \"$INV/artifacts/admin.conf\" -n kube-system get pods\n"
     },
     {
       "id": "istio-operator",
@@ -2870,6 +3297,7 @@
     "haproxy": "3.2.26 (3.2 branch)",
     "nginx": "1.31.8",
     "nic": "5.7.0 (chart nginx-ingress 2.8.0)",
+    "ngf": "2.8.0",
     "envoy": "v1.9.2",
     "metallb": "v0.16.1",
     "rancher": "v2.15.2",

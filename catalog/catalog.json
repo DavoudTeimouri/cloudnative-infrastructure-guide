@@ -1,5 +1,5 @@
 {
-  "catalogVersion": "3.0.0",
+  "catalogVersion": "3.1.0",
   "updated": "2026-10-22",
   "source": {
     "docs": "The repository is the source of truth. This catalog points at it; it never duplicates a procedure.",
@@ -102,16 +102,21 @@
       "fields": [
         "clusterName",
         "env",
-        "domain"
+        "domain",
+        "kubesprayRelease",
+        "kubernetesVersion",
+        "cephRelease",
+        "cephImage"
       ]
     },
     {
       "id": "p2",
       "title": "Application cluster",
-      "subtitle": "Control plane, workers and their sizes. Names and addresses are generated from the prefix and the first address.",
+      "subtitle": "Control plane, Linux and Windows workers, and the resources kept for the OS and the agents. Node names and addresses are generated from the prefix and the first address.",
       "components": [
         "controlPlane",
-        "cni"
+        "cni",
+        "windowsNodes"
       ],
       "fields": [
         "nodePrefix",
@@ -124,15 +129,27 @@
         "appWorkerCpu",
         "appWorkerMemGb",
         "appWorkerDiskGb",
-        "appWorkerDataDiskGb"
+        "appWorkerDataDiskGb",
+        "windowsWorkerCount",
+        "windowsWorkerCpu",
+        "windowsWorkerMemGb",
+        "windowsWorkerDiskGb",
+        "reservedSystemCpu",
+        "reservedSystemMem",
+        "reservedKubeCpu",
+        "reservedKubeMem",
+        "evictionHardMem",
+        "evictionHardNodefs",
+        "additionalClusters"
       ]
     },
     {
       "id": "p3",
       "title": "Management cluster",
-      "subtitle": "Rancher, Keycloak and the directory integrations run here, sized separately from the workload clusters.",
+      "subtitle": "Rancher or an alternative management UI, optional in-cluster storage, Keycloak and the directory integrations, sized separately from the workload clusters.",
       "components": [
         "management",
+        "mgmtStorage",
         "identity",
         "idpIntegration"
       ],
@@ -226,7 +243,7 @@
     {
       "id": "p7",
       "title": "Network and offline artifacts",
-      "subtitle": "Address plan, registries and package repositories. Everything is mirrored; nothing is pulled from the internet.",
+      "subtitle": "Address plan, CoreDNS forwarding, registries and package repositories. Everything is mirrored; nothing is pulled from the internet.",
       "components": [],
       "fields": [
         "mgmtCidr",
@@ -243,7 +260,10 @@
         "nexusHost",
         "extraRegistries",
         "extraRepos",
-        "registryAuth"
+        "registryAuth",
+        "corednsForwarders",
+        "corednsForwardPolicy",
+        "corednsCacheTtl"
       ]
     },
     {
@@ -474,6 +494,11 @@
           "default": true,
           "versionKey": "rancher",
           "doc": "management-cluster/rancher/rancher.md"
+        },
+        {
+          "id": "headlamp",
+          "title": "Headlamp + Argo CD (no Rancher)",
+          "doc": "management-cluster/alternatives.md"
         }
       ]
     },
@@ -895,6 +920,50 @@
           "title": "OpenTelemetry Collector DaemonSet",
           "versionKey": "otel-operator",
           "doc": "addons/platform-addons.md"
+        }
+      ]
+    },
+    {
+      "id": "mgmtStorage",
+      "title": "Management cluster storage",
+      "required": false,
+      "doc": "storage/rook-ceph/rook-ceph.md",
+      "options": [
+        {
+          "id": "none",
+          "title": "No storage in the management cluster",
+          "default": true,
+          "doc": "management-cluster/alternatives.md"
+        },
+        {
+          "id": "rook",
+          "title": "Rook-Ceph inside the management cluster",
+          "versionKey": "rook",
+          "doc": "storage/rook-ceph/rook-ceph.md"
+        },
+        {
+          "id": "shared",
+          "title": "Use the application cluster's Ceph",
+          "doc": "storage/ceph/cephadm-deployment.md"
+        }
+      ]
+    },
+    {
+      "id": "windowsNodes",
+      "title": "Windows worker nodes",
+      "required": false,
+      "doc": "kubernetes/windows-workers.md",
+      "options": [
+        {
+          "id": "none",
+          "title": "No Windows nodes",
+          "default": true,
+          "doc": "kubernetes/windows-workers.md"
+        },
+        {
+          "id": "enabled",
+          "title": "Windows Server 2022 workers (Calico required)",
+          "doc": "kubernetes/windows-workers.md"
         }
       ]
     }
@@ -1612,6 +1681,158 @@
       "type": "text",
       "default": "tempo.observability.svc:4317",
       "required": false
+    },
+    {
+      "id": "kubesprayRelease",
+      "label": "Kubespray release",
+      "type": "select",
+      "default": "release-2.32",
+      "options": [
+        "release-2.28",
+        "release-2.29",
+        "release-2.30",
+        "release-2.31",
+        "release-2.32"
+      ],
+      "required": false
+    },
+    {
+      "id": "kubernetesVersion",
+      "label": "Kubernetes version override",
+      "type": "text",
+      "default": "",
+      "hint": "Empty uses the release default. Never skip a minor on an upgrade.",
+      "required": false
+    },
+    {
+      "id": "cephRelease",
+      "label": "Ceph release",
+      "type": "select",
+      "default": "Tentacle 20.x",
+      "options": [
+        "Tentacle 20.x",
+        "Squid 19.x"
+      ],
+      "hint": "The repository you mirror decides the exact build; this records the intent.",
+      "required": false
+    },
+    {
+      "id": "cephImage",
+      "label": "Ceph container image override",
+      "type": "text",
+      "default": "",
+      "hint": "Empty uses the distribution package. Only set a pinned digest when the mirror requires it.",
+      "required": false
+    },
+    {
+      "id": "reservedSystemCpu",
+      "label": "System reserved CPU",
+      "type": "text",
+      "default": "500m",
+      "required": false
+    },
+    {
+      "id": "reservedSystemMem",
+      "label": "System reserved memory",
+      "type": "text",
+      "default": "1Gi",
+      "required": false
+    },
+    {
+      "id": "reservedKubeCpu",
+      "label": "Kube reserved CPU",
+      "type": "text",
+      "default": "500m",
+      "required": false
+    },
+    {
+      "id": "reservedKubeMem",
+      "label": "Kube reserved memory",
+      "type": "text",
+      "default": "1Gi",
+      "required": false
+    },
+    {
+      "id": "evictionHardMem",
+      "label": "Eviction threshold: memory",
+      "type": "text",
+      "default": "100Mi",
+      "required": false
+    },
+    {
+      "id": "evictionHardNodefs",
+      "label": "Eviction threshold: node filesystem",
+      "type": "text",
+      "default": "10%",
+      "required": false
+    },
+    {
+      "id": "corednsForwarders",
+      "label": "CoreDNS upstream servers",
+      "type": "text",
+      "default": "10.10.0.53 10.10.0.54",
+      "hint": "Space separated. Cluster DNS forwards everything outside cluster.local here.",
+      "required": false
+    },
+    {
+      "id": "corednsForwardPolicy",
+      "label": "CoreDNS forward policy",
+      "type": "select",
+      "default": "sequential",
+      "options": [
+        "sequential",
+        "random"
+      ],
+      "required": false
+    },
+    {
+      "id": "corednsCacheTtl",
+      "label": "CoreDNS cache TTL (seconds)",
+      "type": "number",
+      "default": 30,
+      "min": 0,
+      "required": false
+    },
+    {
+      "id": "windowsWorkerCount",
+      "label": "Windows worker nodes",
+      "type": "number",
+      "default": 0,
+      "min": 0,
+      "max": 50,
+      "required": false
+    },
+    {
+      "id": "windowsWorkerCpu",
+      "label": "Windows worker vCPU",
+      "type": "number",
+      "default": 8,
+      "min": 2,
+      "required": false
+    },
+    {
+      "id": "windowsWorkerMemGb",
+      "label": "Windows worker RAM (GiB)",
+      "type": "number",
+      "default": 32,
+      "min": 8,
+      "required": false
+    },
+    {
+      "id": "windowsWorkerDiskGb",
+      "label": "Windows worker disk (GiB)",
+      "type": "number",
+      "default": 120,
+      "min": 60,
+      "required": false
+    },
+    {
+      "id": "additionalClusters",
+      "label": "Additional application clusters",
+      "type": "lines",
+      "default": "",
+      "hint": "One per line: name,controlPlaneCount,workerCount,podCidr,serviceCidr",
+      "required": false
     }
   ],
   "steps": [
@@ -1723,6 +1944,38 @@
         "Fill the inventory and the group vars from the generated files",
         "Mirror the artifacts for the selected Kubespray release",
         "Run cluster.yml, then validate the control plane and etcd"
+      ]
+    },
+    {
+      "id": "s05b",
+      "phase": "7b. Windows workers (optional)",
+      "title": "Join the Windows node pool",
+      "doc": "kubernetes/windows-workers.md",
+      "when": {
+        "component": {
+          "windowsNodes": [
+            "enabled"
+          ]
+        }
+      },
+      "actions": [
+        "Calico is the CNI: confirm kube_network_plugin is calico before the Windows play runs",
+        "WinRM over HTTPS reachable from the Ansible host, account in the local Administrators group",
+        "Container runtime and the Containers feature installed on every Windows node",
+        "Same Kubernetes minor as the control plane; the generated vars pin kube_version",
+        "No Ceph RBD on Windows: keep stateful workloads on Linux"
+      ]
+    },
+    {
+      "id": "s05c",
+      "phase": "7c. Additional clusters (optional)",
+      "title": "Build the extra application clusters",
+      "doc": "kubernetes/multiple-clusters.md",
+      "actions": [
+        "Each cluster needs its own pod and service CIDR, API VIP and inventory",
+        "Run deploy.sh again with that cluster's nodes.tsv and k8s-cluster.yml",
+        "Register each cluster in Argo CD with its own Secret, labelled secret-type=cluster",
+        "One ApplicationSet per cluster so a bad sync cannot reach the other clusters"
       ]
     },
     {
@@ -1945,6 +2198,19 @@
         "Execute every acceptance test and store the evidence",
         "Record the known limitations",
         "Hand over to the operations team"
+      ]
+    },
+    {
+      "id": "s17",
+      "phase": "16. User access",
+      "title": "Give users working access from Linux and Windows",
+      "doc": "kubernetes/access/end-user-access.md",
+      "actions": [
+        "kubectl and kubelogin on the user machine: winget on Windows, the signed binary on Linux",
+        "One kubeconfig per user or group with the OIDC exec plugin; never a shared client certificate",
+        "Merge into KUBECONFIG, never overwrite ~/.kube/config",
+        "Automation tokens come from kubectl create token with a short duration, stored in the CI secret store",
+        "Verify: kubectl auth whoami, kubectl get nodes, kubectl auth can-i --list"
       ]
     }
   ]

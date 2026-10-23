@@ -198,6 +198,25 @@ var addons = {
   pageCount: __byId["page-count"] ? __byId["page-count"].textContent : ""
 };
 
+// Windows workers, extra clusters, management alternatives, reservations.
+__g.state.choices.windowsNodes = "enabled";
+__g.state.choices.management = "headlamp";
+__g.state.choices.mgmtStorage = "rook";
+__g.state.values.windowsWorkerCount = 2;
+__g.state.values.additionalClusters = "site-b,3,4,10.130.0.0/16,10.132.0.0/16";
+__g.state.values.kubesprayRelease = "release-2.29";
+__g.gotoPage(1);
+var p2 = __byId["page"].textContent;
+__g.renderReview();
+var v31 = {
+  files: filenames(),
+  bodies: exportBodies().join("\n"),
+  steps: __byId["steps"].children.length,
+  runbook: __g.buildRunbook(),
+  derived: __g.derived(),
+  p2HasWindows: p2.indexOf("Windows worker") !== -1
+};
+
 // Upgrade walkthrough.
 __g.renderUpgrade();
 var upFirst = __byId["upgrade-body"].textContent;
@@ -227,6 +246,21 @@ JSON.stringify({
             hasExtDns: addons.files.indexOf("external-dns-values.yaml") !== -1,
             certInRunbook: addons.runbook.indexOf("cert-manager-values.yaml") !== -1,
             runbookLeftovers: (addons.runbook.match(/\{\{/g) || []).length },
+  v31: { files: v31.files, steps: v31.steps, p2HasWindows: v31.p2HasWindows,
+          windowsGroup: v31.derived.windowsGroup, k8sVersion: v31.derived.k8sVersion,
+          windowsHosts: v31.derived.windowsHosts,
+          hasWindowsVars: v31.bodies.indexOf("windows_nodes: true") !== -1,
+          hasExtraClusters: v31.bodies.indexOf("site-b") !== -1,
+          hasArgocdSecret: v31.bodies.indexOf("argocd.argoproj.io/secret-type: cluster") !== -1,
+          hasHeadlamp: v31.files.indexOf("headlamp-values.yaml") !== -1,
+          hasMgmtRook: v31.files.indexOf("mgmt-rook-cluster.yaml") !== -1,
+          hasReservation: v31.bodies.indexOf("system-reserved") !== -1,
+          hasCorefile: v31.bodies.indexOf("forward . ") !== -1,
+          hasStorageClass: v31.files.indexOf("storageclass.yaml") !== -1,
+          runbookHasWindows: v31.runbook.indexOf("windows") !== -1,
+          runbookLeftovers: (v31.runbook.match(/\{\{/g) || []).length,
+          windowsCount: v31.derived.windowsCount,
+          expectedK8s: DATA.clusterMethods[0].versions["release-2.29"].kubernetes },
   upgrade: { firstSteps: upFirst.split("gate").length - 1,
              k8sHasCommand: upK8s.indexOf("ansible-playbook") !== -1,
              k8sHasGate: upK8s.indexOf("gate") !== -1,
@@ -302,6 +336,35 @@ def main():
     if addons["runbookLeftovers"]:
         failures.append(f"add-on runbook has {addons['runbookLeftovers']} unresolved placeholders")
 
+    v31 = result["v31"]
+    for wanted in ("windows-vars.yaml", "additional-clusters.yaml", "argocd-cluster-secrets.yaml",
+                   "headlamp-values.yaml", "mgmt-rook-cluster.yaml", "storageclass.yaml",
+                   "kubelet-reservation.yaml", "coredns-configmap.yaml"):
+        if wanted not in v31["files"]:
+            failures.append(f"windows/cluster selection did not reveal {wanted}")
+    if not v31["hasWindowsVars"]:
+        failures.append("windows group vars missing or wrong")
+    if not v31["hasExtraClusters"]:
+        failures.append("additional cluster record missing")
+    if not v31["hasArgocdSecret"]:
+        failures.append("argo cd cluster secret missing")
+    if "[windows]" not in v31["windowsGroup"]:
+        failures.append("windows inventory group missing")
+    if v31["windowsCount"] != "2":
+        failures.append(f"windows nodes: expected 2, got {v31['windowsCount']}")
+    if not v31["runbookHasWindows"]:
+        failures.append("runbook has no windows rows")
+    if not v31["p2HasWindows"]:
+        failures.append("page 2 does not show the windows sizing fields")
+    if not v31["hasReservation"]:
+        failures.append("kubelet reservation missing from exports")
+    if not v31["hasCorefile"]:
+        failures.append("coredns Corefile missing from exports")
+    if v31["runbookLeftovers"]:
+        failures.append(f"windows runbook has {v31['runbookLeftovers']} unresolved placeholders")
+    if v31["k8sVersion"] != v31["expectedK8s"]:
+        failures.append(f"k8s version {v31['k8sVersion']} does not match release-2.29 ({v31['expectedK8s']})")
+
     up = result["upgrade"]
     if up["runbookLeftovers"]:
         failures.append(f"upgrade runbook has {up['runbookLeftovers']} unresolved placeholders")
@@ -321,6 +384,8 @@ def main():
           f"{len(base['files'])} files, {base['sizingRows'] - 2} sizing rows")
     print(f"OK   flipped: {len(flipped['files'])} files, engine {flipped['engine']}, "
           f"gpu {flipped['gpuNodes'] or 'none'}")
+    print(f"OK   v31: {len(v31['files'])} files, {v31['steps']} steps, k8s {v31['k8sVersion']}, "
+          f"windows {v31['windowsCount']}")
     print(f"OK   add-ons: {addons['steps'] - flipped['reviewSteps']} extra step(s), "
           f"{len(addons['files']) - len(flipped['files'])} extra file(s)")
     print(f"OK   upgrade: {len(data['upgrades'])} flows, first gate markers {up['firstSteps']}")

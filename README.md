@@ -160,10 +160,13 @@ operating-systems/       oracle-linux/ ubuntu/ distro baselines +
 automation/              ansible/ awx/ gitlab-ci/
 kubespray/               deployment guide, multi-version support, inventory and
                          group-vars templates
-kubernetes/              control-plane/ networking/ ingress/ csi/ security/
-                         ingress/  nginx-ingress.md, multi-controller-plan.md
+kubernetes/              control-plane/ networking/ (cilium, coredns-forwarding,
+                         metallb) ingress/ csi/ security/ access/ (end-user
+                         kubeconfig), windows-workers.md,
+                         node-resource-reservation.md, multiple-clusters.md
 storage/                 ceph/ (incl. per-role node separation) rook-ceph/ alternatives/
 management-cluster/      rancher/ argocd/ keycloak/ platform-services/
+                         alternatives.md: Rancher vs Headlamp vs KubeSphere
 identity/                application-level directory integration (no host join)
 addons/                  platform-addons.md: cert-manager, metrics-server, VPA,
                          descheduler, external-dns, Trivy, OpenTelemetry

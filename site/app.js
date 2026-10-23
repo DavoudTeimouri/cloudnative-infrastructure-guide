@@ -146,6 +146,8 @@
     var cp = roleNodes("cp", num("appCpCount"), start, 0);
     var w = roleNodes("w", num("appWorkerCount"), start, cp.length);
     var g = gpuEnabled() ? roleNodes("gpu", num("gpuCount"), start, cp.length + w.length) : [];
+    var win = state.choices.windowsNodes === "enabled"
+      ? roleNodes("win", num("windowsWorkerCount"), start, cp.length + w.length + g.length) : [];
 
     var mgmt = [];
     for (var i = 0; i < num("mgmtWorkerCount"); i++) {
@@ -181,7 +183,7 @@
       edge.push({ name: "lb-" + (k + 1), ip: ipAdd(state.values.edgeIpStart, k) });
     }
 
-    return { cp: cp, w: w, gpu: g, mgmt: mgmt, ceph: ceph, cephRoles: cephRoles, edge: edge };
+    return { cp: cp, w: w, gpu: g, win: win, mgmt: mgmt, ceph: ceph, cephRoles: cephRoles, edge: edge };
   }
 
   function names(list) {
@@ -204,6 +206,20 @@
 
   function ips(list) {
     return list.map(function (n) { return n.ip; }).join(" ");
+  }
+
+  function releaseVersion(key) {
+    var cm = DATA.clusterMethods[0] || {};
+    var rel = (cm.versions || {})[state.values.kubesprayRelease || state.choices.kubespray] || {};
+    return rel[key] || DATA.versions[key] || "UNVERIFIED";
+  }
+
+  function extraClusters() {
+    return lines(state.values.additionalClusters).map(function (line) {
+      var c = line.split(",").map(function (x) { return String(x).trim(); });
+      if (!c[0]) return null;
+      return { name: c[0], cp: c[1] || "3", workers: c[2] || "3", pod: c[3] || "", svc: c[4] || "" };
+    }).filter(function (x) { return x; });
   }
 
   function hostLines(list) {
@@ -288,6 +304,23 @@
       cephMonIp: t.ceph.length ? t.ceph[0].ip : "",
       cephEngine: engine,
       cephEngineFlag: engine === "docker" ? "--docker" : "",
+      windowsHosts: hostLines(t.win),
+      windowsCount: String(t.win.length),
+      windowsGroup: t.win.length ? "\n[windows]\n" + hostLines(t.win) + "\n\n[k8s-cluster:children]\nwindows" : "",
+      k8sVersion: state.values.kubernetesVersion || releaseVersion("kubernetes"),
+      corednsForwarderList: String(state.values.corednsForwarders || "").split(/\s+/).filter(function (x) { return x; })
+        .map(function (x) { return "  - " + x; }).join("\n"),
+      firstMgmtNode: t.mgmt.length ? t.mgmt[0].name : "",
+      additionalClustersYaml: extraClusters().map(function (c) {
+        return "  - name: " + c.name + "\n    controlPlane: \"" + c.cp + "\"\n    workers: \"" + c.workers +
+          "\"\n    podCidr: \"" + c.pod + "\"\n    serviceCidr: \"" + c.svc + "\"";
+      }).join("\n") || "  []",
+      argocdClusterSecrets: extraClusters().map(function (c) {
+        return "apiVersion: v1\nkind: Secret\nmetadata:\n  name: cluster-" + c.name +
+          "\n  namespace: argocd\n  labels:\n    argocd.argoproj.io/secret-type: cluster\nstringData:\n  name: " +
+          c.name + "\n  server: https://<" + c.name + "-api>:6443\n  config: |\n    {\"tlsClientConfig\":{\"insecure\":false}}";
+      }).join("\n---\n") || "# No additional clusters configured.",
+      totalNodesExtra: String(t.win.length),
       edgeHosts: hostLines(t.edge),
       edgeHostList: t.edge.map(function (n) { return n.name + "=" + n.ip; }).join(", "),
       edgeL1: t.edge.length ? t.edge[0].ip : "",
@@ -298,7 +331,7 @@
       vrrpAuthPass: state.values.vrrpAuthPass || "",
       revision: String(DATA.versions.istio || "").replace(/\./g, "-"),
       istioProfile: state.choices.serviceMesh === "istio-ambient" ? "ambient" : "default",
-      totalNodes: String(t.cp.length + t.w.length + t.gpu.length + t.mgmt.length + t.ceph.length + t.edge.length)
+      totalNodes: String(t.cp.length + t.w.length + t.gpu.length + t.win.length + t.mgmt.length + t.ceph.length + t.edge.length)
     };
   }
 
@@ -318,7 +351,7 @@
         var cm = DATA.clusterMethods.filter(function (m) { return m.id === id; })[0];
         return cm && state.cluster === id ? id : "";
       },
-      version: function (key) { return DATA.versions[key] || "UNVERIFIED"; }
+      version: function (key) { return releaseVersion(key); }
     };
 
     return tpl.replace(/\{\{\s*([a-zA-Z]+)\.([a-zA-Z0-9_-]+)\s*\}\}/g, function (m, ns, key) {
@@ -624,7 +657,7 @@
 
     var t = topology();
     if (page.id === "p2") {
-      box.appendChild(nodeListCard("Nodes generated", t.cp.concat(t.w, t.gpu)));
+      box.appendChild(nodeListCard("Nodes generated", t.cp.concat(t.w, t.gpu, t.win)));
     }
     if (page.id === "p3") {
       box.appendChild(nodeListCard("Management nodes generated", t.mgmt));
@@ -678,6 +711,7 @@
     add("Application control plane", t.cp, "appCpCpu", "appCpMemGb", "appCpDiskGb", null);
     add("Application workers", t.w, "appWorkerCpu", "appWorkerMemGb", "appWorkerDiskGb", "appWorkerDataDiskGb");
     if (t.gpu.length) add("GPU workers", t.gpu, "gpuCpu", "gpuMemGb", "gpuDiskGb", null);
+    if (t.win.length) add("Windows workers", t.win, "windowsWorkerCpu", "windowsWorkerMemGb", "windowsWorkerDiskGb", null);
     add("Management cluster", t.mgmt, "mgmtCpu", "mgmtMemGb", "mgmtDiskGb", null);
     if (t.ceph.length) {
       var r = t.cephRoles;
@@ -800,7 +834,7 @@
 
   function topologyTotals() {
     var t = topology();
-    return t.cp.length + t.w.length + t.gpu.length + t.mgmt.length + t.ceph.length + t.edge.length;
+    return t.cp.length + t.w.length + t.gpu.length + t.win.length + t.mgmt.length + t.ceph.length + t.edge.length;
   }
 
   var ADDON_FILES = {
@@ -899,6 +933,7 @@
     rows("control plane", t.cp);
     rows("worker", t.w);
     rows("gpu", t.gpu);
+    rows("windows", t.win);
     rows("management", t.mgmt);
     rows("ceph-mon", t.cephRoles.mon);
     rows("ceph-mgr", t.cephRoles.mgr);

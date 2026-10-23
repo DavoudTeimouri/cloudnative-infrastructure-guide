@@ -32,7 +32,7 @@ VERSION_ALIASES = {
     "haproxy": ["HAProxy"],
     "nginx": ["Nginx (OSS)"],
     "nic": ["NGINX Ingress Controller (F5)"],
-    "ngf": ["NGINX Gateway Fabric"],
+    "ngf": ["NGINX Gateway Fabric (F5)", "NGINX Gateway Fabric"],
     "envoy": ["Envoy Gateway"],
     "metallb": ["MetalLB"],
     "rancher": ["Rancher"],
