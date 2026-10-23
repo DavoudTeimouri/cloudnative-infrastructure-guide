@@ -1,5 +1,5 @@
 {
-  "catalogVersion": "3.1.0",
+  "catalogVersion": "3.1.1",
   "updated": "2026-10-22",
   "source": {
     "docs": "The repository is the source of truth. This catalog points at it; it never duplicates a procedure.",
@@ -112,7 +112,7 @@
     {
       "id": "p2",
       "title": "Application cluster",
-      "subtitle": "Control plane, Linux and Windows workers, and the resources kept for the OS and the agents. Node names and addresses are generated from the prefix and the first address.",
+      "subtitle": "Control plane, Linux and Windows workers, and the resources kept for the OS and the agents. Additional application clusters are added one at a time, each with its own CIDRs and sizing.",
       "components": [
         "controlPlane",
         "cni",
@@ -139,8 +139,7 @@
         "reservedKubeCpu",
         "reservedKubeMem",
         "evictionHardMem",
-        "evictionHardNodefs",
-        "additionalClusters"
+        "evictionHardNodefs"
       ]
     },
     {
@@ -1824,14 +1823,6 @@
       "type": "number",
       "default": 120,
       "min": 60,
-      "required": false
-    },
-    {
-      "id": "additionalClusters",
-      "label": "Additional application clusters",
-      "type": "lines",
-      "default": "",
-      "hint": "One per line: name,controlPlaneCount,workerCount,podCidr,serviceCidr",
       "required": false
     }
   ],

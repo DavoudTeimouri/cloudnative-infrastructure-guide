@@ -335,8 +335,8 @@ def derived(data, values, choices, versions):
         "k8sVersion": str(values.get("kubernetesVersion") or versions.get("kubernetes", "")),
         "corednsForwarderList": "\n".join("  - " + x for x in str(values.get("corednsForwarders", "")).split()),
         "firstMgmtNode": t["mgmt"][0]["name"] if t["mgmt"] else "",
-        "additionalClustersYaml": extra_clusters_yaml(values),
-        "argocdClusterSecrets": argocd_cluster_secrets(values),
+        "additionalClustersYaml": "  []",
+        "argocdClusterSecrets": "# No additional clusters configured.",
         "edgeHosts": host_lines(t["edge"]),
         "edgeHostList": ", ".join(f"{n['name']}={n['ip']}" for n in t["edge"]),
         "edgeL1": t["edge"][0]["ip"] if t["edge"] else "",
@@ -349,35 +349,6 @@ def derived(data, values, choices, versions):
         "istioProfile": "ambient" if choices.get("serviceMesh") == "istio-ambient" else "default",
         "totalNodes": str(sum(len(v) for k, v in t.items() if k != "cephRoles")),
     }
-
-
-def extra_clusters(values):
-    rows = []
-    for line in str(values.get("additionalClusters", "") or "").splitlines():
-        c = [x.strip() for x in line.split(",")]
-        if not c or not c[0]:
-            continue
-        rows.append({"name": c[0], "cp": c[1] if len(c) > 1 and c[1] else "3",
-                     "workers": c[2] if len(c) > 2 and c[2] else "3",
-                     "pod": c[3] if len(c) > 3 else "", "svc": c[4] if len(c) > 4 else ""})
-    return rows
-
-
-def extra_clusters_yaml(values):
-    rows = extra_clusters(values)
-    return "\n".join(
-        f'  - name: {c["name"]}\n    controlPlane: "{c["cp"]}"\n    workers: "{c["workers"]}"'
-        f'\n    podCidr: "{c["pod"]}"\n    serviceCidr: "{c["svc"]}"' for c in rows) or "  []"
-
-
-def argocd_cluster_secrets(values):
-    blocks = [
-        "apiVersion: v1\nkind: Secret\nmetadata:\n  name: cluster-" + c["name"] +
-        "\n  namespace: argocd\n  labels:\n    argocd.argoproj.io/secret-type: cluster"
-        "\nstringData:\n  name: " + c["name"] + "\n  server: https://<" + c["name"] +
-        '-api>:6443\n  config: |\n    {"tlsClientConfig":{"insecure":false}}'
-        for c in extra_clusters(values)]
-    return "\n---\n".join(blocks) or "# No additional clusters configured."
 
 
 def render_export(template, data):

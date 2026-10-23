@@ -32,15 +32,13 @@ balancer (different VIPs or SNI hosts), the backup target.
 
 ## How the configurator models it
 
-The **Application cluster** page configures the first cluster fully. A `additionalClusters` field
-takes one line per extra cluster:
+The **Application cluster** page configures the first cluster fully. Each extra cluster is added with
+the **+ Add application cluster** button, which appends a card holding that cluster's name, pod and
+service CIDRs, node counts and node sizing. Every card is independent; **Remove** deletes it. The
+first card starts with non-overlapping CIDRs derived from the main cluster (10.32.0.0/16 and
+10.33.0.0/16 by default), and the numbers are editable.
 
-```
-name,controlPlaneCount,workerCount,podCidr,serviceCidr
-site-b,3,6,10.130.0.0/16,10.132.0.0/16
-```
-
-From those lines the site generates:
+From those cards the site generates:
 
 - `additional-clusters.yaml` — one record per cluster with name, counts and CIDRs;
 - `argocd-cluster-secrets.yaml` — one Argo CD cluster Secret per entry, labelled

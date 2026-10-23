@@ -198,12 +198,42 @@ var addons = {
   pageCount: __byId["page-count"] ? __byId["page-count"].textContent : ""
 };
 
+// The + button adds a cluster with its own defaults; Remove takes it away.
+function findAll(root, pred, out) {
+  out = out || [];
+  for (var i = 0; i < root.children.length; i++) {
+    var k = root.children[i];
+    if (pred(k)) out.push(k);
+    findAll(k, pred, out);
+  }
+  return out;
+}
+__g.gotoPage(1);
+var addBtn = findAll(__byId["page"], function (n) {
+  return (n.tagName === "button" || n.tagName === "BUTTON") &&
+    n.textContent.indexOf("Add application cluster") !== -1;
+})[0];
+var plus = { found: !!addBtn, count: 0, name: "", pod: "", svc: "", afterRemove: -1 };
+if (addBtn) {
+  addBtn.onclick();
+  plus.count = __g.state.clusters.length;
+  plus.name = __g.state.clusters[0].name;
+  plus.pod = __g.state.clusters[0].pod;
+  plus.svc = __g.state.clusters[0].svc;
+  var rm = findAll(__byId["page"], function (n) {
+    return (n.tagName === "button" || n.tagName === "BUTTON") && n.textContent === "Remove";
+  })[0];
+  if (rm) { rm.onclick(); plus.afterRemove = __g.state.clusters.length; }
+}
+
 // Windows workers, extra clusters, management alternatives, reservations.
 __g.state.choices.windowsNodes = "enabled";
 __g.state.choices.management = "headlamp";
 __g.state.choices.mgmtStorage = "rook";
 __g.state.values.windowsWorkerCount = 2;
-__g.state.values.additionalClusters = "site-b,3,4,10.130.0.0/16,10.132.0.0/16";
+__g.state.clusters = [{ name: "site-b", cp: "3", cpCpu: "8", cpMemGb: "16", cpDiskGb: "120",
+                        workers: "4", workerCpu: "16", workerMemGb: "64", workerDiskGb: "200",
+                        pod: "10.130.0.0/16", svc: "10.132.0.0/16" }];
 __g.state.values.kubesprayRelease = "release-2.29";
 __g.gotoPage(1);
 var p2 = __byId["page"].textContent;
@@ -214,7 +244,8 @@ var v31 = {
   steps: __byId["steps"].children.length,
   runbook: __g.buildRunbook(),
   derived: __g.derived(),
-  p2HasWindows: p2.indexOf("Windows worker") !== -1
+  p2HasWindows: p2.indexOf("Windows worker") !== -1,
+  p2HasAddCluster: p2.indexOf("Add application cluster") !== -1
 };
 
 // Upgrade walkthrough.
@@ -247,6 +278,8 @@ JSON.stringify({
             certInRunbook: addons.runbook.indexOf("cert-manager-values.yaml") !== -1,
             runbookLeftovers: (addons.runbook.match(/\{\{/g) || []).length },
   v31: { files: v31.files, steps: v31.steps, p2HasWindows: v31.p2HasWindows,
+          p2HasAddCluster: v31.p2HasAddCluster,
+          plus: plus,
           windowsGroup: v31.derived.windowsGroup, k8sVersion: v31.derived.k8sVersion,
           windowsHosts: v31.derived.windowsHosts,
           hasWindowsVars: v31.bodies.indexOf("windows_nodes: true") !== -1,
@@ -354,6 +387,16 @@ def main():
         failures.append(f"windows nodes: expected 2, got {v31['windowsCount']}")
     if not v31["runbookHasWindows"]:
         failures.append("runbook has no windows rows")
+    if not v31["plus"]["found"]:
+        failures.append("+ Add application cluster button not found")
+    elif v31["plus"]["count"] != 1 or not v31["plus"]["name"]:
+        failures.append(f"add button did not create a cluster: {v31['plus']}")
+    elif v31["plus"]["pod"] == v31["plus"]["svc"]:
+        failures.append("new cluster pod and service CIDRs are identical")
+    elif v31["plus"]["afterRemove"] != 0:
+        failures.append("Remove button did not delete the cluster")
+    if not v31["p2HasAddCluster"]:
+        failures.append("page 2 has no + Add application cluster button")
     if not v31["p2HasWindows"]:
         failures.append("page 2 does not show the windows sizing fields")
     if not v31["hasReservation"]:

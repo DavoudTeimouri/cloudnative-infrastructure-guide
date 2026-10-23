@@ -16,6 +16,7 @@
     cluster: null,
     choices: {},
     values: {},
+    clusters: [],
     page: 0,
     view: "wizard",
     upgrade: { flow: null, target: "" }
@@ -214,12 +215,74 @@
     return rel[key] || DATA.versions[key] || "UNVERIFIED";
   }
 
-  function extraClusters() {
-    return lines(state.values.additionalClusters).map(function (line) {
-      var c = line.split(",").map(function (x) { return String(x).trim(); });
-      if (!c[0]) return null;
-      return { name: c[0], cp: c[1] || "3", workers: c[2] || "3", pod: c[3] || "", svc: c[4] || "" };
-    }).filter(function (x) { return x; });
+  function extraClusters() { return state.clusters; }
+
+  function newCluster() {
+    var n = state.clusters.length + 2;
+    var base = parseInt(String(state.values.podCidr || "10.30.0.0/16").split(".")[1], 10);
+    if (isNaN(base)) base = 30;
+    return {
+      name: "site-" + n,
+      cp: state.values.appCpCount || "3",
+      cpCpu: state.values.appCpCpu || "8",
+      cpMemGb: state.values.appCpMemGb || "16",
+      cpDiskGb: state.values.appCpDiskGb || "120",
+      workers: state.values.appWorkerCount || "3",
+      workerCpu: state.values.appWorkerCpu || "16",
+      workerMemGb: state.values.appWorkerMemGb || "64",
+      workerDiskGb: state.values.appWorkerDiskGb || "200",
+      pod: "10." + (base + 2 * (n - 1)) + ".0.0/16",
+      svc: "10." + (base + 2 * (n - 1) + 1) + ".0.0/16"
+    };
+  }
+
+  function clusterField(obj, key, label, numeric) {
+    var input = el("input", {
+      type: numeric ? "number" : "text",
+      value: obj[key] === undefined ? "" : String(obj[key]),
+      oninput: function () { obj[key] = input.value; }
+    });
+    return el("div", { class: "field" }, [el("label", { text: label }), input]);
+  }
+
+  function clusterCard(c, idx) {
+    var fields = el("div", { class: "values" }, [
+      clusterField(c, "name", "Cluster name"),
+      clusterField(c, "pod", "Pod CIDR"),
+      clusterField(c, "svc", "Service CIDR"),
+      clusterField(c, "cp", "Control plane nodes", true),
+      clusterField(c, "cpCpu", "Control plane vCPU", true),
+      clusterField(c, "cpMemGb", "Control plane RAM (GiB)", true),
+      clusterField(c, "cpDiskGb", "Control plane disk (GiB)", true),
+      clusterField(c, "workers", "Worker nodes", true),
+      clusterField(c, "workerCpu", "Worker vCPU", true),
+      clusterField(c, "workerMemGb", "Worker RAM (GiB)", true),
+      clusterField(c, "workerDiskGb", "Worker disk (GiB)", true)
+    ]);
+    return el("div", { class: "comp" }, [
+      el("h4", {}, [
+        el("span", { text: "Cluster " + (idx + 2) + ": " + (c.name || "unnamed") }),
+        el("button", {
+          class: "btn",
+          onclick: function () { state.clusters.splice(idx, 1); renderPage(); }
+        }, ["Remove"])
+      ]),
+      fields
+    ]);
+  }
+
+  function clusterSection() {
+    var list = el("div", { class: "values" });
+    state.clusters.forEach(function (c, i) { list.appendChild(clusterCard(c, i)); });
+    return el("div", { class: "card" }, [
+      el("h3", { text: "Additional application clusters" }),
+      el("p", { class: "hint", text: "Each cluster has its own nodes, CIDRs and sizing. Every entry becomes one record in additional-clusters.yaml and one Argo CD cluster Secret." }),
+      list,
+      el("button", {
+        class: "btn primary",
+        onclick: function () { state.clusters.push(newCluster()); renderPage(); }
+      }, ["+ Add application cluster"])
+    ]);
   }
 
   function hostLines(list) {
@@ -312,7 +375,11 @@
         .map(function (x) { return "  - " + x; }).join("\n"),
       firstMgmtNode: t.mgmt.length ? t.mgmt[0].name : "",
       additionalClustersYaml: extraClusters().map(function (c) {
-        return "  - name: " + c.name + "\n    controlPlane: \"" + c.cp + "\"\n    workers: \"" + c.workers +
+        return "  - name: " + c.name +
+          "\n    controlPlane:\n      count: \"" + c.cp + "\"\n      cpu: \"" + c.cpCpu +
+          "\"\n      memoryGiB: \"" + c.cpMemGb + "\"\n      diskGiB: \"" + c.cpDiskGb +
+          "\"\n    workers:\n      count: \"" + c.workers + "\"\n      cpu: \"" + c.workerCpu +
+          "\"\n      memoryGiB: \"" + c.workerMemGb + "\"\n      diskGiB: \"" + c.workerDiskGb +
           "\"\n    podCidr: \"" + c.pod + "\"\n    serviceCidr: \"" + c.svc + "\"";
       }).join("\n") || "  []",
       argocdClusterSecrets: extraClusters().map(function (c) {
@@ -644,6 +711,10 @@
       box.appendChild(el("div", { class: "card" }, [el("h3", { text: "Values" }), grid]));
     }
 
+    if (page.id === "p2") {
+      box.appendChild(clusterSection());
+    }
+
     if (page.components && page.components.length) {
       var comps = el("div", { class: "components" });
       page.components.forEach(function (id) {
@@ -940,6 +1011,17 @@
     rows("ceph-osd", t.cephRoles.osd);
     rows("ceph-mds", t.cephRoles.mds);
     rows("ceph-rgw", t.cephRoles.rgw);
+    if (state.clusters.length) {
+      out.push("");
+      out.push("## Additional application clusters");
+      out.push("");
+      out.push("| Cluster | Control plane | Workers | Pod CIDR | Service CIDR |");
+      out.push("|---|---|---|---|---|");
+      state.clusters.forEach(function (c) {
+        out.push("| " + c.name + " | " + c.cp + " x " + c.cpCpu + " vCPU / " + c.cpMemGb + " GiB | " +
+          c.workers + " x " + c.workerCpu + " vCPU / " + c.workerMemGb + " GiB | " + c.pod + " | " + c.svc + " |");
+      });
+    }
     rows("edge", t.edge);
     out.push("");
     out.push("## Phased steps");
