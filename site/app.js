@@ -16,7 +16,6 @@
     cluster: null,
     choices: {},
     values: {},
-    clusters: [],
     page: 0,
     roleTab: "",
     view: "wizard",
@@ -86,6 +85,11 @@
     return isNaN(n) ? 0 : n;
   }
 
+  function rowNum(obj, key) {
+    var n = parseInt(obj && obj[key], 10);
+    return isNaN(n) ? 0 : n;
+  }
+
   function lines(text) {
     return String(text || "").split("\n").map(function (s) { return s.trim(); })
       .filter(function (s) { return s.length > 0; });
@@ -100,6 +104,10 @@
     v += offset;
     return [Math.floor(v / 16777216) % 256, Math.floor(v / 65536) % 256,
             Math.floor(v / 256) % 256, v % 256].join(".");
+  }
+
+  function cloneRow(x) {
+    return JSON.parse(JSON.stringify(x));
   }
 
   /* role -> [{name, ip}] */
@@ -144,12 +152,14 @@
   /* ------------------------------------------------------------------ */
 
   function topology() {
+    var app = asArray(state.values.appClusters) ? state.values.appClusters : [];
+    var p = app[0] || {};
     var start = state.values.appNodeIpStart;
-    var cp = roleNodes("cp", num("appCpCount"), start, 0);
-    var w = roleNodes("w", num("appWorkerCount"), start, cp.length);
+    var cp = roleNodes("cp", rowNum(p, "cp"), start, 0);
+    var w = roleNodes("w", rowNum(p, "workers"), start, cp.length);
     var g = gpuEnabled() ? roleNodes("gpu", num("gpuCount"), start, cp.length + w.length) : [];
     var win = state.choices.windowsNodes === "enabled"
-      ? roleNodes("win", num("windowsWorkerCount"), start, cp.length + w.length + g.length) : [];
+      ? roleNodes("win", rowNum(p, "windows"), start, cp.length + w.length + g.length) : [];
 
     var mgmt = [];
     for (var i = 0; i < num("mgmtWorkerCount"); i++) {
@@ -160,24 +170,18 @@
     }
 
     var cephRoles = { mon: [], mgr: [], osd: [], mds: [], rgw: [] };
-    if (storageMode().indexOf("cephadm") === 0) {
-      var cp2 = state.values.cephHostPrefix || "ceph";
-      var spec = [
-        ["mon", "cephMonCount", "cephMonIpStart"],
-        ["mgr", "cephMgrCount", "cephMgrIpStart"],
-        ["osd", "cephOsdCount", "cephOsdIpStart"],
-        ["mds", "cephMdsCount", "cephMdsIpStart"],
-        ["rgw", "cephRgwCount", "cephRgwIpStart"]
-      ];
-      spec.forEach(function (role) {
-        for (var n = 0; n < num(role[1]); n++) {
-          cephRoles[role[0]].push({
-            name: cp2 + "-" + role[0] + "-" + (n + 1),
-            ip: ipAdd(state.values[role[2]], n)
-          });
+    var sds = asArray(state.values.sdsClusters) ? state.values.sdsClusters : [];
+    sds.forEach(function (c) {
+      var prefix = (c.name || "ceph").split("-")[0] || "ceph";
+      var base = c.ipStart;
+      var off = 0;
+      [["mon", rowNum(c, "mon")], ["mgr", rowNum(c, "mgr")], ["osd", rowNum(c, "osd")], ["mds", rowNum(c, "mds")], ["rgw", rowNum(c, "rgw")]].forEach(function (role) {
+        for (var n = 0; n < role[1]; n++) {
+          cephRoles[role[0]].push({ name: prefix + "-" + role[0] + "-" + (n + 1), ip: ipAdd(base, off) });
+          off++;
         }
       });
-    }
+    });
     var ceph = cephRoles.mon.concat(cephRoles.mgr, cephRoles.osd, cephRoles.mds, cephRoles.rgw);
 
     var edge = [];
@@ -216,74 +220,9 @@
     return rel[key] || DATA.versions[key] || "UNVERIFIED";
   }
 
-  function extraClusters() { return state.clusters; }
-
-  function newCluster() {
-    var n = state.clusters.length + 2;
-    var base = parseInt(String(state.values.podCidr || "10.30.0.0/16").split(".")[1], 10);
-    if (isNaN(base)) base = 30;
-    return {
-      name: "site-" + n,
-      cp: state.values.appCpCount || "3",
-      cpCpu: state.values.appCpCpu || "8",
-      cpMemGb: state.values.appCpMemGb || "16",
-      cpDiskGb: state.values.appCpDiskGb || "120",
-      workers: state.values.appWorkerCount || "3",
-      workerCpu: state.values.appWorkerCpu || "16",
-      workerMemGb: state.values.appWorkerMemGb || "64",
-      workerDiskGb: state.values.appWorkerDiskGb || "200",
-      pod: "10." + (base + 2 * (n - 1)) + ".0.0/16",
-      svc: "10." + (base + 2 * (n - 1) + 1) + ".0.0/16"
-    };
-  }
-
-  function clusterField(obj, key, label, numeric) {
-    var input = el("input", {
-      type: numeric ? "number" : "text",
-      value: obj[key] === undefined ? "" : String(obj[key]),
-      oninput: function () { obj[key] = input.value; }
-    });
-    return el("div", { class: "field" }, [el("label", { text: label }), input]);
-  }
-
-  function clusterCard(c, idx) {
-    var fields = el("div", { class: "values" }, [
-      clusterField(c, "name", "Cluster name"),
-      clusterField(c, "pod", "Pod CIDR"),
-      clusterField(c, "svc", "Service CIDR"),
-      clusterField(c, "cp", "Control plane nodes", true),
-      clusterField(c, "cpCpu", "Control plane vCPU", true),
-      clusterField(c, "cpMemGb", "Control plane RAM (GiB)", true),
-      clusterField(c, "cpDiskGb", "Control plane disk (GiB)", true),
-      clusterField(c, "workers", "Worker nodes", true),
-      clusterField(c, "workerCpu", "Worker vCPU", true),
-      clusterField(c, "workerMemGb", "Worker RAM (GiB)", true),
-      clusterField(c, "workerDiskGb", "Worker disk (GiB)", true)
-    ]);
-    return el("div", { class: "comp" }, [
-      el("h4", {}, [
-        el("span", { text: "Cluster " + (idx + 2) + ": " + (c.name || "unnamed") }),
-        el("button", {
-          class: "btn",
-          onclick: function () { state.clusters.splice(idx, 1); renderPage(); }
-        }, ["Remove"])
-      ]),
-      fields
-    ]);
-  }
-
-  function clusterSection() {
-    var list = el("div", { class: "values" });
-    state.clusters.forEach(function (c, i) { list.appendChild(clusterCard(c, i)); });
-    return el("div", { class: "card" }, [
-      el("h3", { text: "Additional application clusters" }),
-      el("p", { class: "hint", text: "Each cluster has its own nodes, CIDRs and sizing. Every entry becomes one record in additional-clusters.yaml and one Argo CD cluster Secret." }),
-      list,
-      el("button", {
-        class: "btn primary",
-        onclick: function () { state.clusters.push(newCluster()); renderPage(); }
-      }, ["+ Add application cluster"])
-    ]);
+  function extraClusters() {
+    var app = asArray(state.values.appClusters) ? state.values.appClusters : [];
+    return app.slice(1);
   }
 
   function hostLines(list) {
@@ -550,7 +489,57 @@
     });
   }
 
+  function tableNode(v) {
+    var rows = asArray(state.values[v.id]) ? state.values[v.id] : [];
+    var cols = v.columns || [];
+    function cellInput(row, c) {
+      var input;
+      if (c.type === "select") {
+        input = el("select", { oninput: function () { row[c.id] = input.value; } });
+        (c.options || []).forEach(function (o) {
+          input.appendChild(el("option", { value: o, text: o, selected: o === row[c.id] ? "selected" : null }));
+        });
+        if ((c.options || []).indexOf(row[c.id]) === -1 && c.options && c.options.length) row[c.id] = c.options[0];
+      } else {
+        input = el("input", {
+          type: c.type === "number" ? "number" : "text",
+          value: row[c.id] === undefined ? "" : String(row[c.id]),
+          oninput: function () { row[c.id] = input.value; }
+        });
+      }
+      return input;
+    }
+    var thead = el("thead", [el("tr", cols.map(function (c) { return el("th", { text: c.label }); }))]);
+    var tbody = el("tbody");
+    rows.forEach(function (row, i) {
+      var tr = el("tr");
+      cols.forEach(function (c) { tr.appendChild(el("td", {}, [cellInput(row, c)])); });
+      tr.appendChild(el("td", {}, [el("button", { type: "button", onclick: function () { rows.splice(i, 1); renderPage(); } }, ["Remove"])]));
+      tbody.appendChild(tr);
+    });
+    var addLabel = v.label.indexOf("clusters") !== -1 ? "Add application cluster" : "Add row";
+    var add = el("button", { type: "button", class: "btn primary", onclick: function () {
+      rows.push(newRow()); renderPage();
+    } }, ["+ " + addLabel]);
+
+    function newRow() {
+      var blank = {};
+      var n = rows.length + 1;
+      cols.forEach(function (c) {
+        var key = c.id;
+        if (key === "name") blank[key] = (/(ceph|sds)/i.test(v.label || "") ? "ceph-" : "site-") + n;
+        else if (key === "pod") blank[key] = "10." + (30 + 2 * n) + ".0.0/16";
+        else if (key === "svc") blank[key] = "10." + (30 + 2 * n + 1) + ".0.0/16";
+        else if (c.type === "select") blank[key] = (c.options && c.options.length) ? c.options[0] : "";
+        else blank[key] = c.type === "number" ? "0" : "";
+      });
+      return blank;
+    }
+    return el("div", { class: "field" }, [el("label", { text: v.label }), el("table", {}, [thead, tbody]), add]);
+  }
+
   function fieldNode(v) {
+    if (v.type === "table") return tableNode(v);
     var input;
     if (v.type === "bool") {
       input = el("input", {
@@ -810,7 +799,6 @@
     }
 
     if (page.id === "p2") {
-      box.appendChild(clusterSection());
     }
 
     if (page.components && page.components.length) {
@@ -867,33 +855,33 @@
   /* ------------------------------------------------------------------ */
 
   function sizingRows() {
-    var t = topology();
     var rows = [];
-    function add(label, list, cpuId, memId, diskId, dataId) {
-      if (!list.length) return;
-      var cpu = num(cpuId), mem = num(memId), disk = num(diskId);
-      var data = 0;
-      if (dataId) {
-        (Object.prototype.toString.call(dataId) === "[object Array]" ? dataId : [dataId]).forEach(function (id) {
-          data += num(id);
-        });
-      }
-      rows.push([label, String(list.length), String(cpu), String(mem), String(disk + data)]);
+    function add(label, count, cpu, mem, disk) {
+      if (!count) return;
+      rows.push([label, String(count), String(cpu), String(mem), String(disk)]);
     }
-    add("Application control plane", t.cp, "appCpCpu", "appCpMemGb", "appCpDiskGb", null);
-    add("Application workers", t.w, "appWorkerCpu", "appWorkerMemGb", "appWorkerDiskGb", "appWorkerDataDiskGb");
-    if (t.gpu.length) add("GPU workers", t.gpu, "gpuCpu", "gpuMemGb", "gpuDiskGb", null);
-    if (t.win.length) add("Windows workers", t.win, "windowsWorkerCpu", "windowsWorkerMemGb", "windowsWorkerDiskGb", null);
-    add("Management cluster", t.mgmt, "mgmtCpu", "mgmtMemGb", "mgmtDiskGb", null);
-    if (t.ceph.length) {
-      var r = t.cephRoles;
-      add("Ceph MON hosts", r.mon, "cephCpu", "cephMemGb", "cephSystemDiskGb", null);
-      add("Ceph MGR hosts", r.mgr, "cephCpu", "cephMemGb", "cephSystemDiskGb", null);
-      add("Ceph OSD hosts", r.osd, "cephCpu", "cephMemGb", "cephSystemDiskGb", ["cephOsdDataDiskGb", "cephOsdDbDiskGb"]);
-      add("Ceph MDS hosts", r.mds, "cephCpu", "cephMemGb", "cephSystemDiskGb", null);
-      add("Ceph RGW hosts", r.rgw, "cephCpu", "cephMemGb", "cephSystemDiskGb", null);
+    var app = asArray(state.values.appClusters) ? state.values.appClusters : [];
+    app.forEach(function (c) {
+      add("Application control plane (" + (c.name || "cluster") + ")", num(c.cp), num(c.cpCpu), num(c.cpMemGb), num(c.cpDiskGb));
+      add("Application workers (" + (c.name || "cluster") + ")", num(c.workers), num(c.workerCpu), num(c.workerMemGb), num(c.workerDiskGb) + num(c.workerDataDiskGb));
+      if (num(c.windows)) add("Windows workers (" + (c.name || "cluster") + ")", num(c.windows), num(c.windowsCpu || 0), num(c.windowsMemGb || 0), num(c.windowsDiskGb || 0));
+    });
+    if (gpuEnabled()) {
+      var g = num("gpuCount");
+      if (g) add("GPU workers", g, num("gpuCpu"), num("gpuMemGb"), num("gpuDiskGb"));
     }
-    add("Edge nodes", t.edge, "edgeCpu", "edgeMemGb", "edgeDiskGb", null);
+    var sds = asArray(state.values.sdsClusters) ? state.values.sdsClusters : [];
+    sds.forEach(function (c) {
+      var cpu = num(c.cpu), mem = num(c.memGb), sys = num(c.systemDiskGb);
+      var osdDisk = sys + num(c.osdDataDiskGb) + num(c.osdDbDiskGb);
+      if (num(c.mon)) add("Ceph MON hosts (" + (c.name || "ceph") + ")", num(c.mon), cpu, mem, sys);
+      if (num(c.mgr)) add("Ceph MGR hosts (" + (c.name || "ceph") + ")", num(c.mgr), cpu, mem, sys);
+      if (num(c.osd)) add("Ceph OSD hosts (" + (c.name || "ceph") + ")", num(c.osd), cpu, mem, osdDisk);
+      if (num(c.mds)) add("Ceph MDS hosts (" + (c.name || "ceph") + ")", num(c.mds), cpu, mem, sys);
+      if (num(c.rgw)) add("Ceph RGW hosts (" + (c.name || "ceph") + ")", num(c.rgw), cpu, mem, sys);
+    });
+    add("Management cluster", num("mgmtWorkerCount"), num("mgmtCpu"), num("mgmtMemGb"), num("mgmtDiskGb"));
+    add("Edge nodes", num("edgeCount"), num("edgeCpu"), num("edgeMemGb"), num("edgeDiskGb"));
     return rows;
   }
 
@@ -1112,13 +1100,14 @@
     rows("ceph-osd", t.cephRoles.osd);
     rows("ceph-mds", t.cephRoles.mds);
     rows("ceph-rgw", t.cephRoles.rgw);
-    if (state.clusters.length) {
+    var additional = asArray(state.values.appClusters) ? state.values.appClusters.slice(1) : [];
+    if (additional.length) {
       out.push("");
       out.push("## Additional application clusters");
       out.push("");
       out.push("| Cluster | Control plane | Workers | Pod CIDR | Service CIDR |");
       out.push("|---|---|---|---|---|");
-      state.clusters.forEach(function (c) {
+      additional.forEach(function (c) {
         out.push("| " + c.name + " | " + c.cp + " x " + c.cpCpu + " vCPU / " + c.cpMemGb + " GiB | " +
           c.workers + " x " + c.workerCpu + " vCPU / " + c.workerMemGb + " GiB | " + c.pod + " | " + c.svc + " |");
       });
@@ -1355,7 +1344,11 @@
       }
     });
     DATA.values.forEach(function (v) {
-      state.values[v.id] = v.default === undefined ? "" : String(v.default);
+      if (v.type === "table") {
+        state.values[v.id] = v.default === undefined ? [] : cloneRow(v.default);
+      } else {
+        state.values[v.id] = v.default === undefined ? "" : String(v.default);
+      }
     });
     state.upgrade.flow = DATA.upgrades.length ? DATA.upgrades[0].id : null;
     state.upgrade.target = "";

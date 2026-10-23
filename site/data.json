@@ -1,6 +1,6 @@
 {
   "catalogVersion": "3.1.3",
-  "updated": "2026-10-22",
+  "updated": "2026-10-23",
   "source": {
     "docs": "The repository is the source of truth. This catalog points at it; it never duplicates a procedure.",
     "versions": "compatibility/version-matrix.md \u2014 parsed at build time, so a version bump propagates without touching this file.",
@@ -121,25 +121,13 @@
       "fields": [
         "nodePrefix",
         "appNodeIpStart",
-        "appCpCount",
-        "appCpCpu",
-        "appCpMemGb",
-        "appCpDiskGb",
-        "appWorkerCount",
-        "appWorkerCpu",
-        "appWorkerMemGb",
-        "appWorkerDiskGb",
-        "appWorkerDataDiskGb",
-        "windowsWorkerCount",
-        "windowsWorkerCpu",
-        "windowsWorkerMemGb",
-        "windowsWorkerDiskGb",
         "reservedSystemCpu",
         "reservedSystemMem",
         "reservedKubeCpu",
         "reservedKubeMem",
         "evictionHardMem",
-        "evictionHardNodefs"
+        "evictionHardNodefs",
+        "appClusters"
       ]
     },
     {
@@ -194,22 +182,7 @@
         "rookDeviceFilter",
         "rookBlockClass",
         "rookFsClass",
-        "cephHostPrefix",
-        "cephMonCount",
-        "cephMonIpStart",
-        "cephMgrCount",
-        "cephMgrIpStart",
-        "cephOsdCount",
-        "cephOsdIpStart",
-        "cephMdsCount",
-        "cephMdsIpStart",
-        "cephRgwCount",
-        "cephRgwIpStart",
-        "cephCpu",
-        "cephMemGb",
-        "cephSystemDiskGb",
-        "cephOsdDataDiskGb",
-        "cephOsdDbDiskGb"
+        "sdsClusters"
       ]
     },
     {
@@ -1065,74 +1038,6 @@
       "hint": "Assigned in order: control plane, then workers, then GPU."
     },
     {
-      "id": "appCpCount",
-      "label": "Control-plane nodes",
-      "type": "number",
-      "default": 3,
-      "min": 1,
-      "max": 9,
-      "required": true
-    },
-    {
-      "id": "appCpCpu",
-      "label": "Control-plane vCPU per node",
-      "type": "number",
-      "default": 4,
-      "min": 2
-    },
-    {
-      "id": "appCpMemGb",
-      "label": "Control-plane RAM (GiB)",
-      "type": "number",
-      "default": 16,
-      "min": 4
-    },
-    {
-      "id": "appCpDiskGb",
-      "label": "Control-plane disk (GiB)",
-      "type": "number",
-      "default": 120,
-      "min": 40
-    },
-    {
-      "id": "appWorkerCount",
-      "label": "Worker nodes",
-      "type": "number",
-      "default": 3,
-      "min": 1,
-      "max": 200,
-      "required": true
-    },
-    {
-      "id": "appWorkerCpu",
-      "label": "Worker vCPU per node",
-      "type": "number",
-      "default": 8,
-      "min": 2
-    },
-    {
-      "id": "appWorkerMemGb",
-      "label": "Worker RAM (GiB)",
-      "type": "number",
-      "default": 32,
-      "min": 4
-    },
-    {
-      "id": "appWorkerDiskGb",
-      "label": "Worker boot disk (GiB)",
-      "type": "number",
-      "default": 120,
-      "min": 40
-    },
-    {
-      "id": "appWorkerDataDiskGb",
-      "label": "Worker data disk (GiB)",
-      "type": "number",
-      "default": 0,
-      "min": 0,
-      "hint": "0 means no local data disk. Images and logs stay on the boot disk."
-    },
-    {
       "id": "mgmtWorkerCount",
       "label": "Management cluster workers",
       "type": "number",
@@ -1190,20 +1095,6 @@
       "type": "text",
       "default": "/etc/pki/ca-trust/source/anchors/internal-ca.crt",
       "required": true
-    },
-    {
-      "id": "cephCpu",
-      "label": "Ceph vCPU per host",
-      "type": "number",
-      "default": 8,
-      "min": 4
-    },
-    {
-      "id": "cephMemGb",
-      "label": "Ceph RAM per host (GiB)",
-      "type": "number",
-      "default": 32,
-      "min": 16
     },
     {
       "id": "edgeCount",
@@ -1570,109 +1461,6 @@
       "hint": "Never let them reboot a node silently; drain first."
     },
     {
-      "id": "cephHostPrefix",
-      "label": "Ceph host prefix",
-      "type": "text",
-      "default": "ceph",
-      "required": false
-    },
-    {
-      "id": "cephMonCount",
-      "label": "MON nodes",
-      "type": "number",
-      "default": 3,
-      "min": 1,
-      "max": 9
-    },
-    {
-      "id": "cephMonIpStart",
-      "label": "First MON IP",
-      "type": "text",
-      "default": "10.40.0.11",
-      "required": false
-    },
-    {
-      "id": "cephMgrCount",
-      "label": "MGR nodes",
-      "type": "number",
-      "default": 2,
-      "min": 1,
-      "max": 5
-    },
-    {
-      "id": "cephMgrIpStart",
-      "label": "First MGR IP",
-      "type": "text",
-      "default": "10.40.1.11",
-      "required": false
-    },
-    {
-      "id": "cephOsdCount",
-      "label": "OSD nodes",
-      "type": "number",
-      "default": 3,
-      "min": 3,
-      "max": 64
-    },
-    {
-      "id": "cephOsdIpStart",
-      "label": "First OSD IP",
-      "type": "text",
-      "default": "10.40.2.11",
-      "required": false
-    },
-    {
-      "id": "cephMdsCount",
-      "label": "MDS nodes (CephFS)",
-      "type": "number",
-      "default": 2,
-      "min": 0,
-      "max": 9
-    },
-    {
-      "id": "cephMdsIpStart",
-      "label": "First MDS IP",
-      "type": "text",
-      "default": "10.40.3.11",
-      "required": false
-    },
-    {
-      "id": "cephRgwCount",
-      "label": "RGW nodes (S3)",
-      "type": "number",
-      "default": 2,
-      "min": 0,
-      "max": 16
-    },
-    {
-      "id": "cephRgwIpStart",
-      "label": "First RGW IP",
-      "type": "text",
-      "default": "10.40.4.11",
-      "required": false
-    },
-    {
-      "id": "cephSystemDiskGb",
-      "label": "Ceph system disk per host (GiB)",
-      "type": "number",
-      "default": 100,
-      "min": 40
-    },
-    {
-      "id": "cephOsdDataDiskGb",
-      "label": "OSD data disk per host (GiB)",
-      "type": "number",
-      "default": 2000,
-      "min": 100
-    },
-    {
-      "id": "cephOsdDbDiskGb",
-      "label": "OSD DB/WAL NVMe per host (GiB)",
-      "type": "number",
-      "default": 100,
-      "min": 0
-    },
-    {
       "id": "rookOsdNodes",
       "label": "Rook OSD worker nodes",
       "type": "number",
@@ -1847,39 +1635,6 @@
       "required": false
     },
     {
-      "id": "windowsWorkerCount",
-      "label": "Windows worker nodes",
-      "type": "number",
-      "default": 0,
-      "min": 0,
-      "max": 50,
-      "required": false
-    },
-    {
-      "id": "windowsWorkerCpu",
-      "label": "Windows worker vCPU",
-      "type": "number",
-      "default": 8,
-      "min": 2,
-      "required": false
-    },
-    {
-      "id": "windowsWorkerMemGb",
-      "label": "Windows worker RAM (GiB)",
-      "type": "number",
-      "default": 32,
-      "min": 8,
-      "required": false
-    },
-    {
-      "id": "windowsWorkerDiskGb",
-      "label": "Windows worker disk (GiB)",
-      "type": "number",
-      "default": 120,
-      "min": 60,
-      "required": false
-    },
-    {
       "id": "pidMax",
       "type": "number",
       "default": 4194304
@@ -1897,6 +1652,206 @@
         "none",
         "static",
         "best-effort"
+      ]
+    },
+    {
+      "id": "appClusters",
+      "type": "table",
+      "label": "Application clusters",
+      "columns": [
+        {
+          "id": "name",
+          "label": "Cluster name",
+          "type": "text"
+        },
+        {
+          "id": "cp",
+          "label": "Control plane nodes",
+          "type": "number"
+        },
+        {
+          "id": "cpCpu",
+          "label": "CP vCPU",
+          "type": "number"
+        },
+        {
+          "id": "cpMemGb",
+          "label": "CP RAM GiB",
+          "type": "number"
+        },
+        {
+          "id": "cpDiskGb",
+          "label": "CP disk GiB",
+          "type": "number"
+        },
+        {
+          "id": "workers",
+          "label": "Worker nodes",
+          "type": "number"
+        },
+        {
+          "id": "workerCpu",
+          "label": "Worker vCPU",
+          "type": "number"
+        },
+        {
+          "id": "workerMemGb",
+          "label": "Worker RAM GiB",
+          "type": "number"
+        },
+        {
+          "id": "workerDiskGb",
+          "label": "Worker disk GiB",
+          "type": "number"
+        },
+        {
+          "id": "workerDataDiskGb",
+          "label": "Worker data disk GiB",
+          "type": "number"
+        },
+        {
+          "id": "windows",
+          "label": "Windows worker nodes",
+          "type": "number"
+        },
+        {
+          "id": "windowsCpu",
+          "label": "Windows vCPU",
+          "type": "number"
+        },
+        {
+          "id": "windowsMemGb",
+          "label": "Windows RAM GiB",
+          "type": "number"
+        },
+        {
+          "id": "windowsDiskGb",
+          "label": "Windows disk GiB",
+          "type": "number"
+        },
+        {
+          "id": "pod",
+          "label": "Pod CIDR",
+          "type": "text"
+        },
+        {
+          "id": "svc",
+          "label": "Service CIDR",
+          "type": "text"
+        }
+      ],
+      "default": [
+        {
+          "name": "site-1",
+          "cp": "3",
+          "cpCpu": "4",
+          "cpMemGb": "16",
+          "cpDiskGb": "120",
+          "workers": "3",
+          "workerCpu": "8",
+          "workerMemGb": "32",
+          "workerDiskGb": "120",
+          "workerDataDiskGb": "0",
+          "windows": "0",
+          "windowsCpu": "8",
+          "windowsMemGb": "32",
+          "windowsDiskGb": "120",
+          "pod": "10.30.0.0/16",
+          "svc": "10.32.0.0/16"
+        }
+      ]
+    },
+    {
+      "id": "sdsClusters",
+      "type": "table",
+      "label": "SDS / Ceph clusters",
+      "columns": [
+        {
+          "id": "name",
+          "label": "SDS cluster name",
+          "type": "text"
+        },
+        {
+          "id": "mode",
+          "label": "Mode",
+          "type": "select",
+          "options": [
+            "cephadm",
+            "rook"
+          ]
+        },
+        {
+          "id": "ipStart",
+          "label": "Node IP start",
+          "type": "text"
+        },
+        {
+          "id": "cpu",
+          "label": "vCPU per node",
+          "type": "number"
+        },
+        {
+          "id": "memGb",
+          "label": "RAM GiB per node",
+          "type": "number"
+        },
+        {
+          "id": "mon",
+          "label": "MON nodes",
+          "type": "number"
+        },
+        {
+          "id": "mgr",
+          "label": "MGR nodes",
+          "type": "number"
+        },
+        {
+          "id": "osd",
+          "label": "OSD nodes",
+          "type": "number"
+        },
+        {
+          "id": "mds",
+          "label": "MDS nodes",
+          "type": "number"
+        },
+        {
+          "id": "rgw",
+          "label": "RGW nodes",
+          "type": "number"
+        },
+        {
+          "id": "systemDiskGb",
+          "label": "System disk GiB",
+          "type": "number"
+        },
+        {
+          "id": "osdDataDiskGb",
+          "label": "OSD data disk GiB",
+          "type": "number"
+        },
+        {
+          "id": "osdDbDiskGb",
+          "label": "OSD DB disk GiB",
+          "type": "number"
+        }
+      ],
+      "default": [
+        {
+          "name": "ceph-1",
+          "mode": "cephadm",
+          "ipStart": "10.40.0.11",
+          "cpu": "8",
+          "memGb": "32",
+          "mon": "3",
+          "mgr": "2",
+          "osd": "3",
+          "mds": "2",
+          "rgw": "2",
+          "systemDiskGb": "100",
+          "osdDataDiskGb": "2000",
+          "osdDbDiskGb": "100"
+        }
       ]
     }
   ],

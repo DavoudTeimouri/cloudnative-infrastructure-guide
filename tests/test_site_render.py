@@ -216,23 +216,26 @@ var addBtn = findAll(__byId["page"], function (n) {
 var plus = { found: !!addBtn, count: 0, name: "", pod: "", svc: "", afterRemove: -1 };
 if (addBtn) {
   addBtn.onclick();
-  plus.count = __g.state.clusters.length;
-  plus.name = __g.state.clusters[0].name;
-  plus.pod = __g.state.clusters[0].pod;
-  plus.svc = __g.state.clusters[0].svc;
-  var rm = findAll(__byId["page"], function (n) {
+  var ac = __g.state.values.appClusters || [];
+  plus.count = ac.length;
+  plus.name = ac[ac.length - 1].name;
+  plus.pod = ac[ac.length - 1].pod;
+  plus.svc = ac[ac.length - 1].svc;
+  var rms = findAll(__byId["page"], function (n) {
     return (n.tagName === "button" || n.tagName === "BUTTON") && n.textContent === "Remove";
-  })[0];
-  if (rm) { rm.onclick(); plus.afterRemove = __g.state.clusters.length; }
+  });
+  if (rms.length) { rms[rms.length - 1].onclick(); plus.afterRemove = (__g.state.values.appClusters || []).length; }
 }
 
 // Windows workers, extra clusters, management alternatives, reservations.
 __g.state.choices.windowsNodes = "enabled";
 __g.state.choices.management = "headlamp";
 __g.state.choices.mgmtStorage = "rook";
-__g.state.values.windowsWorkerCount = 2;
-__g.state.clusters = [{ name: "site-b", cp: "3", cpCpu: "8", cpMemGb: "16", cpDiskGb: "120",
-                        workers: "4", workerCpu: "16", workerMemGb: "64", workerDiskGb: "200",
+var primary = __g.state.values.appClusters[0];
+primary.windows = "2";
+__g.state.values.appClusters = [primary, { name: "site-b", cp: "3", cpCpu: "8", cpMemGb: "16", cpDiskGb: "120",
+                        workers: "4", workerCpu: "16", workerMemGb: "64", workerDiskGb: "200", workerDataDiskGb: "0",
+                        windows: "0", windowsCpu: "8", windowsMemGb: "32", windowsDiskGb: "120",
                         pod: "10.130.0.0/16", svc: "10.132.0.0/16" }];
 __g.state.values.kubesprayRelease = "release-2.29";
 __g.gotoPage(1);
@@ -405,11 +408,11 @@ def main():
         failures.append("runbook has no windows rows")
     if not v31["plus"]["found"]:
         failures.append("+ Add application cluster button not found")
-    elif v31["plus"]["count"] != 1 or not v31["plus"]["name"]:
+    elif v31["plus"]["count"] != 2 or not v31["plus"]["name"]:
         failures.append(f"add button did not create a cluster: {v31['plus']}")
     elif v31["plus"]["pod"] == v31["plus"]["svc"]:
         failures.append("new cluster pod and service CIDRs are identical")
-    elif v31["plus"]["afterRemove"] != 0:
+    elif v31["plus"]["afterRemove"] != 1:
         failures.append("Remove button did not delete the cluster")
     if not v31["p2HasAddCluster"]:
         failures.append("page 2 has no + Add application cluster button")
