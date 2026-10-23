@@ -697,39 +697,33 @@
 
   function roleTabSection() {
     var chosen = state.choices.hostRoles || [];
-    var box = el("div", { class: "card" });
-    box.appendChild(el("h3", { text: "Per-role configuration" }));
-    box.appendChild(el("p", { class: "hint", text: "Each tab overrides the common baseline for that role. Unselected roles are not exported." }));
-    var tabs = el("div", { class: "options" });
-    var panels = el("div", { class: "role-tabs" });
-    var show = function (id) {
-      state.roleTab = id;
-      renderPage();
-    };
     var roles = Object.keys(ROLE_TITLE);
-    roles.forEach(function (r) {
-      var sel = chosen.indexOf(r) !== -1;
-      tabs.appendChild(el("label", {
-        class: "opt" + (state.roleTab === r ? " on" : "") + (sel ? "" : " dim"),
-        onclick: function () { show(r); }
-      }, [
-        el("input", {
-          type: "radio", name: "role-tab", value: r,
-          checked: state.roleTab === r ? "checked" : null
-        }),
-        el("div", { class: "opt-body" }, [
-          el("div", { class: "opt-title", text: ROLE_TITLE[r] }),
-          el("div", { class: "opt-note", text: sel ? "selected" : "not selected for export" })
-        ])
-      ]));
-    });
-    box.appendChild(tabs);
     var active = state.roleTab || roles[0];
     if (chosen.indexOf(active) === -1) active = chosen[0] || roles[0];
-    var panel = el("div", { class: "role-panel" });
+
+    var bar = el("div", { class: "tab-bar" });
+    roles.forEach(function (r) {
+      var sel = chosen.indexOf(r) !== -1;
+      var on = active === r;
+      var kids = [ el("span", { class: "tab-title", text: ROLE_TITLE[r] }) ];
+      if (sel) kids.push(el("span", { class: "tab-tag", text: "selected" }));
+      bar.appendChild(el("button", {
+        type: "button",
+        class: "tab" + (on ? " on" : "") + (sel ? "" : " off"),
+        onclick: function () { state.roleTab = r; renderPage(); },
+        disabled: !sel
+      }, kids));
+    });
+
+    var panel = el("div", { class: "tab-panel" });
     ROLE_FIELDS[active].forEach(function (id) {
       panel.appendChild(fieldById(id));
     });
+
+    var box = el("div", { class: "card" });
+    box.appendChild(el("h3", { text: "Per-role configuration" }));
+    box.appendChild(el("p", { class: "hint", text: "Each tab overrides the common OS baseline for that role. Unselected roles are not exported." }));
+    box.appendChild(bar);
     box.appendChild(panel);
     return box;
   }

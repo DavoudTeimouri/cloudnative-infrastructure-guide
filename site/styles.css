@@ -98,15 +98,14 @@ h3 { font-size: 15px; margin: 24px 0 10px; color: var(--fg); }
 
 
 /* role tabs */
-.role-tabs { border: 1px solid var(--line); border-radius: 8px; background: var(--card); margin: 12px 0; overflow: hidden; }
-.role-tabs .options { display: flex; gap: 0; border-bottom: 1px solid var(--line); }
-.role-tabs .opt { flex: 1; border: none; border-radius: 0; margin: 0; text-align: center; }
-.role-tabs .opt.on { border-bottom: 2px solid var(--accent); background: var(--accent-10); }
-.role-tabs .opt.dim { opacity: .55; cursor: default; }
-.role-tabs .opt.dim input { cursor: not-allowed; }
-.role-tabs .opt-body .opt-title { font-size: 13px; font-weight: 600; }
-.role-panel { padding: 12px 14px; }
-.role-panel .field { grid-column: span 2; }
+.tab-bar { display: flex; gap: 0; border-bottom: 1px solid var(--line); margin: 10px 0 4px 0; }
+.tab-bar .tab { flex: 1; border: none; border-bottom: 2px solid transparent; background: var(--panel-2); color: var(--muted); font-size: 13px; font-weight: 600; text-align: center; padding: 8px 4px; cursor: pointer; }
+.tab-bar .tab:hover { color: var(--fg); }
+.tab-bar .tab.on { border-bottom-color: var(--accent); color: var(--accent); background: var(--panel); }
+.tab-bar .tab.off { opacity: .45; cursor: not-allowed; }
+.tab-bar .tab-tag { margin-left: 6px; font-size: 10px; color: var(--accent-2); }
+.tab-panel { padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); }
+.tab-panel .field { grid-column: span 2; }
 
 /* values */
 .values { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
