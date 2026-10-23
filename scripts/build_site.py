@@ -22,6 +22,7 @@ EXPORTS = os.path.join(BASE, "catalog", "exports.json")
 UPGRADES = os.path.join(BASE, "catalog", "upgrades.json")
 MATRIX = os.path.join(BASE, "compatibility", "version-matrix.md")
 OUT = os.path.join(BASE, "site", "data.json")
+INDEX = os.path.join(BASE, "site", "index.html")
 
 # component id in the catalog -> label used in the version matrix
 VERSION_ALIASES = {
@@ -198,6 +199,18 @@ def main():
             return 1
         print("OK: site/data.json is up to date.")
         return 0
+
+    # Stamp the asset URLs so a deployed version cannot be served from a
+    # browser cache that still holds the previous app.js.
+    if os.path.exists(INDEX):
+        html = open(INDEX, encoding="utf-8").read()
+        ver = catalog["catalogVersion"]
+        stamped = re.sub(r'(app\.js)(\?v=[0-9A-Za-z.\-]+)?', r'\1?v=' + ver, html)
+        stamped = re.sub(r'(styles\.css)(\?v=[0-9A-Za-z.\-]+)?', r'\1?v=' + ver, stamped)
+        if stamped != html:
+            with open(INDEX, "w", encoding="utf-8") as fh:
+                fh.write(stamped)
+            print(f"stamped {INDEX} with v={ver}")
 
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     with open(OUT, "w", encoding="utf-8") as fh:
