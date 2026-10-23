@@ -5,7 +5,18 @@ differences are shown per item. The generated `10-os-baseline.sh` applies this l
 document explains each line so an operator can review it before running it.
 
 Scope: nodes only. Identity is application-level (ADR-0015) — there is no SSSD, realmd or AD join
-in this baseline.
+in this baseline. The sections below are per role. A role inherits every input from the sections
+above it in the list, unless it overrides them.
+
+| Role | Inherits | Overrides |
+|---|---|---|
+| Master (control plane) | All Linux | Kernel, limits, NTP |
+| Worker | All Linux | Limits, reserved resources |
+| Ceph OSD | All Linux | Kernel, THP |
+| Ceph MON | All Linux | Kernel, NTP |
+| Load balancer | All Linux | Runtime prerequisites |
+| Operation server | All Linux | Identity, access |
+| Others (GPU, edge, MDS/RGW) | All Linux | Kernel, limits |
 
 ## 1. Identity and access
 
@@ -60,12 +71,6 @@ resolve `harbor.internal` fails image pulls even though the cluster DNS is healt
 | `kernelModules` | `overlay`, `br_netfilter`, `nf_conntrack`, `rbd` | `/etc/modules-load.d/` | `lsmod \| grep br_netfilter` |
 | `kernelArgs` | Extra boot parameters (hugepages, IOMMU for GPU passthrough) | `grubby --update-kernel=ALL --args=` | `cat /proc/cmdline` |
 
-Ceph OSD hosts: `transparent_hugepage=never` and `vm.swappiness=1`. A THP stall shows up as
-`slow ops` in `ceph -s`, not as a CPU problem, which is why it is set before the OSD exists.
-
-GPU hosts: `intel_iommu=on iommu=pt` in `kernelArgs` when the card is passed through, and
-`pci=realloc` on some firmware. Reboot required; the generated script marks that step.
-
 ## 5. Limits and scheduling
 
 | Input | Effect | Where | Verify |
@@ -105,7 +110,73 @@ reboot. Not a silent reboot at 03:00.
 `insecureRegistries` is a last resort. If the internal CA is installed in the host trust store,
 there is no reason to disable verification: the generated preflight checks the chain instead.
 
-## 8. What the generated script does not do
+## Master (control plane)
+
+Inherits every section above. Overrides:
+
+- Kernel: `fileDescriptorsMax` at 1048576 — the API server and etcd hold thousands of open files.
+- Time: `ntpServers` must have a third source not on the same switch as the first two. etcd refuses
+  leadership churn beyond the election timeout; a single flaky NTP source shows up as an etcd
+  leader election, not a clock problem.
+- Limits: `pidMax` at 4194304; the API server, etcd and the scheduler spawn many short-lived
+  processes under load.
+
+## Worker
+
+Inherits every section above. Overrides:
+
+- Limits: `maxPodsPerNode` and the CNI IP pool must cover each other. The pool is sized from this
+  value, so a change here requires a CNI pool change.
+- Scheduling: `cpuManagerPolicy: static` only when pods request Guaranteed QoS. Without it, static
+  pinning is a no-op.
+- Reserved resources: `reservedSystemCpu` and `reservedSystemMem` keep the node usable under full
+  pod load.
+
+## Ceph OSD
+
+Inherits every section above. Overrides:
+
+- Kernel: `transparentHugePages=never` and `vm.swappiness=1`. A THP stall shows up as `slow ops`
+  in `ceph -s`, not as a CPU problem, which is why it is set before the OSD exists.
+- Limits: `fileDescriptorsMax` at 1048576; each OSD opens many files.
+
+## Ceph MON
+
+Inherits every section above. Overrides:
+
+- Time: `ntpServers` is the most important input on a monitor. Ceph monitor quorum depends on
+  timestamp agreement; a clock that drifts can drop a monitor from the quorum.
+- Limits: `fileDescriptorsMax` at 1048576.
+
+## Load balancers
+
+Inherits identity, time, name resolution, kernel, security and the runtime prerequisites sections,
+minus the kubelet-specific limits. Overrides:
+
+- Runtime: no `containerd`, no `cgroupDriver`, no `maxPodsPerNode`. The HAProxy and Keepalived
+  units are installed directly.
+- Kernel: `kernelModules` includes `nft` for the external load balancer when it runs in nftables
+  mode.
+- Security: `firewallBackend` is usually `nftables`; the network matrix is the authority on which
+  ports open.
+
+## Operation server
+
+The admin and operations host: where `kubectl`, `ansible-playbook` and the Argo CD CLI run. Inherits
+identity, time, name resolution and security. Overrides:
+
+- Identity: `adminUser` is the human account; `sudoNopasswd` is the Ansible automation account.
+- Access: `breakGlassKey` must be installed on every node, but the operation server is the place
+  where the private half is kept offline, not in Git and not in Vault alone.
+
+## Others
+
+- GPU: `kernelArgs` includes `intel_iommu=on iommu=pt` when the card is passed through, and
+  `pci=realloc` on some firmware. Reboot required; the generated script marks that step.
+- Edge: the same baseline, with `topologyManagerPolicy: best-effort` and a smaller `maxPodsPerNode`.
+- Ceph MDS and RGW: the OSD kernel settings, with `fileDescriptorsMax` at 1048576.
+
+## What the generated script does not do
 
 - It does not partition disks. Disk layout is a per-site decision and stays manual.
 - It does not join a directory. That is intentional (ADR-0015).
