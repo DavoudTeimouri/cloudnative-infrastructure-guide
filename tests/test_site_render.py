@@ -337,6 +337,8 @@ def main():
         failures.append("runbook has no sizing section")
     if not base["files"]:
         failures.append("no export cards rendered")
+    if "host-config.yaml" not in base["files"]:
+        failures.append("host-config.yaml not rendered with default roles")
 
     flipped = result["flipped"]
     for wanted in ("ceph-bootstrap.sh", "peer-authentication.yaml", "idp-integration.md"):

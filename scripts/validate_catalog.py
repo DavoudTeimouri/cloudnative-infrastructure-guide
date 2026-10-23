@@ -347,8 +347,30 @@ def derived(data, values, choices, versions):
         "vrrpAuthPass": "",
         "revision": str(versions.get("istio", "")).replace(".", "-"),
         "istioProfile": "ambient" if choices.get("serviceMesh") == "istio-ambient" else "default",
+        "hostRolesYaml": host_roles_yaml(choices.get("hostRoles", [])),
         "totalNodes": str(sum(len(v) for k, v in t.items() if k != "cephRoles")),
     }
+
+
+def host_roles_yaml(roles):
+    spec = {
+        "master": ["    fileDescriptorsMax: 1048576", "    pidMax: 4194304",
+                   '    ntpServers: "internal"'],
+        "worker": ["    maxPodsPerNode: 110", "    cpuManagerPolicy: static",
+                   '    reservedSystemCpu: "500m"'],
+        "ceph-osd": ["    transparentHugePages: never", "    vmSwappiness: 1",
+                     "    fileDescriptorsMax: 1048576"],
+        "ceph-mon": ["    ntpServers: \"internal\"", "    fileDescriptorsMax: 1048576"],
+        "load-balancer": ["    firewallBackend: nftables"],
+        "operation-server": ["    adminUser: \"admin\"", '    sudoNopasswd: "false"'],
+        "gpu": ['    kernelArgs: "intel_iommu=on iommu=pt"'],
+        "edge": ["    maxPodsPerNode: 20"],
+        "ceph-mds-rgw": ["    fileDescriptorsMax: 1048576"],
+    }
+    out = []
+    for r in roles:
+        out.append("  " + r + ":\n" + "\n".join(spec.get(r, [])))
+    return "\n".join(out) if out else "  []"
 
 
 def render_export(template, data):

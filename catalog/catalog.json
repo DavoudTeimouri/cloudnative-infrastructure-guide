@@ -1,5 +1,5 @@
 {
-  "catalogVersion": "3.1.1",
+  "catalogVersion": "3.1.2",
   "updated": "2026-10-22",
   "source": {
     "docs": "The repository is the source of truth. This catalog points at it; it never duplicates a procedure.",
@@ -165,9 +165,10 @@
     {
       "id": "p4",
       "title": "Operating system",
-      "subtitle": "Distribution and the host baseline: access, time, resolution, kernel, limits, security. Local accounts only — nodes are never joined to a directory.",
+      "subtitle": "Operating system baseline, per role. Select the node roles this export covers; each role inherits the baseline and overrides the inputs that matter to it.",
       "components": [
-        "os"
+        "os",
+        "hostRoles"
       ],
       "fields": [
         "adminUser",
@@ -963,6 +964,69 @@
           "id": "enabled",
           "title": "Windows Server 2022 workers (Calico required)",
           "doc": "kubernetes/windows-workers.md"
+        }
+      ]
+    },
+    {
+      "id": "hostRoles",
+      "title": "Host configuration roles",
+      "required": false,
+      "multi": true,
+      "doc": "operating-systems/host-configuration.md",
+      "options": [
+        {
+          "id": "master",
+          "title": "Master (control plane)",
+          "default": true,
+          "doc": "operating-systems/host-configuration.md"
+        },
+        {
+          "id": "worker",
+          "title": "Worker",
+          "default": true,
+          "doc": "operating-systems/host-configuration.md"
+        },
+        {
+          "id": "ceph-osd",
+          "title": "Ceph OSD",
+          "default": true,
+          "doc": "operating-systems/host-configuration.md"
+        },
+        {
+          "id": "ceph-mon",
+          "title": "Ceph MON",
+          "default": true,
+          "doc": "operating-systems/host-configuration.md"
+        },
+        {
+          "id": "load-balancer",
+          "title": "Load balancer",
+          "default": true,
+          "doc": "operating-systems/host-configuration.md"
+        },
+        {
+          "id": "operation-server",
+          "title": "Operation server",
+          "default": true,
+          "doc": "operating-systems/host-configuration.md"
+        },
+        {
+          "id": "gpu",
+          "title": "GPU",
+          "default": true,
+          "doc": "operating-systems/host-configuration.md"
+        },
+        {
+          "id": "edge",
+          "title": "Edge",
+          "default": true,
+          "doc": "operating-systems/host-configuration.md"
+        },
+        {
+          "id": "ceph-mds-rgw",
+          "title": "Ceph MDS / RGW",
+          "default": true,
+          "doc": "operating-systems/host-configuration.md"
         }
       ]
     }

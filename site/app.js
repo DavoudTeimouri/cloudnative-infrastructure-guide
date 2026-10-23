@@ -387,6 +387,37 @@
           "\n  namespace: argocd\n  labels:\n    argocd.argoproj.io/secret-type: cluster\nstringData:\n  name: " +
           c.name + "\n  server: https://<" + c.name + "-api>:6443\n  config: |\n    {\"tlsClientConfig\":{\"insecure\":false}}";
       }).join("\n---\n") || "# No additional clusters configured.",
+      hostRolesYaml: (state.choices.hostRoles || []).map(function (r) {
+        var lines = [];
+        if (r === "master") {
+          lines.push("    fileDescriptorsMax: 1048576");
+          lines.push("    pidMax: 4194304");
+          lines.push("    ntpServers: \"" + (state.values.ntpServers || "") + "\"");
+        } else if (r === "worker") {
+          lines.push("    maxPodsPerNode: " + (state.values.maxPodsPerNode || 110));
+          lines.push("    cpuManagerPolicy: static");
+          lines.push("    reservedSystemCpu: \"" + (state.values.reservedSystemCpu || "") + "\"");
+        } else if (r === "ceph-osd") {
+          lines.push("    transparentHugePages: never");
+          lines.push("    vmSwappiness: 1");
+          lines.push("    fileDescriptorsMax: 1048576");
+        } else if (r === "ceph-mon") {
+          lines.push("    ntpServers: \"" + (state.values.ntpServers || "") + "\"");
+          lines.push("    fileDescriptorsMax: 1048576");
+        } else if (r === "load-balancer") {
+          lines.push("    firewallBackend: nftables");
+        } else if (r === "operation-server") {
+          lines.push("    adminUser: \"" + (state.values.adminUser || "") + "\"");
+          lines.push("    sudoNopasswd: \"" + (state.values.sudoNopasswd || "") + "\"");
+        } else if (r === "gpu") {
+          lines.push("    kernelArgs: \"intel_iommu=on iommu=pt\"");
+        } else if (r === "edge") {
+          lines.push("    maxPodsPerNode: 20");
+        } else if (r === "ceph-mds-rgw") {
+          lines.push("    fileDescriptorsMax: 1048576");
+        }
+        return "  " + r + ":\n" + lines.join("\n");
+      }).join("\n") || "  []",
       totalNodesExtra: String(t.win.length),
       edgeHosts: hostLines(t.edge),
       edgeHostList: t.edge.map(function (n) { return n.name + "=" + n.ip; }).join(", "),
