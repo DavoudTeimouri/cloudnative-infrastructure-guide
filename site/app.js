@@ -819,11 +819,11 @@
     if (page.id === "p3") {
       box.appendChild(nodeListCard("Management nodes generated", t.mgmt));
     }
-    if (page.id === "p5" && storageMode().indexOf("cephadm") === 0) {
+    if (page.id === "p5" && t.ceph.length) {
       var roles = t.cephRoles;
       [["MON", roles.mon], ["MGR", roles.mgr], ["OSD", roles.osd],
        ["MDS", roles.mds], ["RGW", roles.rgw]].forEach(function (r) {
-        box.appendChild(nodeListCard("Ceph " + r[0] + " hosts generated", r[1]));
+        if (r[1].length) box.appendChild(nodeListCard("Ceph " + r[0] + " hosts generated", r[1]));
       });
     }
     if (page.id === "p4") {
