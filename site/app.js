@@ -690,6 +690,9 @@
     var active = state.roleTab || roles[0];
     if (chosen.indexOf(active) === -1) active = chosen[0] || roles[0];
 
+    var p4 = DATA.pages.filter(function (pg) { return pg.id === "p4"; })[0];
+    var commonFields = p4 ? p4.fields : [];
+
     var bar = el("div", { class: "tab-bar" });
     roles.forEach(function (r) {
       var sel = chosen.indexOf(r) !== -1;
@@ -712,13 +715,18 @@
     });
 
     var panel = el("div", { class: "tab-panel" });
+    commonFields.forEach(function (id) {
+      var f = fieldById(id);
+      if (f) panel.appendChild(f);
+    });
     ROLE_FIELDS[active].forEach(function (id) {
-      panel.appendChild(fieldById(id));
+      var f = fieldById(id);
+      if (f) panel.appendChild(f);
     });
 
     var box = el("div", { class: "card" });
     box.appendChild(el("h3", { text: "Per-role configuration" }));
-    box.appendChild(el("p", { class: "hint", text: "Each tab overrides the common OS baseline for that role. Unselected roles are not exported." }));
+    box.appendChild(el("p", { class: "hint", text: "Each tab shows the common OS baseline plus that role's override fields. Unselected roles are not exported." }));
     box.appendChild(bar);
     box.appendChild(panel);
     return box;
@@ -796,7 +804,7 @@
       }
     }
 
-    if (page.fields && page.fields.length) {
+    if (page.fields && page.fields.length && page.id !== "p4") {
       var grid = el("div", { class: "values" });
       page.fields.forEach(function (id) {
         var v = DATA.values.filter(function (x) { return x.id === id; })[0];
