@@ -1,5 +1,5 @@
 {
-  "catalogVersion": "3.2.1",
+  "catalogVersion": "3.2.2",
   "updated": "2026-10-23",
   "source": {
     "docs": "The repository is the source of truth. This catalog points at it; it never duplicates a procedure.",

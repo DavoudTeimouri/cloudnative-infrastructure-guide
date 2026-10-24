@@ -34,7 +34,7 @@
         else if (k === "text") node.textContent = attrs[k];
         else if (k === "html") node.innerHTML = attrs[k];
         else if (k.slice(0, 2) === "on") node.addEventListener(k.slice(2), attrs[k]);
-        else if (attrs[k] !== null && attrs[k] !== undefined) node.setAttribute(k, attrs[k]);
+        else if (attrs[k] !== null && attrs[k] !== undefined && attrs[k] !== false) node.setAttribute(k, attrs[k]);
       });
     }
     (children || []).forEach(function (c) {
@@ -696,12 +696,13 @@
       var on = active === r;
       var kids = [ el("span", { class: "tab-title", text: ROLE_TITLE[r] }) ];
       if (sel) kids.push(el("span", { class: "tab-tag", text: "selected" }));
-      bar.appendChild(el("button", {
+      var buttonAttrs = {
         type: "button",
         class: "tab" + (on ? " on" : "") + (sel ? "" : " off"),
-        onclick: function () { state.roleTab = r; renderPage(); },
-        disabled: !sel
-      }, kids));
+        onclick: function () { state.roleTab = r; renderPage(); }
+      };
+      if (!sel) buttonAttrs.disabled = true;
+      bar.appendChild(el("button", buttonAttrs, kids));
     });
 
     var panel = el("div", { class: "tab-panel" });
