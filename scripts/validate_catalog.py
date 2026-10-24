@@ -207,7 +207,12 @@ def ip_add(ip, offset):
 
 
 def default_state(data):
-    values = {v["id"]: str(v.get("default", "")) for v in data["values"]}
+    values = {}
+    for v in data["values"]:
+        if v.get("type") == "table":
+            values[v["id"]] = v.get("default", [])
+        else:
+            values[v["id"]] = str(v.get("default", ""))
     choices = {}
     for comp in data["components"]:
         if comp.get("multi"):
@@ -226,6 +231,18 @@ def num(values, key):
         return 0
 
 
+def row_num(obj, key):
+    try:
+        return int(str(obj.get(key, "0") or 0).strip() or 0)
+    except (ValueError, AttributeError):
+        return 0
+
+
+def as_rows(values, key):
+    v = values.get(key)
+    return v if isinstance(v, list) else []
+
+
 def topology(values, choices):
     prefix = values.get("nodePrefix", "k8s")
 
@@ -238,33 +255,33 @@ def topology(values, choices):
             })
         return out
 
-    cp = role("cp", num(values, "appCpCount"), values.get("appNodeIpStart", ""), 0)
-    workers = role("w", num(values, "appWorkerCount"), values.get("appNodeIpStart", ""), len(cp))
+    app = as_rows(values, "appClusters")
+    p = app[0] if app else {}
+    cp = role("cp", row_num(p, "cp"), values.get("appNodeIpStart", ""), 0)
+    workers = role("w", row_num(p, "workers"), values.get("appNodeIpStart", ""), len(cp))
     gpu_on = choices.get("gpu") in ("mig", "timeslicing")
-    gpu = role("gpu", num(values, "gpuCount"), values.get("appNodeIpStart", ""), len(cp) + len(workers)) if gpu_on else []
-    win = (role("win", num(values, "windowsWorkerCount"), values.get("appNodeIpStart", ""),
+    gpu = role("gpu", num(values, "gpuCount"), values.get("appNodeIpStart", ""),
+               len(cp) + len(workers)) if gpu_on else []
+    win = (role("win", row_num(p, "windows"), values.get("appNodeIpStart", ""),
                 len(cp) + len(workers) + len(gpu))
            if choices.get("windowsNodes") == "enabled" else [])
 
     mgmt = [{"name": f"{prefix}-mgmt-{i + 1}", "ip": ip_add(values.get("mgmtIpStart", ""), i)}
             for i in range(num(values, "mgmtWorkerCount"))]
 
-    storage = str(choices.get("storage", ""))
-    prefix_ceph = values.get("cephHostPrefix", "ceph")
     roles = {"mon": [], "mgr": [], "osd": [], "mds": [], "rgw": []}
-    if storage.startswith("cephadm"):
-        for role_id, count_key, start_key in (
-            ("mon", "cephMonCount", "cephMonIpStart"),
-            ("mgr", "cephMgrCount", "cephMgrIpStart"),
-            ("osd", "cephOsdCount", "cephOsdIpStart"),
-            ("mds", "cephMdsCount", "cephMdsIpStart"),
-            ("rgw", "cephRgwCount", "cephRgwIpStart"),
-        ):
-            for i in range(num(values, count_key)):
+    for c in as_rows(values, "sdsClusters"):
+        cprefix = str(c.get("name") or "ceph").split("-")[0] or "ceph"
+        base = c.get("ipStart", "")
+        off = 0
+        for role_id in ("mon", "mgr", "osd", "mds", "rgw"):
+            count = row_num(c, role_id)
+            for i in range(count):
                 roles[role_id].append({
-                    "name": f"{prefix_ceph}-{role_id}-{i + 1}",
-                    "ip": ip_add(values.get(start_key, ""), i),
+                    "name": f"{cprefix}-{role_id}-{i + 1}",
+                    "ip": ip_add(base, off),
                 })
+                off += 1
     ceph = roles["mon"] + roles["mgr"] + roles["osd"] + roles["mds"] + roles["rgw"]
 
     edge = [{"name": f"lb-{i + 1}", "ip": ip_add(values.get("edgeIpStart", ""), i)}
