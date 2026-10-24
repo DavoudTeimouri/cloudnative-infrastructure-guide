@@ -699,7 +699,13 @@
       var buttonAttrs = {
         type: "button",
         class: "tab" + (on ? " on" : "") + (sel ? "" : " off"),
-        onclick: function () { state.roleTab = r; renderPage(); }
+        onclick: function (ev) {
+          if (ev && ev.preventDefault) ev.preventDefault();
+          var y = window.pageYOffset || document.documentElement.scrollTop || 0;
+          state.roleTab = r;
+          renderPage();
+          window.scrollTo(0, y);
+        }
       };
       if (!sel) buttonAttrs.disabled = true;
       bar.appendChild(el("button", buttonAttrs, kids));
