@@ -18,11 +18,11 @@ with the page counter between them.
 
 | Page | Inputs |
 |---|---|
-| 1. Deployment | Bare metal or VM, cluster name, environment, domain |
-| 2. Application cluster | Control-plane count, worker count, GPU count, vCPU/RAM/disk per role, node prefix, first address |
+| 1. Deployment | Bare metal or VM, cluster name, environment, domain, deployment method, Kubespray release, component versions |
+| 2. Application cluster | One or more application clusters as a table: per cluster — name, control-plane count/size/disk, worker count/size/disk, Windows workers, pod and service CIDRs. The first cluster is the primary; each additional one yields its own `additional-clusters.yaml` record and Argo CD cluster Secret. |
 | 3. Management cluster | Its own worker count and sizes, Rancher, Keycloak, directory integrations (multi-select) |
-| 4. Operating system | Oracle Linux 9/8, Ubuntu 24.04/22.04, admin user, SSH port and policy, sudo, timezone, locale, NTP, DNS, search domain, kernel arguments, swap, THP, max pods, file descriptors, SELinux, firewall, audit retention, unattended updates, CA bundle |
-| 5. Storage | Rook in-cluster (OSD workers, device filter, StorageClasses), or cephadm on Podman or Docker with one node group per role: MON, MGR, OSD, MDS, RGW |
+| 4. Operating system | Oracle Linux 9/8, Ubuntu 24.04/22.04, admin user, SSH port and policy, sudo, timezone, locale, NTP, DNS, search domain, kernel arguments, swap, THP, max pods, file descriptors, SELinux, firewall, audit retention, unattended updates, CA bundle. One tab per selected role; every tab shows the common baseline plus that role's overrides. |
+| 5. Storage | Rook in-cluster (OSD workers, device filter, StorageClasses), or one or more Ceph clusters as a table (`sdsClusters`): per cluster — name, mode, IP start, CPU/RAM/system disk, MON/MGR/OSD/MDS/RGW host counts, OSD data and DB disk sizes |
 | 6. Traffic | Edge count and VIP, MetalLB pool, DMZ CIDR, VRRP pass phrase, ingress controller |
 | 7. Network and offline | Seven CIDRs, API VIP, registry and file mirror, extra registries and repos |
 | 8. Platform services | GitOps, secrets, observability, logging, policy, runtime detection, backup, mesh, GPU |
