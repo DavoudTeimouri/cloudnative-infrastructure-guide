@@ -312,6 +312,22 @@ Pick **one** registry manager per site and do not mix them. Supported options:
 
 The engine-side configuration (Docker `daemon.json`, Podman `registries.conf`) is in section D, per deployment method. This section covers the registry side: what to mirror and where, using either the CLI or the web GUI.
 
+### C.2.0 Addresses to proxy / mirror
+
+Configure your internal registry/repository manager to proxy or mirror these addresses. Every Ceph host must reach only the internal addresses; nothing on the Ceph hosts may reach the public internet.
+
+| What | Public source (proxy from) | Internal address (configure hosts to) | Notes |
+|---|---|---|---|
+| Ceph container images | `quay.io/ceph` | `harbor.internal/ceph`, `nexus.internal:<port>/ceph`, or `registry.internal:5000/ceph` | Mirrored with `skopeo`; tags pinned in `compatibility/version-matrix.md` |
+| OS packages (Oracle Linux) | `yum.oracle.com` | Internal OL mirror (Nexus yum group or `yummirror.internal`) | `dnf` repo files point here |
+| OS packages (Ubuntu) | `archive.ubuntu.com`, `security.ubuntu.com` | Internal Ubuntu mirror (Nexus apt repo or `ubuntumirror.internal`) | `apt sources.list` points here |
+| Container engine (Docker) | `download.docker.com` | Internal mirror or the RPM/DEB already staged | Engine installed before bootstrap |
+| Container engine (Podman) | OS vendor repos | Internal OS mirror | `podman` package comes with the OS |
+| skopeo | OS vendor repos | Internal OS mirror | `skopeo` package comes with the OS |
+
+Do not configure Ceph hosts to use any public registry directly. Set `NO_PROXY=no_proxy` to exclude all internal addresses (`harbor.internal`, `nexus.internal`, `registry.internal`, `10.40.0.0/24`, `10.41.0.0/24`, `.internal`, `localhost`, `127.0.0.1`) so internal traffic never goes through a proxy.
+
+
 ### C.2.1 Harbor (platform default)
 
 Mirror Ceph images into Harbor ahead of time from a connected build machine:
