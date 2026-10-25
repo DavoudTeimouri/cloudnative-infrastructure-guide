@@ -103,7 +103,7 @@ reboot. Not a silent reboot at 03:00.
 | Input | Effect | Verify |
 |---|---|---|
 | `containerdVersion` | Pinned by the Kubespray release; do not hand-install | `containerd --version` |
-| `registryMirrors` | `registries.yaml` mirror + auth for the internal registry | `crictl pull <image>` |
+| `registryMirrors` | `registries.yaml` mirror + auth for the internal registry (Harbor, Nexus, or the self-hosted OCI registry — pick one per site) | `crictl pull ` |
 | `insecureRegistries` | Only for a registry whose CA cannot be distributed | `crictl pull` succeeds |
 | `cgroupDriver` | `systemd`, matching kubelet | `cat /etc/containerd/config.toml \| grep SystemdCgroup` |
 

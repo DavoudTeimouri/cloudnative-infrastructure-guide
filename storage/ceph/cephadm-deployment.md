@@ -116,9 +116,19 @@ ssh root@ceph-osd-3 'hostname'
 
 cephadm pulls Ceph container images at bootstrap and whenever it deploys or upgrades a daemon. In an air-gapped site there is no internet, so the images must already live in your internal registry and every host must pull from it.
 
-### 2.1 Internal registry (Harbor)
+Pick **one** registry manager per site and do not mix them. Supported options:
 
-Harbor is the platform's image and OCI chart registry (`harbor.internal`, port 443). Ceph images are mirrored into it ahead of time from a connected build machine.
+| Registry manager | Best for | Notes |
+|---|---|---|
+| Harbor (platform default) | Image + OCI chart registry with projects, robot accounts, vulnerability scanning | Already referenced throughout this platform as `harbor.internal` |
+| Nexus | Single manager for images **and** OS packages (yum/apt) plus docker repos | Good when one tool must own both artifacts and packages |
+| Self-hosted OCI registry (suggested alternative) | Smaller air-gap sites that only need image mirroring | Single binary, filesystem storage, OCI-compatible; lighter than Harbor/Nexus |
+
+The engine-side configuration (Docker `daemon.json`, Podman `registries.conf`) is in section D, per deployment method. This section covers the registry side: what to mirror and where.
+
+### C.2.1 Harbor (platform default)
+
+Mirror Ceph images into Harbor ahead of time from a connected build machine:
 
 ```bash
 # Run on a connected machine, never on an air-gapped host
@@ -126,51 +136,31 @@ skopeo copy docker://quay.io/ceph/ceph:v18 docker://harbor.internal/ceph/ceph:v1
 skopeo copy docker://quay.io/ceph/ceph:v17 docker://harbor.internal/ceph/ceph:v17 --dest-tls-verify=false
 ```
 
-Record the exact image tags in `compatibility/version-matrix.md` so the pinned version propagates through the build.
+Create a `ceph` project in Harbor and a robot account with `pull` permission for `cephadm` to use. Record the exact image tags in `compatibility/version-matrix.md` so the pinned version propagates through the build.
 
-### 2.2 Container engine registry mirror
+### C.2.2 Nexus
 
-Configure every Ceph host's container engine to pull from the internal registry so bootstrap and daemon deployment never touch the internet.
-
-**Docker** — `/etc/docker/daemon.json`:
-
-```json
-{
-  "registry-mirrors": ["https://harbor.internal"],
-  "live-restore": true
-}
-```
-
-**Podman** — `/etc/containers/registries.conf`:
-
-```ini
-[registries.search]
-registries = ['harbor.internal']
-
-[registries.insecure]
-registries = ['harbor.internal']
-```
-
-(TLS-verified in production; `insecure` is shown only because some air-gap sites terminate TLS at an internal load balancer.)
-
-Restart the engine after the change:
+Mirror Ceph images into a Nexus docker (group) repository, e.g. `nexus.internal:8083` or `nexus.internal/repository/ceph/`:
 
 ```bash
-systemctl restart docker      # Docker
-systemctl restart podman.socket   # Podman
+# Run on a connected machine, never on an air-gapped host
+skopeo copy docker://quay.io/ceph/ceph:v18 docker://nexus.internal:8083/ceph/ceph:v18 --dest-tls-verify=false
+skopeo copy docker://quay.io/ceph/ceph:v17 docker://nexus.internal:8083/ceph/ceph:v17 --dest-tls-verify=false
 ```
 
-### 2.3 Air-gap package repository (OS packages)
+Nexus can also serve OS packages (yum/apt group repos) so the same manager holds both images and packages. When Nexus is the registry, replace `harbor.internal` with `nexus.internal:<port>` everywhere below, and point Docker/Podman at the Nexus docker repository.
 
-cephadm and the container engine must come from your internal mirror, not from OS vendor repos. Do not mix OS vendor repos and internal mirrors on the same host; the version pins diverge silently.
+### C.2.3 Suggested alternative: self-hosted OCI registry (distribution)
+
+For smaller air-gap sites that only need image mirroring and do not need Harbor's projects/robot accounts or Nexus's package repos, run a minimal OCI-compatible registry (the Docker `distribution` image) on a filesystem-backed store:
 
 ```bash
-# Oracle Linux
-dnf install -y cephadm podman docker-ce docker-ce-cli containerd.io   # from the internal OL mirror
-
-# Ubuntu
-apt install -y cephadm podman docker-ce docker-ce-cli containerd.io   # from the internal Ubuntu mirror
+# Run on a connected machine, mirror into the self-hosted registry
+skopeo copy docker://quay.io/ceph/ceph:v18 docker://registry.internal:5000/ceph/ceph:v18 --dest-tls-verify=false
+skopeo copy docker://quay.io/ceph/ceph:v17 docker://registry.internal:5000/ceph/ceph:v17 --dest-tls-verify=false
 ```
+
+Run it as a single container or systemd unit backed by a persistent volume. Configure it as insecure (or terminate TLS at the edge load balancer) and point Docker/Podman at `registry.internal:5000`.
 
 ---
 
@@ -477,7 +467,7 @@ Allowed co-location:
 
 Never co-locate the only MON store with the OSD DB device.
 
-To assign all roles to one server, apply all labels to that single host and use explicit host placement in the service spec (§F.5). The generated platform layout uses separated hosts by default; co-location is a manual edit and the operator owns that decision.
+To assign all roles to one server, apply all labels to that single host and use explicit host placement via labels (E.2). The generated platform layout uses separated hosts by default; co-location is a manual edit and the operator owns that decision.
 
 Example — all roles on one host (lab/small site only):
 
