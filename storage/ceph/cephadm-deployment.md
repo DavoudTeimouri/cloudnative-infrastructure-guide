@@ -189,20 +189,29 @@ Name resolution failures prevent cephadm from adding hosts and daemons from form
 
 ### 1.4 Disks and filesystems (node preparation)
 
-One data device per OSD. XFS with `ftype=1` is required by BlueStore.
+One OSD daemon per data disk. Each data disk must be a dedicated device — never a shared virtual disk, never a partition shared with the OS. XFS with `ftype=1` is required by BlueStore.
 
 ```bash
+# List candidate data devices
 lsblk -d -o NAME,SIZE,TYPE,ROTA,MODEL
 
-# Destructive: wipes stale filesystems/signatures from data devices
+# Destructive: wipes stale filesystems/signatures from data devices only
 wipefs -a /dev/sdb
+wipefs -a /dev/sdc
 ```
 
-Reserve a separate NVMe device per host for the OSD BlueStore DB/WAL when data devices are HDD or SATA SSD. Do not share the DB/WAL device with the OS.
+Do not format the device yourself — cephadm formats and manages OSD disks via BlueStore. This step only clears stale signatures so device detection is clean.
+
+Reserve a separate NVMe device per host for the OSD BlueStore DB/WAL when data devices are HDD or SATA SSD. Do not share the DB/WAL device with the OS or with another OSD's data disk.
+
+How many OSDs per host:
+- One OSD daemon per data disk.
+- Minimum 3 OSD hosts (one OSD each) for a 3-replica pool.
+- More OSDs per host = more throughput and more rebuild load per host failure. Balance rebuild time against host count.
 
 ### 1.5 Network
 
-**Two NICs/VLANs (recommended):** one public (client/MON/RGW traffic, `10.40.0.0/24`) and one cluster (replication/OSD traffic, `10.41.0.0/24`). Replication traffic is the driver; 10 GbE is the minimum for production.
+**Two NICs/VLANs (recommended):** one public (client/MON/RGW traffic, `10.40.0.0/24`) and one cluster/replication (replication/OSD traffic, `10.41.0.0/24`). Replication traffic is the driver; 10 GbE is the minimum for production. Separating them keeps Ceph replication from competing with client and management traffic.
 
 **One network:** If the site has only one network, put MON and OSD traffic on the same subnet/VLAN. Ceph still works, but replication traffic competes with client traffic on the same link. Mitigations:
 - Size the link for the combined load (replication is roughly 2× the client write volume for a 3x pool).
@@ -219,7 +228,7 @@ ping -c 3 10.40.0.12
 
 The bootstrap host must reach every other Ceph host over SSH without a password prompt, because cephadm installs the engine and daemons on remote hosts itself.
 
-**Non-root user:** SSH as a non-root user with passwordless `sudo` is preferred over direct root login. cephadm elevates via sudo when needed.
+**Service user:** SSH as a non-root deploy user (e.g. `cephadm`) with passwordless `sudo` is preferred over direct root login. cephadm elevates via sudo when needed. This user is a local account on each Ceph host — not a directory account.
 
 ```bash
 # From the bootstrap host, as the deploy user
@@ -234,7 +243,15 @@ Ensure the deploy user can run sudo without a password on each Ceph host:
 echo "cephadm ALL=(ALL) NOPASSWD:ALL" | sudo tee /etc/sudoers.d/cephadm
 ```
 
-**AD authentication:** Hosts must NOT be joined to Active Directory/LDAP (ADR-0015). Identity is application-layer only; nodes keep local accounts plus an offline break-glass key. Do not rely on AD/Kerberos for the SSH access cephadm uses — use local key-based authentication with the break-glass key installed for `root` or the deploy user.
+Install the same SSH public key (break-glass key) for the deploy user on every Ceph host so the bootstrap host can connect without a password:
+
+```bash
+# From the bootstrap host
+ssh-copy-id cephadm@ceph-osd-2
+ssh-copy-id cephadm@ceph-osd-3
+```
+
+**AD authentication:** Hosts must NOT be joined to Active Directory/LDAP (ADR-0015). Identity is application-layer only; nodes keep local accounts plus an offline break-glass key. Do not rely on AD/Kerberos for the SSH access cephadm uses — use local key-based authentication.
 
 Verify:
 
@@ -244,19 +261,24 @@ ssh cephadm@ceph-osd-2 'sudo cephadm --version'
 
 ---
 
-## C. Step 2 — Prepare air-gap repositories/registries
+## C. Step 2 — Prepare air-gap registry/repository
 
-cephadm pulls Ceph container images at bootstrap and whenever it deploys or upgrades a daemon. In an air-gapped site there is no internet, so the images must already live in your internal registry and every host must pull from it.
+cephadm pulls Ceph container images at bootstrap and whenever it deploys or upgrades a daemon. In an air-gapped site there is no internet, so the images must already live in your internal **registry** and every host must pull from it.
+
+Terminology:
+- **Registry** = the server/manager that stores images (Harbor, Nexus, or a self-hosted OCI registry).
+- **Repository** = a named collection of images inside a registry (e.g. `ceph/ceph`, `ceph/ceph-osd`).
+- **Repositories** = plural, multiple collections.
 
 Pick **one** registry manager per site and do not mix them. Supported options:
 
 | Registry manager | Best for | Notes |
 |---|---|---|
-| Harbor (platform default) | Image + OCI chart registry with projects, robot accounts, vulnerability scanning | Already referenced throughout this platform as `harbor.internal` |
-| Nexus | Single manager for images **and** OS packages (yum/apt) plus docker repos | Good when one tool must own both artifacts and packages |
-| Self-hosted OCI registry (suggested alternative) | Smaller air-gap sites that only need image mirroring | Single binary, filesystem storage, OCI-compatible; lighter than Harbor/Nexus |
+| Harbor (platform default) | Image + OCI chart registry with projects, robot accounts, vulnerability scanning | Already referenced throughout this platform as `harbor.internal`; has a web GUI for managing projects and robot accounts |
+| Nexus | Single manager for images **and** OS packages (yum/apt) plus docker repos | Good when one tool must own both artifacts and packages; has a web GUI for repositories |
+| Self-hosted OCI registry (suggested alternative) | Smaller air-gap sites that only need image mirroring | Single binary, filesystem storage, OCI-compatible; lighter than Harbor/Nexus; minimal or no GUI |
 
-The engine-side configuration (Docker `daemon.json`, Podman `registries.conf`) is in section D, per deployment method. This section covers the registry side: what to mirror and where.
+The engine-side configuration (Docker `daemon.json`, Podman `registries.conf`) is in section D, per deployment method. This section covers the registry side: what to mirror and where, using either the CLI or the web GUI.
 
 ### C.2.1 Harbor (platform default)
 
@@ -270,7 +292,7 @@ skopeo copy docker://quay.io/ceph/ceph:v17 docker://harbor.internal/ceph/ceph:v1
 
 **What is skopeo?** `skopeo` is a tool for inspecting and copying container images between registries without running a daemon. It copies image layers and metadata directly from one registry to another (e.g. from the public `quay.io` to your internal Harbor), so you can stage Ceph images on a connected machine and push them into the air-gapped registry. Install it from your internal mirror (`dnf install -y skopeo` on Oracle Linux, `apt install -y skopeo` on Ubuntu).
 
-Create a `ceph` project in Harbor and a robot account with `pull` permission for `cephadm` to use. Record the exact image tags in `compatibility/version-matrix.md` so the pinned version propagates through the build.
+**Via Harbor GUI:** log in to the Harbor web UI, create a `ceph` project, push or mirror the Ceph images into it, then create a robot account with `pull` permission for `cephadm` to use. Record the exact image tags in `compatibility/version-matrix.md` so the pinned version propagates through the build.
 
 ### C.2.2 Nexus
 
@@ -281,6 +303,8 @@ Mirror Ceph images into a Nexus docker (group) repository, e.g. `nexus.internal:
 skopeo copy docker://quay.io/ceph/ceph:v18 docker://nexus.internal:8083/ceph/ceph:v18 --dest-tls-verify=false
 skopeo copy docker://quay.io/ceph/ceph:v17 docker://nexus.internal:8083/ceph/ceph:v17 --dest-tls-verify=false
 ```
+
+**Via Nexus GUI:** log in to the Nexus web UI, create a docker (group) repository named `ceph`, mirror the Ceph images into it, then create a service account with `pull` permission. Record the exact image tags in `compatibility/version-matrix.md`.
 
 Nexus can also serve OS packages (yum/apt group repos) so the same manager holds both images and packages. When Nexus is the registry, replace `harbor.internal` with `nexus.internal:<port>` everywhere below, and point Docker/Podman at the Nexus docker repository.
 
@@ -295,6 +319,8 @@ skopeo copy docker://quay.io/ceph/ceph:v17 docker://registry.internal:5000/ceph/
 ```
 
 Run it as a single container or systemd unit backed by a persistent volume. Configure it as insecure (or terminate TLS at the edge load balancer) and point Docker/Podman at `registry.internal:5000`.
+
+
 
 ---
 
