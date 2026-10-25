@@ -180,32 +180,223 @@ cephadm runs every Ceph daemon in a container. It supports Podman (upstream defa
 
 ### D.1 Engine: Docker
 
-```bash
-# Install from the internal mirror (OL example; apt on Ubuntu)
-dnf install -y docker-ce docker-ce-cli containerd.io
-systemctl enable --now docker
+Docker must be installed from the internal mirror, pointed at the internal registry, and allowed through the host firewall before `cephadm bootstrap`. cephadm does not install or configure the engine.
 
+#### D.1.1 Install Docker from the internal mirror
+
+```bash
+# Oracle Linux (from the internal OL mirror)
+dnf install -y docker-ce docker-ce-cli containerd.io
+
+# Ubuntu (from the internal Ubuntu mirror)
+apt install -y docker-ce docker-ce-cli containerd.io
+
+systemctl enable --now docker
+docker info | grep -i server-version
+```
+
+#### D.1.2 Configure daemon.json for air-gap
+
+`/etc/docker/daemon.json` on every Ceph host:
+
+```json
+{
+  "registry-mirrors": ["https://harbor.internal"],
+  "insecure-registries": ["harbor.internal"],
+  "live-restore": true,
+  "storage-driver": "overlay2",
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "100m",
+    "max-file": "3"
+  },
+  "dns": ["10.10.0.10"],
+  "iptables": false,
+  "bridge": "none",
+  "default-address-pools": [
+    { "base": "172.20.0.0/16", "size": 24 }
+  ]
+}
+```
+
+- `registry-mirrors` — pulls are redirected to Harbor so daemon and cephadm never reach quay.io.
+- `insecure-registries` — Harbor terminates TLS at an internal load balancer; Docker treats it as insecure without this flag and refuses to pull.
+- `live-restore` — containers keep running if the Docker daemon restarts.
+- `iptables: false` / `bridge: none` — the platform manages the network and firewall with nftables/firewalld; Docker must not punch its own holes.
+- `dns` — internal DNS so containers resolve `harbor.internal`, `ceph-mon-1`, etc.
+
+```bash
+mkdir -p /etc/docker
 cat > /etc/docker/daemon.json <<'EOF'
-{ "registry-mirrors": ["https://harbor.internal"], "live-restore": true }
+{ ... }
 EOF
 systemctl restart docker
+```
 
-docker info | grep -i server-version
+#### D.1.3 systemd environment drop-in (air-gap)
+
+If the site uses an HTTP proxy for the connected build machine only, exclude it on Ceph hosts and never proxy internal traffic:
+
+```bash
+mkdir -p /etc/systemd/system/docker.service.d
+cat > /etc/systemd/system/docker.service.d/no-proxy.conf <<'EOF'
+[Service]
+Environment="NO_PROXY=harbor.internal,10.40.0.0/24,10.41.0.0/24,.internal,localhost,127.0.0.1"
+Environment="no_proxy=harbor.internal,10.40.0.0/24,10.41.0.0/24,.internal,localhost,127.0.0.1"
+EOF
+systemctl daemon-reload
+systemctl restart docker
+```
+
+#### D.1.4 Firewall rules for Docker (nftables)
+
+Docker daemon traffic to Harbor and between Ceph hosts:
+
+```nft
+# Allow outbound to the internal registry
+ip daddr @harbor_hosts tcp dport 443 accept
+# Allow outbound to the internal registry registry API
+ip daddr @harbor_hosts tcp dport { 80, 443 } accept
+# Allow Ceph daemon container traffic on the cluster network
+ip saddr @storage_hosts ip daddr @storage_hosts tcp dport { 6789, 6800-7568, 7480 } accept
+```
+
+Do not open Docker's default `2375/tcp` (unencrypted Docker API). Verify:
+
+```bash
+docker info --format '{{ .ServerVersion }}'
+curl -sk https://harbor.internal/api/v2.0/systeminfo | head -c 200
 ```
 
 When bootstrapping with Docker, pass `--docker` to `cephadm bootstrap` and to every subsequent `cephadm` invocation.
 
+
 ### D.2 Engine: Podman
 
-```bash
-# Install from the internal mirror
-dnf install -y podman
-systemctl enable --now podman.socket
+Podman is the upstream default for cephadm. It must be installed from the internal mirror, pointed at Harbor, and configured for air-gap before `cephadm bootstrap`. cephadm does not install or configure the engine.
 
+cephadm runs Ceph daemons as root with privileged host access, so Podman is run **rootful** on Ceph hosts (not rootless).
+
+#### D.2.1 Install Podman from the internal mirror
+
+```bash
+# Oracle Linux (from the internal OL mirror)
+dnf install -y podman
+
+# Ubuntu (from the internal Ubuntu mirror)
+apt install -y podman
+
+systemctl enable --now podman.socket
 podman info | grep -i host.version
 ```
 
+#### D.2.2 Configure registries.conf for air-gap
+
+`/etc/containers/registries.conf` on every Ceph host:
+
+```ini
+[registries.search]
+registries = ['harbor.internal']
+
+[registries.insecure]
+registries = ['harbor.internal']
+
+[registries.block]
+registries = ['docker.io', 'quay.io', 'ghcr.io']
+```
+
+- `registries.search` — unqualified image names resolve to Harbor first.
+- `registries.insecure` — Harbor terminates TLS at an internal load balancer; Podman refuses plain-HTTP registries without this.
+- `registries.block` — explicit deny-list so nothing accidentally pulls from the public internet.
+
+```bash
+mkdir -p /etc/containers
+cat > /etc/containers/registries.conf <<'EOF'
+[registries.search]
+registries = ['harbor.internal']
+
+[registries.insecure]
+registries = ['harbor.internal']
+
+[registries.block]
+registries = ['docker.io', 'quay.io', 'ghcr.io']
+EOF
+```
+
+#### D.2.3 Configure containers.conf for air-gap
+
+`/etc/containers/containers.conf` on every Ceph host:
+
+```ini
+[containers]
+dns = ["10.10.0.10"]
+
+[storage]
+driver = "overlay2"
+
+[containers]
+log_driver = "k8s-file"
+log_opts = {
+  "max-size": "100m",
+  "max-file": "3"
+}
+```
+
+- `dns` — internal DNS so containers resolve `harbor.internal` and Ceph host names.
+- `log_driver` / `log_opts` — bounded container logs so a churning Ceph daemon cannot fill the root filesystem.
+
+```bash
+cat > /etc/containers/containers.conf <<'EOF'
+[containers]
+dns = ["10.10.0.10"]
+
+[storage]
+driver = "overlay2"
+
+[containers]
+log_driver = "k8s-file"
+log_opts = {
+  "max-size": "100m",
+  "max-file": "3"
+}
+EOF
+```
+
+#### D.2.4 systemd environment drop-in (air-gap)
+
+If the site uses an HTTP proxy for the connected build machine only, exclude it on Ceph hosts:
+
+```bash
+mkdir -p /etc/systemd/system/podman.socket.d
+cat > /etc/systemd/system/podman.socket.d/no-proxy.conf <<'EOF'
+[Socket]
+Environment="NO_PROXY=harbor.internal,10.40.0.0/24,10.41.0.0/24,.internal,localhost,127.0.0.1"
+Environment="no_proxy=harbor.internal,10.40.0.0/24,10.41.0.0/24,.internal,localhost,127.0.0.1"
+EOF
+systemctl daemon-reload
+systemctl restart podman.socket
+```
+
+#### D.2.5 Firewall rules for Podman (nftables)
+
+Podman daemon and Ceph daemon container traffic:
+
+```nft
+# Allow outbound to the internal registry
+ip daddr @harbor_hosts tcp dport { 80, 443 } accept
+# Allow Ceph daemon container traffic on the cluster network
+ip saddr @storage_hosts ip daddr @storage_hosts tcp dport { 6789, 6800-7568, 7480 } accept
+```
+
+Do not expose the Podman API socket over TCP. Verify:
+
+```bash
+podman info --format '{{ .Host.Version }}'
+curl -sk https://harbor.internal/api/v2.0/systeminfo | head -c 200
+```
+
 When bootstrapping with Podman, omit `--docker` (Podman is the default).
+
 
 ### D.3 Cephadm bootstrap
 
