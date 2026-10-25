@@ -1,5 +1,9 @@
 # Host configuration inputs
 
+[Previous step](architecture/03-failure-domains.md) | [Next step](storage/ceph/cephadm-deployment.md)
+
+---
+
 Every host setting the configurator exposes, what it changes, and the check that proves it. Distro
 differences are shown per item. The generated `10-os-baseline.sh` applies this list in order; this
 document explains each line so an operator can review it before running it.
@@ -220,3 +224,6 @@ generated `10-os-baseline.sh` and the firewall role enforce.
 Open exactly these ports per role; everything else is denied by default. See
 `network-matrix/firewall-rules-generation.md` for the nftables ruleset and how
 the matrix is converted into per-role rules.
+
+
+[Previous step](architecture/03-failure-domains.md) | [Next step](storage/ceph/cephadm-deployment.md)

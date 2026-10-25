@@ -1,5 +1,9 @@
 # Upgrade procedures
 
+[Previous step](lifecycle/backup/backup-and-dr.md)
+
+---
+
 Format for every component upgrade: source -> target, compatibility, pre-validation, offline artifact preparation, backup, dependency and upgrade order, canary, execution, post-checks, rollback feasibility, downtime, risks, success criteria.
 
 ## Rules that apply to every upgrade
@@ -142,3 +146,6 @@ Not a version upgrade, but the same discipline applies.
 - Update `offline-artifacts/artifact-matrix.md` status for the affected artifacts.
 - Re-run the affected acceptance tests.
 - Record the actual downtime and any deviation from this procedure in the change record.
+
+
+[Previous step](lifecycle/backup/backup-and-dr.md)

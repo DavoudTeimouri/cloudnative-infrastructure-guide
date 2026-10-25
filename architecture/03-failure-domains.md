@@ -1,5 +1,9 @@
 # Failure Domain Analysis
 
+[Previous step](architecture/02-deployment-topology.md) | [Next step](operating-systems/host-configuration.md)
+
+---
+
 | Scenario | Running workloads | Blocked operations | Recovery path |
 |---|---|---|---|
 | Single worker node loss | Unaffected (rescheduled if capacity) | Deploys targeting that node | Replace node + uncordon |
@@ -24,3 +28,6 @@
 2. GitLab must not depend on the cluster it deploys (dedicated infra, backed up externally).
 3. Argo CD must not be the only path to restore the cluster it manages — Kubespray + GitLab + Ansible remain the recovery path.
 4. Break-glass access exists on every node: local account + sudo, keys held offline.
+
+
+[Previous step](architecture/02-deployment-topology.md) | [Next step](operating-systems/host-configuration.md)

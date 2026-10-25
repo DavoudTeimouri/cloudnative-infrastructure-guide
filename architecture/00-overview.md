@@ -1,5 +1,9 @@
 # Architecture Overview
 
+[Next step](architecture/02-deployment-topology.md)
+
+---
+
 ## Layers
 
 | Layer | Components | Failure impact |
@@ -34,3 +38,6 @@ Rationale: `decisions/ADR-0010.md`, `decisions/ADR-0013.md`, `decisions/ADR-0025
 | nodeport | 30000-32767 or MetalLB pool 10.61.0.10-10.61.0.30 | PROVISIONAL |
 
 Verify every CIDR against the site plan before build. All ports: `network-matrix/network-communication-matrix.md`.
+
+
+[Next step](architecture/02-deployment-topology.md)

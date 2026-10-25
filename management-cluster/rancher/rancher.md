@@ -1,5 +1,9 @@
 # Rancher management cluster
 
+[Previous step](kubespray/kubespray-deployment.md) | [Next step](network-matrix/external-load-balancer.md)
+
+---
+
 ## A. Purpose and architecture
 
 Rancher manages the lifecycle of the Application Clusters and provides the operator view of the estate.
@@ -213,3 +217,6 @@ Strongly recommended:
 - Rancher limited to the platform project for operators, so an operator cannot manage unrelated clusters.
 - Project-scoped RBAC for each application team.
 - Alert on Rancher availability, and on the Rancher operator's own reconciliation errors.
+
+
+[Previous step](kubespray/kubespray-deployment.md) | [Next step](network-matrix/external-load-balancer.md)

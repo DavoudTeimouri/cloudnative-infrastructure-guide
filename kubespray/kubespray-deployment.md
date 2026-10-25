@@ -1,5 +1,9 @@
 # Kubespray deployment (offline)
 
+[Previous step](storage/ceph/cephadm-deployment.md) | [Next step](management-cluster/rancher/rancher.md)
+
+---
+
 ## A. Purpose and scope
 
 Kubespray is the cluster lifecycle tool. Ansible deploys the cluster, manages the node OS configuration for the cluster components, and drives version upgrades.
@@ -331,3 +335,6 @@ Strongly recommended:
 - Keep a `patches/` directory for site-specific overrides so they are visible in review.
 - Run the deploy from the Automation Management Server, never from a laptop that also runs a browser.
 - Record the Ansible and Python versions in `requirements.txt` and pin them.
+
+
+[Previous step](storage/ceph/cephadm-deployment.md) | [Next step](management-cluster/rancher/rancher.md)

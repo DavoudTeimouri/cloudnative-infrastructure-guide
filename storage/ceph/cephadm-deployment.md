@@ -1,5 +1,9 @@
 # Ceph storage (cephadm path)
 
+[Previous step](operating-systems/host-configuration.md) | [Next step](kubespray/kubespray-deployment.md)
+
+---
+
 ## A. Purpose and architecture
 
 Ceph deployed by cephadm on dedicated Linux hosts, consumed by Kubernetes through the external CSI driver, and optionally exposed as S3 via RGW.
@@ -900,3 +904,6 @@ Requires the monmap and OSD map from backup; see `lifecycle/backup/`. Back up `c
 - Joining hosts to Active Directory/LDAP — intentional per ADR-0015; identity is application-layer only.
 - Rebooting after kernel args (operator decides when).
 - The in-cluster Rook-Ceph model — that is `storage/rook-ceph/rook-ceph.md`.
+
+
+[Previous step](operating-systems/host-configuration.md) | [Next step](kubespray/kubespray-deployment.md)

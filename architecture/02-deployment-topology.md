@@ -1,5 +1,9 @@
 # Deployment Topology (reference sizing, PROVISIONAL)
 
+[Previous step](architecture/00-overview.md) | [Next step](architecture/03-failure-domains.md)
+
+---
+
 ## Server roles
 
 | Role | Count (ref) | Min (prod) | Required? | Notes |
@@ -31,3 +35,6 @@ Consolidating roles onto few hosts lowers cost and raises blast radius. Explicit
 | etcd | Low latency to local SSD | Virtual disk + vCPU jitter risk; local SSD + local vCPUs |
 | Failure domain | Physical host | Host + hypervisor + storage array |
 | Upgrade | Firmware/BIOS in scope | BIOS out of scope; hypervisor tooling in scope |
+
+
+[Previous step](architecture/02-deployment-topology.md) | [Next step](architecture/03-failure-domains.md)

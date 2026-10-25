@@ -1,5 +1,9 @@
 # External load balancer — active/active edge
 
+[Previous step](management-cluster/rancher/rancher.md) | [Next step](management-cluster/platform-services/)
+
+---
+
 ## A. Purpose and architecture
 
 The external load balancer is the platform's edge: it terminates client TLS, applies the site edge policy, and forwards to the Kubernetes management endpoints (API server, Rancher, Argo CD, Keycloak, Grafana) and to the L7 ingress tier.
@@ -447,3 +451,6 @@ Strongly recommended:
 - HAProxy for the L4 edge and the active health checks; Nginx for the L7 policy, and not both on the same traffic path.
 - `reuseport` on the Nginx listeners for per-host worker sharding at high connection rates.
 - A quarterly failover drill on both tiers, with the measured failover time recorded.
+
+
+[Previous step](management-cluster/rancher/rancher.md) | [Next step](management-cluster/platform-services/)

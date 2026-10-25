@@ -1,5 +1,9 @@
 # Backup and disaster recovery
 
+[Previous step](management-cluster/platform-services/) | [Next step](lifecycle/upgrades/upgrade-procedures.md)
+
+---
+
 ## A. Scope
 
 Backup targets and their recovery procedures, and the failure scenarios the platform must survive.
@@ -194,3 +198,6 @@ Strongly recommended:
 - Immutable or object-locked backup storage where the platform supports it, so a compromised administrator cannot delete the backups.
 - Monthly restore drills of one application, quarterly of the full environment.
 - Record the measured RTO in this file after each drill.
+
+
+[Previous step](management-cluster/platform-services/) | [Next step](lifecycle/upgrades/upgrade-procedures.md)
