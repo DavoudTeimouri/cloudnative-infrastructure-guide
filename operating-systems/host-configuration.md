@@ -196,3 +196,27 @@ crictl info | head -5
 ```
 
 A host that fails any of these is not ready for Kubespray, regardless of what the playbook says.
+
+## Port requirements
+
+Host-to-host flows that must be allowed before a node is handed to Kubespray. The authoritative
+matrix is `network-matrix/port-requirements.md`; the host-level subset below is the one the
+generated `10-os-baseline.sh` and the firewall role enforce.
+
+| Source IP/Subnet | Source Role/Roles | Source Port | Destination IP/Subnet | Destination Rule | Destination Port | Protocols |
+|---|---|---|---|---|---|---|
+| Operation server subnet | Operation server (Ansible) | * | This node | Ansible SSH | 22 | TCP |
+| Management subnet | Monitoring (Prometheus) | * | This node | metrics scrape | 9100, 10250 | TCP |
+| Control plane subnet | K8s control plane | * | This node | kubelet | 10250 | TCP |
+| This node | Any node | * | Kubernetes API | kube-apiserver | 6443 | TCP |
+| This node | Any node | * | etcd (peer) | etcd raft | 2380 | TCP |
+| This node | Any node | * | etcd (client) | etcd client | 2379 | TCP |
+| This node | Any node | * | Ceph MON | Ceph monitor | 6789 | TCP |
+| This node | Storage node | * | Ceph OSD | OSD data | 6800-7568 | TCP |
+| This node | Any node | * | NTP | time sync | 123 | UDP |
+| This node | Any node | * | DNS | name resolution | 53 | UDP, TCP |
+| This node | Any node | * | Harbor / Nexus | image / package pull | 443, 8081 | TCP |
+
+Open exactly these ports per role; everything else is denied by default. See
+`network-matrix/firewall-rules-generation.md` for the nftables ruleset and how
+the matrix is converted into per-role rules.

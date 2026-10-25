@@ -377,8 +377,8 @@ def main():
         failures.append("selecting add-ons did not add the add-on step")
     if not addons["pageHasAddons"]:
         failures.append("add-ons page does not render cert-manager")
-    if addons["pageCount"] != f"{len(data['pages'])} / {len(data['pages'])}":
-        failures.append(f"page counter wrong on the last page: {addons['pageCount']}")
+    if addons["pageCount"] != f"9 / {len(data['pages'])}":
+        failures.append(f"page counter wrong on the add-ons page: {addons['pageCount']}")
     for key, name in (("hasCert", "cert-manager-values.yaml"), ("hasIssuer", "cert-manager-issuer.yaml"),
                       ("hasVpaAuto", "vpa-auto-values.yaml"), ("hasExtDns", "external-dns-values.yaml")):
         if not addons[key]:

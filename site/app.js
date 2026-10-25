@@ -732,6 +732,33 @@
     return box;
   }
 
+  function portReqsTable() {
+    var rows = DATA.portRequirements || [];
+    var headers = [ "Source IP/Subnet", "Source Role/Roles", "Source Port", "Destination IP/Subnet", "Destination Rule", "Destination Port", "Protocols" ];
+    var table = el("table", {});
+    var thead = el("thead", {});
+    var tr = el("tr", {});
+    headers.forEach(function (h) {
+      tr.appendChild(el("th", { text: h }));
+    });
+    thead.appendChild(tr);
+    table.appendChild(thead);
+    var tbody = el("tbody", {});
+    rows.forEach(function (r) {
+      var tr2 = el("tr", {});
+      [ r.srcSubnet, r.srcRoles, r.srcPort, r.dstSubnet, r.dstRule, r.dstPort, r.proto ].forEach(function (c) {
+        tr2.appendChild(el("td", { text: c }));
+      });
+      tbody.appendChild(tr2);
+    });
+    table.appendChild(tbody);
+    var card = el("div", { class: "card" });
+    card.appendChild(el("h3", { text: "Port requirements — access request" }));
+    card.appendChild(el("p", { class: "hint", text: "Open exactly these flows per role; everything else is denied by default. See network-matrix/port-requirements.md for the full matrix." }));
+    card.appendChild(table);
+    return card;
+  }
+
   function renderPage() {
     var page = DATA.pages[state.page];
     var box = $("page");
@@ -846,6 +873,9 @@
     }
     if (page.id === "p6") {
       box.appendChild(nodeListCard("Edge nodes generated", t.edge));
+    }
+    if (page.id === "p10") {
+      box.appendChild(portReqsTable());
     }
 
     if ($("prev")) $("prev").disabled = state.page === 0;

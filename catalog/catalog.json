@@ -1,5 +1,5 @@
 {
-  "catalogVersion": "3.2.4",
+  "catalogVersion": "3.2.5",
   "updated": "2026-10-23",
   "source": {
     "docs": "The repository is the source of truth. This catalog points at it; it never duplicates a procedure.",
@@ -276,7 +276,59 @@
         "trivySeverity",
         "otelEndpoint"
       ]
+    },
+    {
+      "id": "p10",
+      "title": "Port requirements",
+      "subtitle": "Server-to-server access request: the firewall flows this configuration needs before any node is handed to Kubespray.",
+      "components": [],
+      "fields": []
     }
+  ],
+  "portRequirements": [
+    { "srcSubnet": "10.10.0.0/24", "srcRoles": "Operation server (Ansible, AWX, GitLab runner)", "srcPort": "*", "dstSubnet": "All managed nodes", "dstRule": "Ansible SSH", "dstPort": "22", "proto": "TCP" },
+    { "srcSubnet": "10.10.0.0/24", "srcRoles": "Operation server", "srcPort": "*", "dstSubnet": "Vault", "dstRule": "Vault API / secrets", "dstPort": "8200", "proto": "TCP" },
+    { "srcSubnet": "10.10.0.0/24", "srcRoles": "Operation server", "srcPort": "*", "dstSubnet": "GitLab", "dstRule": "SCM / CI", "dstPort": "443", "proto": "TCP" },
+    { "srcSubnet": "10.10.0.0/24", "srcRoles": "Operation server", "srcPort": "*", "dstSubnet": "Management + application K8s API", "dstRule": "kubectl / apply / CI", "dstPort": "6443", "proto": "TCP" },
+    { "srcSubnet": "DMZ VIP / clients", "srcRoles": "Ops workstation, external clients", "srcPort": "*", "dstSubnet": "Edge load balancer (VIP)", "dstRule": "Admin + client access", "dstPort": "443, 22", "proto": "TCP" },
+    { "srcSubnet": "Edge LB node", "srcRoles": "Edge LB (HAProxy/Nginx + Keepalived)", "srcPort": "*", "dstSubnet": "Edge LB peer", "dstRule": "VRRP advertisements (unicast peers)", "dstPort": "112", "proto": "IP proto 112" },
+    { "srcSubnet": "Edge LB node", "srcRoles": "Edge LB", "srcPort": "*", "dstSubnet": "Kubernetes API (via edge)", "dstRule": "Edge-proxied API access", "dstPort": "6443", "proto": "TCP" },
+    { "srcSubnet": "Edge LB node", "srcRoles": "MetalLB speaker", "srcPort": "*", "dstSubnet": "MetalLB peers", "dstRule": "BGP peering", "dstPort": "179", "proto": "TCP" },
+    { "srcSubnet": "DMZ VIP / clients", "srcRoles": "Clients", "srcPort": "*", "dstSubnet": "L7 ingress (F5 NGINX IC / NGF / Envoy)", "dstRule": "HTTP/TLS entry", "dstPort": "80, 443", "proto": "TCP" },
+    { "srcSubnet": "10.20.0.0/24", "srcRoles": "Control plane", "srcPort": "*", "dstSubnet": "etcd (peer)", "dstRule": "etcd raft", "dstPort": "2380", "proto": "TCP" },
+    { "srcSubnet": "10.20.0.0/24", "srcRoles": "Control plane, workers", "srcPort": "*", "dstSubnet": "etcd (client)", "dstRule": "etcd client", "dstPort": "2379", "proto": "TCP" },
+    { "srcSubnet": "Node subnets", "srcRoles": "K8s nodes", "srcPort": "*", "dstSubnet": "kube-apiserver", "dstRule": "Kubernetes API", "dstPort": "6443", "proto": "TCP" },
+    { "srcSubnet": "Node subnets", "srcRoles": "K8s nodes", "srcPort": "*", "dstSubnet": "kubelet", "dstRule": "exec / logs / metrics / monitoring", "dstPort": "10250", "proto": "TCP" },
+    { "srcSubnet": "Node subnets", "srcRoles": "Nodes", "srcPort": "*", "dstSubnet": "NodePort services", "dstRule": "NodePort ingress (disable if MetalLB)", "dstPort": "30000-32767", "proto": "TCP" },
+    { "srcSubnet": "10.10.0.0/24", "srcRoles": "Prometheus", "srcPort": "*", "dstSubnet": "All scrape targets", "dstRule": "metrics scrape", "dstPort": "9100, 10250, 6443, 9090, 9101, 8081, 9187", "proto": "TCP" },
+    { "srcSubnet": "Monitoring", "srcRoles": "Alertmanager", "srcPort": "*", "dstSubnet": "Alert receivers (SMTP relay)", "dstRule": "notifications", "dstPort": "443, 587", "proto": "TCP" },
+    { "srcSubnet": "Logging", "srcRoles": "Log shipper", "srcPort": "*", "dstSubnet": "Log backend (Loki / OpenSearch / Logstash)", "dstRule": "log ingestion", "dstPort": "3100, 9200, 5044", "proto": "TCP" },
+    { "srcSubnet": "Ceph clients", "srcRoles": "K8s nodes, app nodes", "srcPort": "*", "dstSubnet": "Ceph MON", "dstRule": "monitor", "dstPort": "6789", "proto": "TCP" },
+    { "srcSubnet": "Ceph clients", "srcRoles": "K8s nodes, app nodes", "srcPort": "*", "dstSubnet": "Ceph OSD", "dstRule": "OSD data", "dstPort": "6800-7568", "proto": "TCP" },
+    { "srcSubnet": "Ceph OSD", "srcRoles": "Storage nodes", "srcPort": "*", "dstSubnet": "Ceph OSD", "dstRule": "replication / rebalance", "dstPort": "6800-7568", "proto": "TCP" },
+    { "srcSubnet": "Ceph clients", "srcRoles": "K8s nodes", "srcPort": "*", "dstSubnet": "Ceph MDS", "dstRule": "CephFS", "dstPort": "6800", "proto": "TCP" },
+    { "srcSubnet": "Ceph clients", "srcRoles": "K8s nodes, app nodes", "srcPort": "*", "dstSubnet": "Ceph RGW", "dstRule": "S3 API", "dstPort": "7480", "proto": "TCP" },
+    { "srcSubnet": "All nodes", "srcRoles": "All nodes", "srcPort": "*", "dstSubnet": "Harbor", "dstRule": "image pull", "dstPort": "443", "proto": "TCP" },
+    { "srcSubnet": "All nodes", "srcRoles": "All nodes", "srcPort": "*", "dstSubnet": "Nexus", "dstRule": "rpm / deb / pypi / helm", "dstPort": "443, 8081", "proto": "TCP" },
+    { "srcSubnet": "GitLab Runner", "srcRoles": "GitLab CI runner", "srcPort": "*", "dstSubnet": "GitLab", "dstRule": "job coordination", "dstPort": "443", "proto": "TCP" },
+    { "srcSubnet": "GitLab Runner", "srcRoles": "GitLab CI runner", "srcPort": "*", "dstSubnet": "Kubernetes API", "dstRule": "deploy / validate", "dstPort": "6443", "proto": "TCP" },
+    { "srcSubnet": "GitLab Runner", "srcRoles": "GitLab CI runner", "srcPort": "*", "dstSubnet": "Harbor", "dstRule": "push images", "dstPort": "443", "proto": "TCP" },
+    { "srcSubnet": "Argo CD", "srcRoles": "Argo CD", "srcPort": "*", "dstSubnet": "GitLab", "dstRule": "repo fetch", "dstPort": "443", "proto": "TCP" },
+    { "srcSubnet": "Argo CD", "srcRoles": "Argo CD", "srcPort": "*", "dstSubnet": "Kubernetes API", "dstRule": "apply state", "dstPort": "6443", "proto": "TCP" },
+    { "srcSubnet": "Argo CD", "srcRoles": "Argo CD", "srcPort": "*", "dstSubnet": "Vault", "dstRule": "secret retrieval", "dstPort": "8200", "proto": "TCP" },
+    { "srcSubnet": "Rancher", "srcRoles": "Rancher server", "srcPort": "*", "dstSubnet": "Kubernetes API (managed clusters)", "dstRule": "cluster management", "dstPort": "6443", "proto": "TCP" },
+    { "srcSubnet": "Keycloak", "srcRoles": "Keycloak", "srcPort": "*", "dstSubnet": "AD / LDAP domain controller", "dstRule": "directory sync", "dstPort": "389, 636", "proto": "TCP" },
+    { "srcSubnet": "Nodes", "srcRoles": "All nodes", "srcPort": "*", "dstSubnet": "NTP (chrony)", "dstRule": "time sync", "dstPort": "123", "proto": "UDP" },
+    { "srcSubnet": "Nodes", "srcRoles": "All nodes", "srcPort": "*", "dstSubnet": "DNS (CoreDNS / external)", "dstRule": "name resolution", "dstPort": "53", "proto": "UDP, TCP" },
+    { "srcSubnet": "GPU node", "srcRoles": "GPU worker", "srcPort": "*", "dstSubnet": "DCGM exporter", "dstRule": "GPU metrics", "dstPort": "9400", "proto": "TCP" },
+    { "srcSubnet": "GPU node", "srcRoles": "GPU worker", "srcPort": "*", "dstSubnet": "Model store (RGW / MinIO)", "dstRule": "model download", "dstPort": "443", "proto": "TCP" },
+    { "srcSubnet": "Velero", "srcRoles": "Velero", "srcPort": "*", "dstSubnet": "Object storage (RGW / S3)", "dstRule": "backup target", "dstPort": "443", "proto": "TCP" },
+    { "srcSubnet": "Velero", "srcRoles": "Velero", "srcPort": "*", "dstSubnet": "Kubernetes API", "dstRule": "snapshot / restore", "dstPort": "6443", "proto": "TCP" },
+    { "srcSubnet": "Harbor", "srcRoles": "Harbor", "srcPort": "*", "dstSubnet": "PostgreSQL (Harbor DB)", "dstRule": "Harbor state", "dstPort": "5432", "proto": "TCP" },
+    { "srcSubnet": "GitLab", "srcRoles": "GitLab", "srcPort": "*", "dstSubnet": "PostgreSQL (GitLab DB)", "dstRule": "GitLab state", "dstPort": "5432", "proto": "TCP" },
+    { "srcSubnet": "Keycloak", "srcRoles": "Keycloak", "srcPort": "*", "dstSubnet": "PostgreSQL (Keycloak DB)", "dstRule": "realm state", "dstPort": "5432", "proto": "TCP" },
+    { "srcSubnet": "Nexus", "srcRoles": "Nexus", "srcPort": "*", "dstSubnet": "PostgreSQL (Nexus DB)", "dstRule": "Nexus state", "dstPort": "5432", "proto": "TCP" },
+    { "srcSubnet": "Argo CD HA", "srcRoles": "Argo CD (HA)", "srcPort": "*", "dstSubnet": "Redis", "dstRule": "cache / coordination", "dstPort": "6379", "proto": "TCP" }
   ],
   "components": [
     {

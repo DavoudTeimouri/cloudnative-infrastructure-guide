@@ -186,6 +186,7 @@ def main():
         "steps": catalog["steps"],
         "upgrades": upgrades,
         "exports": exports,
+        "portRequirements": catalog.get("portRequirements", []),
         "versions": versions,
     }
 
