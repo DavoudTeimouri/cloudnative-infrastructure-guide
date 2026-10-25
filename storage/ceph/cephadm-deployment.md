@@ -93,6 +93,31 @@ A 4+2 pool gives ~67% usable. EC saves space but read-decode on recovery is slow
 
 **Network:** a 3x pool writes 2 copies to the network per 1 GB of client write. A 10 GbE link supports roughly 1.25 GB/s of client write throughput before saturation.
 
+**Compute resources (vCPU and RAM):** Ceph is not CPU-heavy; the drivers are network, decompression, and per-OSD memory. These are per-host starting points, sized from the role count, not from disk size.
+
+| Role | vCPU per host | RAM per host | Basis |
+|---|---|---|---|
+| MON | 2 | 8 GiB | Monitor store is small but latency-sensitive; CPU is light |
+| MGR | 2 | 8 GiB | Dashboard and orchestrator run here; one active, one standby |
+| OSD | 1 per OSD daemon, min 4 | 4 GiB per OSD daemon, min 16 GiB | Each OSD holds memory for its data and DB/WAL cache |
+| MDS | 4 | 16 GiB | CephFS metadata server; more than 3 is rarely worth it |
+| RGW | 4 | 8 GiB | Stateless; scale by request rate, not by data size |
+
+**Per-OSD memory estimate:** each OSD daemon reserves roughly 4 GiB for its own cache plus the BlueStore DB/WAL working set. A host with 8 OSDs needs ~32 GiB just for OSD processes, plus OS overhead. Do not size RAM from disk capacity alone — size from the OSD count per host.
+
+**vCPU oversubscription:** Ceph tolerates CPU oversubscription better than memory oversubscription. If hosts are RAM-bound, reduce OSDs per host before reducing vCPU.
+
+**Example 3-host site (1 OSD per host, replicated 3x):**
+
+| Host | Roles | vCPU | RAM | Disk |
+|---|---|---|---|---|
+| ceph-mon-1 | MON + MGR | 4 | 16 GiB | 100 GiB SSD |
+| ceph-mon-2 | MON + MGR | 4 | 16 GiB | 100 GiB SSD |
+| ceph-mon-3 | MON + OSD x1 | 5 | 20 GiB | 100 GiB SSD + 1 data disk |
+
+Always add ~2 GiB RAM and 1 vCPU for the OS and the container engine overhead on top of the role totals.
+
+
 ### 1.2 OS and kernel — mandatory or best practice?
 
 **Mandatory:** OS (Oracle Linux 8/9 or Ubuntu 22.04/24.04) and XFS with `ftype=1` for BlueStore. Ceph does not install or fix the OS.
