@@ -1,6 +1,6 @@
 # Host configuration inputs
 
-[Previous step](architecture/03-failure-domains.md) | [Next step](storage/ceph/cephadm-deployment.md)
+[Previous step](../architecture/03-failure-domains.md) | [Next step](../storage/ceph/cephadm-deployment.md)
 
 ---
 
@@ -226,4 +226,4 @@ Open exactly these ports per role; everything else is denied by default. See
 the matrix is converted into per-role rules.
 
 
-[Previous step](architecture/03-failure-domains.md) | [Next step](storage/ceph/cephadm-deployment.md)
+[Previous step](../architecture/03-failure-domains.md) | [Next step](../storage/ceph/cephadm-deployment.md)

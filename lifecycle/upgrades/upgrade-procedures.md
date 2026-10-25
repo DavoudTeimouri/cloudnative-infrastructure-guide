@@ -1,6 +1,6 @@
 # Upgrade procedures
 
-[Previous step](lifecycle/backup/backup-and-dr.md)
+[Previous step](../backup/backup-and-dr.md)
 
 ---
 
@@ -148,4 +148,4 @@ Not a version upgrade, but the same discipline applies.
 - Record the actual downtime and any deviation from this procedure in the change record.
 
 
-[Previous step](lifecycle/backup/backup-and-dr.md)
+[Previous step](../backup/backup-and-dr.md)

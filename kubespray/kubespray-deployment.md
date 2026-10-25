@@ -1,6 +1,6 @@
 # Kubespray deployment (offline)
 
-[Previous step](storage/ceph/cephadm-deployment.md) | [Next step](management-cluster/rancher/rancher.md)
+[Previous step](../storage/ceph/cephadm-deployment.md) | [Next step](../management-cluster/rancher/rancher.md)
 
 ---
 
@@ -337,4 +337,4 @@ Strongly recommended:
 - Record the Ansible and Python versions in `requirements.txt` and pin them.
 
 
-[Previous step](storage/ceph/cephadm-deployment.md) | [Next step](management-cluster/rancher/rancher.md)
+[Previous step](../storage/ceph/cephadm-deployment.md) | [Next step](../management-cluster/rancher/rancher.md)

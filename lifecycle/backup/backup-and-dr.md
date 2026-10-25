@@ -1,6 +1,6 @@
 # Backup and disaster recovery
 
-[Previous step](management-cluster/platform-services/) | [Next step](lifecycle/upgrades/upgrade-procedures.md)
+[Previous step](../../management-cluster/platform-services/) | [Next step](../upgrades/upgrade-procedures.md)
 
 ---
 
@@ -200,4 +200,4 @@ Strongly recommended:
 - Record the measured RTO in this file after each drill.
 
 
-[Previous step](management-cluster/platform-services/) | [Next step](lifecycle/upgrades/upgrade-procedures.md)
+[Previous step](../../management-cluster/platform-services/) | [Next step](../upgrades/upgrade-procedures.md)

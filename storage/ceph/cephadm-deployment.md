@@ -1,6 +1,6 @@
 # Ceph storage (cephadm path)
 
-[Previous step](operating-systems/host-configuration.md) | [Next step](kubespray/kubespray-deployment.md)
+[Previous step](../../operating-systems/host-configuration.md) | [Next step](../../kubespray/kubespray-deployment.md)
 
 ---
 
@@ -906,4 +906,4 @@ Requires the monmap and OSD map from backup; see `lifecycle/backup/`. Back up `c
 - The in-cluster Rook-Ceph model — that is `storage/rook-ceph/rook-ceph.md`.
 
 
-[Previous step](operating-systems/host-configuration.md) | [Next step](kubespray/kubespray-deployment.md)
+[Previous step](../../operating-systems/host-configuration.md) | [Next step](../../kubespray/kubespray-deployment.md)

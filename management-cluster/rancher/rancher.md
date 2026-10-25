@@ -1,6 +1,6 @@
 # Rancher management cluster
 
-[Previous step](kubespray/kubespray-deployment.md) | [Next step](network-matrix/external-load-balancer.md)
+[Previous step](../../kubespray/kubespray-deployment.md) | [Next step](../../network-matrix/external-load-balancer.md)
 
 ---
 
@@ -219,4 +219,4 @@ Strongly recommended:
 - Alert on Rancher availability, and on the Rancher operator's own reconciliation errors.
 
 
-[Previous step](kubespray/kubespray-deployment.md) | [Next step](network-matrix/external-load-balancer.md)
+[Previous step](../../kubespray/kubespray-deployment.md) | [Next step](../../network-matrix/external-load-balancer.md)

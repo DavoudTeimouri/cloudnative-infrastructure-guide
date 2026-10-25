@@ -1,6 +1,6 @@
 # External load balancer — active/active edge
 
-[Previous step](management-cluster/rancher/rancher.md) | [Next step](management-cluster/platform-services/)
+[Previous step](../management-cluster/rancher/rancher.md) | [Next step](../management-cluster/platform-services/)
 
 ---
 
@@ -453,4 +453,4 @@ Strongly recommended:
 - A quarterly failover drill on both tiers, with the measured failover time recorded.
 
 
-[Previous step](management-cluster/rancher/rancher.md) | [Next step](management-cluster/platform-services/)
+[Previous step](../management-cluster/rancher/rancher.md) | [Next step](../management-cluster/platform-services/)

@@ -37,4 +37,4 @@ Consolidating roles onto few hosts lowers cost and raises blast radius. Explicit
 | Upgrade | Firmware/BIOS in scope | BIOS out of scope; hypervisor tooling in scope |
 
 
-[Previous step](architecture/02-deployment-topology.md) | [Next step](architecture/03-failure-domains.md)
+[Previous step](00-overview.md) | [Next step](03-failure-domains.md)
