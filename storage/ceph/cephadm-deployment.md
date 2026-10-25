@@ -64,9 +64,9 @@ Never co-locate the only MON store with the OSD DB device.
 | Concern | Physical (bare metal) | Virtual machine |
 |---|---|---|
 | Ceph OSD | Recommended; direct disk access, predictable latency | Acceptable with raw/SCSI-passthrough disks; never a shared virtual disk |
-| MON / etcd | Local SSD required | Local SSD + dedicated vCPUs; never shared storage |
-| GPU (if present) | Full PCIe passthrough; MIG on H100/H200 SXM | vGPU/SR-IOV; MIG generally not virtualizable; pass the whole card |
+| MON / MGR / OSD | Local SSD for MON store and OSD DB/WAL | Local SSD + dedicated vCPUs; never shared storage |
 | Failure domain | Physical host | Host + hypervisor + storage array |
+| Disk passthrough | N/A (native) | Required for Ceph OSD data disks; shared virtual disks break replication |
 
 #### Requirements calculations
 
