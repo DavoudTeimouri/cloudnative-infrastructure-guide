@@ -8,13 +8,14 @@ Ceph deployed by cephadm on dedicated Linux hosts, consumed by Kubernetes throug
         K8s cluster                    Ceph cluster (dedicated hosts)
   +-------------------+           +-----------------------------------+
   | CSI driver pod   |---------->| MON x3 (10.40.0.x:6789)            |
-  | (external)       |           | OSD x N (10.40.0.x:6800-7568)      |
-  +-------------------+           | MDS x N (CephFS, optional)         |
+  | (external)       |           | MGR x2 (active/standby)              |
+  +-------------------+           | OSD x N (10.40.0.x:6800-7568)      |
+                                  | MDS x N (CephFS, optional)         |
                                   | RGW x N (S3, optional)              |
                                   +-----------------------------------+
 ```
 
-Two supported deployment models exist in this platform: this one (cephadm on dedicated hosts) and Rook-Ceph inside the cluster (`storage/rook-ceph/`). Containerized Ceph under Docker or Podman is not a supported model here — the container engine only runs the daemons; cephadm orchestrates them.
+Two supported deployment models exist in this platform: this one (cephadm on dedicated hosts) and Rook-Ceph inside the cluster (`storage/rook-ceph/`). cephadm runs every Ceph daemon as a container under one container engine — Docker or Podman, picked per cluster and never mixed — and orchestrates placement, upgrades, and recovery across the dedicated hosts.
 
 This document is a full, ordered instruction set for the cephadm path:
 
