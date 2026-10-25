@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Step 07 — Application cluster · Cloud-Native Configurator</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="module-header">
+  <div class="step-nav" id="step-nav"></div>
+  <h1>Step 07 — Application cluster</h1>
+  <p class="purpose">Create application clusters, size node pools per role, register into Rancher.</p>
+  <p class="doc-link"><strong>Authoritative document:</strong> <a href="../../kubespray/kubespray-deployment.md">kubespray/kubespray-deployment.md</a></p>
+</header>
+<main>
+  <form id="config-form" novalidate>
+    <fieldset>
+      <legend>Cluster</legend>
+      <div class="field-row"><label>Cluster name</label><input type="text" name="clusterName" value="apps-01"></div>
+      <div class="field-row"><label>Control plane nodes (odd)</label><input type="number" name="cpNodes" value="3" min="1"></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Node pools (table-driven sizing)</legend>
+      <div class="field-row"><label>General workers</label><input type="number" name="generalWorkers" value="2" min="0"></div>
+      <div class="field-row"><label>Storage workers (Ceph OSD)</label><input type="number" name="storageWorkers" value="3" min="0"></div>
+      <div class="field-row"><label>GPU workers</label><input type="number" name="gpuWorkers" value="0" min="0"></div>
+      <div class="field-row"><label>Edge workers</label><input type="number" name="edgeWorkers" value="2" min="0"></div>
+      <p class="hint">Reserve 2 vCPU / 4.5 GiB per host for OS + monitoring agents before workload allocation. PGs = (num_osd × 100) / replica_count, rounded up to power of 2.</p>
+    </fieldset>
+
+    <fieldset>
+      <legend>Workloads</legend>
+      <label><input type="checkbox" name="windowsWorkers"> Windows workers (optional)</label>
+      <label><input type="checkbox" name="gitops" checked> Argo CD GitOps from internal GitLab</label>
+    </fieldset>
+  </form>
+
+  <div id="validation" class="msg-box"></div>
+
+  <div class="actions">
+    <button type="button" id="validate">Validate</button>
+    <button type="button" id="download">Download config (JSON)</button>
+    <a class="btn-link" href="../../index.html">← Main site</a>
+  </div>
+
+  <pre id="config-output"></pre>
+</main>
+<script src="app.js"></script>
+</body>
+</html>

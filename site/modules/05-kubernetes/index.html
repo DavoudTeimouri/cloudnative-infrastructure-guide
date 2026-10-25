@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Step 05 — Kubernetes · Cloud-Native Configurator</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="module-header">
+  <div class="step-nav" id="step-nav"></div>
+  <h1>Step 05 — Kubernetes</h1>
+  <p class="purpose">Deploy application clusters with Kubespray: control plane, workers, CNI (Cilium), CoreDNS, MetalLB.</p>
+  <p class="doc-link"><strong>Authoritative document:</strong> <a href="../../kubespray/kubespray-deployment.md">kubespray/kubespray-deployment.md</a></p>
+</header>
+<main>
+  <form id="config-form" novalidate>
+    <fieldset>
+      <legend>Kubespray</legend>
+      <div class="field-row"><label>Kubespray release</label><input type="text" name="kubesprayRelease" value="v2.24"></div>
+      <div class="field-row"><label>Container image registry</label><input type="text" name="imageRegistry" value="harbor.internal/k8s"></div>
+      <div class="field-row"><label>Container manager</label><input type="text" name="containerManager" value="containerd"></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Node counts</legend>
+      <div class="field-row"><label>Control plane nodes (odd)</label><input type="number" name="cpNodes" value="3" min="1"></div>
+      <div class="field-row"><label>Worker nodes</label><input type="number" name="workerNodes" value="2" min="1"></div>
+      <div class="field-row"><label>etcd nodes (odd, ≤ cp nodes)</label><input type="number" name="etcdNodes" value="3" min="1"></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Networking</legend>
+      <label><input type="checkbox" name="cilium" checked> Cilium CNI (eBPF)</label>
+      <label><input type="checkbox" name="metallb" checked> MetalLB Layer 2 pool</label>
+      <label><input type="checkbox" name="corednsForward" checked> CoreDNS forwarding to internal DNS</label>
+      <div class="field-row"><label>Pod CIDR</label><input type="text" name="podCidr" value="10.30.0.0/16"></div>
+      <div class="field-row"><label>Service CIDR</label><input type="text" name="serviceCidr" value="10.32.0.0/16"></div>
+    </fieldset>
+  </form>
+
+  <div id="validation" class="msg-box"></div>
+
+  <div class="actions">
+    <button type="button" id="validate">Validate</button>
+    <button type="button" id="download">Download config (JSON)</button>
+    <a class="btn-link" href="../../index.html">← Main site</a>
+  </div>
+
+  <pre id="config-output"></pre>
+</main>
+<script src="app.js"></script>
+</body>
+</html>

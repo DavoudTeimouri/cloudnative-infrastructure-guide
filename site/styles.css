@@ -239,6 +239,9 @@ pre.mini {
   border-radius: 6px; font: 12px/1.6 var(--mono); overflow: auto;
 }
 .row { display: flex; gap: 8px; }
+.doc-link { margin: 8px 0 0 0; font-size: 13px; color: var(--muted); }
+.doc-link a { color: var(--accent); text-decoration: none; }
+.doc-link a:hover { text-decoration: underline; }
 
 @media (max-width: 640px) {
   .hero h1 { font-size: 26px; }

@@ -767,6 +767,9 @@
 
     box.appendChild(el("h2", { text: page.title }));
     box.appendChild(el("p", { class: "hint", text: page.subtitle }));
+    if (page.doc) {
+      box.appendChild(el("p", { class: "doc-link" }, [el("a", { href: "../" + page.doc, text: "Authoritative document: " + page.doc })]));
+    }
 
     if (page.id === "p1") {
       var mbox = el("div", { class: "options" });

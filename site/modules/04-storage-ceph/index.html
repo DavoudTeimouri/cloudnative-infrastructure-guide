@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Step 04 — Storage — Ceph · Cloud-Native Configurator</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="module-header">
+  <div class="step-nav" id="step-nav"></div>
+  <h1>Step 04 — Storage — Ceph</h1>
+  <p class="purpose">Define Ceph nodes, assign roles per node, configure OSDs and pools. Validation prevents wrong configurations.</p>
+  <p class="doc-link"><strong>Authoritative document:</strong> <a href="../../storage/ceph/cephadm-deployment.md">storage/ceph/cephadm-deployment.md</a></p>
+</header>
+<main>
+  <form id="config-form" novalidate>
+    <fieldset>
+      <legend>Deployment engine</legend>
+      <label><input type="radio" name="engine" value="docker" checked> Docker</label>
+      <label><input type="radio" name="engine" value="podman"> Podman</label>
+      <p class="hint">One engine per cluster, never mixed.</p>
+    </fieldset>
+
+    <fieldset>
+      <legend>Nodes</legend>
+      <div id="node-list"></div>
+      <button type="button" id="addNode" style="margin:8px 0;padding:4px 10px;font-size:12px;">+ Add node</button>
+      <p class="hint">Assign one or more roles per node: mon, mgr, osd, mds, rgw. Odd MON count (≥3). ≥3 OSD hosts for 3-replica. Never co-locate all MONs on one host.</p>
+    </fieldset>
+
+    <fieldset>
+      <legend>Pools</legend>
+      <div id="pool-list"></div>
+      <button type="button" id="addPool" style="margin:8px 0;padding:4px 10px;font-size:12px;">+ Add pool</button>
+      <p class="hint">Replicated pool for Kubernetes (RBD/CSI). Erasure-coded pool for bulk non-K8s data. PGs = (num_osd × 100) / replica_count, rounded up to power of 2.</p>
+    </fieldset>
+  </form>
+
+  <div id="validation" class="msg-box"></div>
+
+  <div class="actions">
+    <button type="button" id="validate">Validate</button>
+    <button type="button" id="download">Download config (JSON)</button>
+    <a class="btn-link" href="../../index.html">← Main site</a>
+  </div>
+
+  <pre id="config-output"></pre>
+</main>
+<script src="app.js"></script>
+</body>
+</html>

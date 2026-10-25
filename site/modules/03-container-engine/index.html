@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Step 03 — Container engine · Cloud-Native Configurator</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="module-header">
+  <div class="step-nav" id="step-nav"></div>
+  <h1>Step 03 — Container engine</h1>
+  <p class="purpose">Install Docker or Podman (one engine per cluster, never mixed) and point it at the internal registry.</p>
+  <p class="doc-link"><strong>Authoritative document:</strong> <a href="../../storage/ceph/cephadm-deployment.md">storage/ceph/cephadm-deployment.md</a> §air-gap</p>
+</header>
+<main>
+  <form id="config-form" novalidate>
+    <fieldset>
+      <legend>Engine selection (one per cluster)</legend>
+      <label><input type="radio" name="engine" value="podman" checked> Podman (default for cephadm)</label>
+      <label><input type="radio" name="engine" value="docker"> Docker</label>
+      <p class="hint">Never mix Docker and Podman inside one cluster.</p>
+    </fieldset>
+
+    <fieldset>
+      <legend>Air-gap registry</legend>
+      <div class="field-row"><label>Registry host</label><input type="text" name="registryHost" value="harbor.internal"></div>
+      <div class="field-row"><label>Registry port</label><input type="number" name="registryPort" value="443" min="1" max="65535"></div>
+      <div class="field-row"><label>Registry project</label><input type="text" name="registryProject" value="ceph"></div>
+      <label><input type="checkbox" name="insecure" checked> Allow insecure (self-signed TLS) registry</label>
+      <p class="hint">Mirror all images from quay.io / Docker Hub to this registry on a connected build machine first.</p>
+    </fieldset>
+
+    <fieldset>
+      <legend>NO_PROXY exclusions</legend>
+      <div class="field-row"><label>Excluded hosts</label><input type="text" name="noProxy" value="harbor.internal,nexus.internal,registry.internal,10.40.0.0/24,10.41.0.0/24,.internal,localhost,127.0.0.1"></div>
+    </fieldset>
+  </form>
+
+  <div id="validation" class="msg-box"></div>
+
+  <div class="actions">
+    <button type="button" id="validate">Validate</button>
+    <button type="button" id="download">Download config (JSON)</button>
+    <a class="btn-link" href="../../index.html">← Main site</a>
+  </div>
+
+  <pre id="config-output"></pre>
+</main>
+<script src="app.js"></script>
+</body>
+</html>
