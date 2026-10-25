@@ -61,47 +61,30 @@ The site holds no independent knowledge. Components, steps and exports come from
 marked `VERIFIED` are used. A build check fails when the generated data no longer matches the
 sources, so the site cannot drift from the documents. Details: `site/README.md`.
 
-## Step-by-step guide (`docs/guide/`)
+## Step-by-step guide — existing documents linked in order
 
-A numbered, interlinked, from-scratch guide for building the platform. Work the steps in order;
-each step lists prerequisites, commands, validation, and links to the authoritative documents.
+Work the existing documents in order. Each step links to the next so the guide reads end-to-end;
+every document is the authority for its section (this README only links them).
 
-| Step | Title | Source |
-|---|---|---|
-| 00 | Prerequisites | `docs/guide/00-prerequisites.md` |
-| 01 | Infrastructure prep | `docs/guide/01-infrastructure-prep.md` |
-| 02 | OS baseline | `docs/guide/02-os-baseline.md` |
-| 03 | Container engine | `docs/guide/03-container-engine.md` |
-| 04 | Storage — Ceph | `docs/guide/04-storage-ceph.md` |
-| 05 | Kubernetes | `docs/guide/05-kubernetes.md` |
-| 06 | Management cluster | `docs/guide/06-management-cluster.md` |
-| 07 | Application cluster | `docs/guide/07-application-cluster.md` |
-| 08 | Traffic edge | `docs/guide/08-traffic-edge.md` |
-| 09 | Platform services | `docs/guide/09-platform-services.md` |
-| 10 | Backup & upgrade | `docs/guide/10-backup-upgrade.md` |
+| Step | Title | Document | Next |
+|---|---|---|---|
+| 00 | Overview & architecture | [`architecture/00-overview.md`](architecture/00-overview.md) | → 01 |
+| 01 | Deployment topology & sizing | [`architecture/02-deployment-topology.md`](architecture/02-deployment-topology.md) | → 02 |
+| 02 | Failure domains | [`architecture/03-failure-domains.md`](architecture/03-failure-domains.md) | → 03 |
+| 03 | OS baseline (per host) | [`operating-systems/host-configuration.md`](operating-systems/host-configuration.md) | → 04 |
+| 04 | Container engine (Docker/Podman, air-gap) | [`storage/ceph/cephadm-deployment.md`](storage/ceph/cephadm-deployment.md) §air-gap | → 05 |
+| 05 | Storage — Ceph (cephadm) | [`storage/ceph/cephadm-deployment.md`](storage/ceph/cephadm-deployment.md) | → 06 |
+| 06 | Kubernetes (Kubespray) | [`kubespray/kubespray-deployment.md`](kubespray/kubespray-deployment.md) | → 07 |
+| 07 | Management cluster | [`management-cluster/rancher/rancher.md`](management-cluster/rancher/rancher.md) | → 08 |
+| 08 | Traffic edge (LB / ingress) | [`network-matrix/external-load-balancer.md`](network-matrix/external-load-balancer.md) | → 09 |
+| 09 | Platform services | [`management-cluster/platform-services/`](management-cluster/platform-services/) | → 10 |
+| 10 | Backup & upgrade | [`lifecycle/backup/backup-and-dr.md`](lifecycle/backup/backup-and-dr.md) · [`lifecycle/upgrades/upgrade-procedures.md`](lifecycle/upgrades/upgrade-procedures.md) | (end) |
 
-[Guide index →](./docs/guide/index.md) | [Guide landing →](./docs/README.md)
-
-## Modular configuration sites (`site/modules/`)
-
-Each configuration step is also a self-contained module site with client-side validation and a
-downloadable config JSON. Modules link to each other and back to the main site:
-
-- `site/modules/00-prerequisites/` — site size, VM vs bare metal, network segments
-- `site/modules/01-infrastructure-prep/` — SSH, break-glass, chrony, DNS
-- `site/modules/02-os-baseline/` — kernel modules, disks, security
-- `site/modules/03-container-engine/` — Docker/Podman, air-gap registry
-- `site/modules/04-storage-ceph/` — nodes, roles per node, pools, PGs
-- `site/modules/05-kubernetes/` — Kubespray, control plane, workers, CNI
-- `site/modules/06-management-cluster/` — Rancher, Argo CD, Keycloak, Vault
-- `site/modules/07-application-cluster/` — node pools, sizing
-- `site/modules/08-traffic-edge/` — LB, VIP, ingress, MetalLB
-- `site/modules/09-platform-services/` — monitoring, logging, add-ons
-- `site/modules/10-backup-upgrade/` — Velero, Ceph recovery, Kubespray upgrades
-
-Each module: self-contained HTML + ES5 JS + CSS (no `let`/`const`/arrow/template literals), step
-nav to all 10 modules plus the main site, client-side validation that prevents wrong configs, and a
-download button. Open `site/modules/NN-step/index.html` directly (no server needed).
+**Cross-references kept inside the documents:**
+- Ports / flows: [`network-matrix/port-requirements.md`](network-matrix/port-requirements.md)
+- Versions: [`compatibility/version-matrix.md`](compatibility/version-matrix.md)
+- No host AD join: [`decisions/ADR-0015-identity-integration-layer.md`](decisions/ADR-0015-identity-integration-layer.md)
+- Secrets: Vault, never in Git — `[REDACTED]`
 
 ## Use it, step by step
 
