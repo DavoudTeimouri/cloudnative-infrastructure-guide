@@ -47,17 +47,65 @@ Do this on every Ceph host before any cephadm command. Ceph assumes a clean, tun
 
 Never put MON on the same host as the only OSD of a pool, and never let the DB/WAL device be shared with the OS.
 
-### 1.2 OS and kernel
+#### Which roles can be hosted together
 
-Supported: Oracle Linux 8/9 or Ubuntu 22.04/24.04. Kernel 5.4+ (OL9) / 5.15 (Ubuntu 24.04). Confirm against the Ceph release notes for the pinned version.
+Co-location is a deliberate trade-off: fewer hosts, higher blast radius. The safest default is one role type per host. Co-locate only when the site cannot spare the hosts.
+
+Allowed co-location:
+- MON + MGR may share a host (never all three MONs on one host).
+- OSD + RGW may share a host; RGW is stateless.
+- MDS + MGR may share a host.
+- MON + OSD on the same host only with ≥ 3 hosts; losing one host loses a monitor and a third of the data at once.
+
+Never co-locate the only MON store with the OSD DB device.
+
+#### Minimum requirements: VM vs physical
+
+| Concern | Physical (bare metal) | Virtual machine |
+|---|---|---|
+| Ceph OSD | Recommended; direct disk access, predictable latency | Acceptable with raw/SCSI-passthrough disks; never a shared virtual disk |
+| MON / etcd | Local SSD required | Local SSD + dedicated vCPUs; never shared storage |
+| GPU (if present) | Full PCIe passthrough; MIG on H100/H200 SXM | vGPU/SR-IOV; MIG generally not virtualizable; pass the whole card |
+| Failure domain | Physical host | Host + hypervisor + storage array |
+
+#### Requirements calculations
+
+State the assumptions; do not use a single formula.
+
+**Replicated (3x) usable capacity:**
+
+```
+usable_raw = Σ(disk_size_available) × (1 - reserved_fraction)
+usable_3x  = usable_raw / 3
+```
+
+`reserved_fraction` is typically 0.05–0.10 (filesystem, WAL, DB). Working target: 70% of usable — keep 25–30% of raw capacity free so a failed OSD can be replaced and rebalanced without filling the pool.
+
+**Erasure coding (k+m):**
+
+```
+usable_ec = raw × (k / (k + m))
+```
+
+A 4+2 pool gives ~67% usable. EC saves space but read-decode on recovery is slow; not recommended for write-heavy databases.
+
+**IOPS:** derived from disk type and queue depth.
+
+**Network:** a 3x pool writes 2 copies to the network per 1 GB of client write. A 10 GbE link supports roughly 1.25 GB/s of client write throughput before saturation.
+
+### 1.2 OS and kernel — mandatory or best practice?
+
+**Mandatory:** OS (Oracle Linux 8/9 or Ubuntu 22.04/24.04) and XFS with `ftype=1` for BlueStore. Ceph does not install or fix the OS.
+
+**Best practice:** Kernel 5.4+ (OL9) / 5.15 (Ubuntu 24.04), dedicated NVMe for OSD DB/WAL, chrony for NTP. Confirm the exact kernel floor against the Ceph release notes for the pinned version.
+
+Required kernel modules (mandatory for networking and RBD):
 
 ```bash
-# Required kernel modules on every host
 modprobe br_netfilter
 modprobe nf_conntrack
 modprobe rbd
 
-# Persist across reboots
 cat > /etc/modules-load.d/ceph.conf <<'EOF'
 br_netfilter
 nf_conntrack
@@ -65,27 +113,63 @@ rbd
 EOF
 ```
 
-### 1.3 Time and name resolution
-
-All Ceph hosts must agree on time; monitor quorum depends on timestamp agreement.
+**How to check:**
 
 ```bash
-# NTP (internal servers only; air-gapped site)
-chronyc sources -v
+cat /etc/os-release
+uname -r
+lsmod | grep -E 'br_netfilter|nf_conntrack|rbd'
+getenforce || aa-status --enabled   # SELinux / AppArmor
+```
 
-# DNS must resolve every Ceph host name from every other Ceph host
+**Impact if not applied:**
+- Missing `br_netfilter` / `nf_conntrack`: bridged container traffic and Ceph replication traffic can be dropped or misrouted by netfilter; daemons may appear down.
+- Missing `rbd`: RBD block devices cannot be mapped; the external CSI driver cannot attach volumes.
+- No XFS `ftype=1`: BlueStore refuses the device; OSD creation fails.
+- Wrong kernel: Ceph daemons may crash or refuse to start on unsupported kernels.
+
+### 1.3 Time and name resolution
+
+All Ceph hosts must agree on time; monitor quorum depends on timestamp agreement. A drifting clock can drop a monitor from quorum.
+
+**NTP (internal only; air-gapped site):**
+
+```bash
+chronyc sources -v
+chronyc tracking
+```
+
+Use at least two internal NTP sources; a third on a different switch is recommended.
+
+**Name resolution:** every Ceph host must resolve every other Ceph host by name:
+
+```bash
 getent hosts ceph-mon-1 ceph-mon-2 ceph-mon-3 ceph-osd-1
 ```
 
-### 1.4 Disks and filesystems
+**No DNS environment:** If there is no DNS server, use `/etc/hosts` on every Ceph host and keep it identical everywhere:
+
+```bash
+cat >> /etc/hosts <<'EOF'
+10.40.0.11  ceph-mon-1
+10.40.0.12  ceph-mon-2
+10.40.0.13  ceph-mon-3
+10.40.0.14  ceph-osd-1
+10.40.0.15  ceph-osd-2
+10.40.0.16  ceph-osd-3
+EOF
+```
+
+Name resolution failures prevent cephadm from adding hosts and daemons from forming quorum.
+
+### 1.4 Disks and filesystems (node preparation)
 
 One data device per OSD. XFS with `ftype=1` is required by BlueStore.
 
 ```bash
-# List candidate devices
 lsblk -d -o NAME,SIZE,TYPE,ROTA,MODEL
 
-# Wipe stale filesystem/signatures on data devices (destructive)
+# Destructive: wipes stale filesystems/signatures from data devices
 wipefs -a /dev/sdb
 ```
 
@@ -93,22 +177,44 @@ Reserve a separate NVMe device per host for the OSD BlueStore DB/WAL when data d
 
 ### 1.5 Network
 
-Use two NICs/VLANs when possible: one public (client/MON/RGW traffic, `10.40.0.0/24`) and one cluster (replication/OSD traffic, `10.41.0.0/24`). Replication traffic is the driver; 10 GbE is the minimum for production.
+**Two NICs/VLANs (recommended):** one public (client/MON/RGW traffic, `10.40.0.0/24`) and one cluster (replication/OSD traffic, `10.41.0.0/24`). Replication traffic is the driver; 10 GbE is the minimum for production.
+
+**One network:** If the site has only one network, put MON and OSD traffic on the same subnet/VLAN. Ceph still works, but replication traffic competes with client traffic on the same link. Mitigations:
+- Size the link for the combined load (replication is roughly 2× the client write volume for a 3x pool).
+- Use separate IP ranges within the same VLAN so firewall rules can still distinguish MON vs OSD traffic.
+- Prefer 10 GbE or faster; 1 GbE is not suitable for production Ceph.
+
+Verify reachability between every pair of hosts:
 
 ```bash
-# Verify both networks are reachable between every pair of hosts
 ping -c 3 10.40.0.12
-ping -c 3 10.41.0.12
 ```
 
 ### 1.6 SSH access
 
-The bootstrap host must reach every other Ceph host over SSH as root (or a sudo-capable account) without a password prompt. cephadm installs the engine and daemons on remote hosts itself.
+The bootstrap host must reach every other Ceph host over SSH without a password prompt, because cephadm installs the engine and daemons on remote hosts itself.
+
+**Non-root user:** SSH as a non-root user with passwordless `sudo` is preferred over direct root login. cephadm elevates via sudo when needed.
 
 ```bash
-# From the bootstrap host
-ssh root@ceph-osd-2 'hostname'
-ssh root@ceph-osd-3 'hostname'
+# From the bootstrap host, as the deploy user
+ssh cephadm@ceph-osd-2 'hostname'
+ssh cephadm@ceph-osd-3 'sudo hostname'
+```
+
+Ensure the deploy user can run sudo without a password on each Ceph host:
+
+```bash
+# On each Ceph host
+echo "cephadm ALL=(ALL) NOPASSWD:ALL" | sudo tee /etc/sudoers.d/cephadm
+```
+
+**AD authentication:** Hosts must NOT be joined to Active Directory/LDAP (ADR-0015). Identity is application-layer only; nodes keep local accounts plus an offline break-glass key. Do not rely on AD/Kerberos for the SSH access cephadm uses — use local key-based authentication with the break-glass key installed for `root` or the deploy user.
+
+Verify:
+
+```bash
+ssh cephadm@ceph-osd-2 'sudo cephadm --version'
 ```
 
 ---
@@ -136,6 +242,8 @@ Mirror Ceph images into Harbor ahead of time from a connected build machine:
 skopeo copy docker://quay.io/ceph/ceph:v18 docker://harbor.internal/ceph/ceph:v18 --dest-tls-verify=false
 skopeo copy docker://quay.io/ceph/ceph:v17 docker://harbor.internal/ceph/ceph:v17 --dest-tls-verify=false
 ```
+
+**What is skopeo?** `skopeo` is a tool for inspecting and copying container images between registries without running a daemon. It copies image layers and metadata directly from one registry to another (e.g. from the public `quay.io` to your internal Harbor), so you can stage Ceph images on a connected machine and push them into the air-gapped registry. Install it from your internal mirror (`dnf install -y skopeo` on Oracle Linux, `apt install -y skopeo` on Ubuntu).
 
 Create a `ceph` project in Harbor and a robot account with `pull` permission for `cephadm` to use. Record the exact image tags in `compatibility/version-matrix.md` so the pinned version propagates through the build.
 
