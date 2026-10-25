@@ -93,17 +93,19 @@ A 4+2 pool gives ~67% usable. EC saves space but read-decode on recovery is slow
 
 **Network:** a 3x pool writes 2 copies to the network per 1 GB of client write. A 10 GbE link supports roughly 1.25 GB/s of client write throughput before saturation.
 
-**Compute resources (vCPU and RAM):** Ceph is not CPU-heavy; the drivers are network, decompression, and per-OSD memory. Size from the role count and the daemon count per host, not from disk capacity.
+**Compute resources (vCPU and RAM):** Ceph is not CPU-heavy; the drivers are network, decompression, and per-OSD memory. Size from the role count and daemon count per host, not from disk capacity.
 
-| Role | vCPU per host | RAM per host | When CPU grows | When RAM grows | Why |
-|---|---|---|---|---|---|
-| MON | 2 | 8 GiB | More clients, more monitors in quorum | More monitors, larger mon store | Each MON holds the full cluster map; CPU grows with client request rate and paxos churn |
-| MGR | 2 | 8 GiB | More modules enabled, more prometheus/exporter scraping | Larger dashboard state, more metrics | MGR runs the orchestrator, dashboard, and all enabled modules |
-| OSD | 1 per OSD daemon, min 4 | 4 GiB per OSD daemon, min 16 GiB | More OSD daemons per host | More OSD daemons, larger DB/WAL cache | Each OSD daemon is a process with its own cache; RAM scales with OSD count, not disk size |
-| MDS | 4 | 16 GiB | More CephFS clients, more metadata operations | More CephFS filesystems, larger metadata cache | MDS is CPU-heavy under metadata load |
-| RGW | 4 | 8 GiB | More S3 requests, higher request rate | More RGW instances, larger object cache | RGW is stateless; scale by request rate, not data size |
+| Role | vCPU grows when | RAM grows when | Starting point |
+|---|---|---|---|
+| MON | Client request rate (kubectl, CSI, RGW, admin) and MON count in quorum | MON count and mon store size | 2 vCPU, 8 GiB |
+| MGR | Enabled modules (prometheus, dashboard, orchestration) and scrape targets | Dashboard state and cached metrics | 2 vCPU, 8 GiB |
+| OSD | Number of OSD daemons on the host and rebuild/rebalance activity | OSD daemon count (cache per daemon) and BlueStore DB/WAL cache | 1 vCPU per OSD daemon (min 4), 4 GiB per OSD daemon (min 16 GiB) |
+| MDS | CephFS clients and metadata operation rate | CephFS filesystems and metadata cache | 4 vCPU, 16 GiB |
+| RGW | S3 request rate and concurrent connections | RGW instance count and object cache | 4 vCPU, 8 GiB |
 
-**Per-OSD memory estimate:** each OSD daemon reserves roughly 4 GiB for its own cache plus the BlueStore DB/WAL working set. A host with 8 OSDs needs ~32 GiB just for OSD processes, plus OS overhead. Do not size RAM from disk capacity alone — size from the OSD count per host.
+**Key principle:** Disk capacity does NOT drive CPU or RAM. A 10 TB disk with 1 OSD needs the same RAM as a 1 TB disk with 1 OSD. RAM scales with the number of daemons, not with how full the disks are. CPU scales with request/rebuild activity, not with capacity.
+
+**Memory per OSD daemon:** each OSD daemon reserves roughly 4 GiB for its cache plus the BlueStore DB/WAL working set. A host with 8 OSDs needs ~32 GiB for OSD processes alone, plus OS overhead. Do not size RAM from disk capacity — size from the OSD count per host.
 
 **vCPU oversubscription:** Ceph tolerates CPU oversubscription better than memory oversubscription. If hosts are RAM-bound, reduce OSDs per host before reducing vCPU.
 
@@ -123,6 +125,17 @@ cephadm shell -- ceph osd df
 ```
 `active+clean` with `undersized` or `degraded` means PGs are not yet placed; `stuck unclean` means a failure is in progress.
 
+**OS and application reservation:** Always reserve resources for the operating system and non-Ceph applications on every host, before allocating the rest to Ceph daemons:
+
+| Reservation | vCPU | RAM | Purpose |
+|---|---|---|---|
+| Operating system | 1 | 2 GiB | Kernel, systemd, journald, SSH, cron |
+| Container engine (Docker/Podman) | 0.5 | 1 GiB | Engine daemon, container metadata, image layers |
+| Monitoring agent (node_exporter / prometheus scrape) | 0.25 | 0.5 GiB | Host metrics collection |
+| Cephadm / orchestrator overhead | 0.25 | 0.5 GiB | cephadm container management on the host |
+| Break-glass / admin tools | 0 | 0.5 GiB | `cephadm shell`, diagnostics, logs |
+| **Total reserve per host** | **2 vCPU** | **4.5 GiB** | Reserve on every Ceph host before Ceph daemons |
+
 **Correctly sized example — 3-host site, replicated 3x (separated roles, no MON+OSD co-location):**
 
 | Host | Roles | vCPU | RAM | Disk |
@@ -134,7 +147,7 @@ cephadm shell -- ceph osd df
 | ceph-osd-2 | OSD x3 | 7 | 28 GiB | 100 GiB SSD + 3 data disks + 1 NVMe DB/WAL |
 | ceph-osd-3 | OSD x3 | 7 | 28 GiB | 100 GiB SSD + 3 data disks + 1 NVMe DB/WAL |
 
-Always add ~2 GiB RAM and 1 vCPU for the OS and the container engine overhead on top of the role totals. This layout satisfies the 3-replica pool (9 OSDs across 3 OSD hosts) and keeps MONs off OSD hosts.
+Total per OSD host = 7 vCPU / 28 GiB for Ceph OSDs, plus 2 vCPU / 4.5 GiB OS + agent reservation. This layout satisfies the 3-replica pool (9 OSDs across 3 OSD hosts) and keeps MONs off OSD hosts.
 
 
 ### 1.2 OS and kernel — mandatory or best practice?
