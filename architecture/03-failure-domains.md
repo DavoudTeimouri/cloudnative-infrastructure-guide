@@ -1,6 +1,6 @@
 # Failure Domain Analysis
 
-[Previous step](architecture/02-deployment-topology.md) | [Next step](operating-systems/host-configuration.md)
+[Previous step](02-deployment-topology.md) | [Next step](../operating-systems/host-configuration.md)
 
 ---
 
@@ -30,4 +30,4 @@
 4. Break-glass access exists on every node: local account + sudo, keys held offline.
 
 
-[Previous step](architecture/02-deployment-topology.md) | [Next step](operating-systems/host-configuration.md)
+[Previous step](02-deployment-topology.md) | [Next step](../operating-systems/host-configuration.md)

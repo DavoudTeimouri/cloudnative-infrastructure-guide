@@ -1,6 +1,6 @@
 # Deployment Topology (reference sizing, PROVISIONAL)
 
-[Previous step](architecture/00-overview.md) | [Next step](architecture/03-failure-domains.md)
+[Previous step](00-overview.md) | [Next step](03-failure-domains.md)
 
 ---
 

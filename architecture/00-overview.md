@@ -1,6 +1,6 @@
 # Architecture Overview
 
-[Next step](architecture/02-deployment-topology.md)
+[Next step](02-deployment-topology.md)
 
 ---
 
@@ -40,4 +40,4 @@ Rationale: `decisions/ADR-0010.md`, `decisions/ADR-0013.md`, `decisions/ADR-0025
 Verify every CIDR against the site plan before build. All ports: `network-matrix/network-communication-matrix.md`.
 
 
-[Next step](architecture/02-deployment-topology.md)
+[Next step](02-deployment-topology.md)
