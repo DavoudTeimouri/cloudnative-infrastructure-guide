@@ -1,0 +1,144 @@
+var STEP = "10";
+var TOTAL = 10;
+var STEPS = [
+  { id: "00", name: "Prerequisites", dir: "00-prerequisites" },
+  { id: "01", name: "Infrastructure prep", dir: "01-infrastructure-prep" },
+  { id: "02", name: "OS baseline", dir: "02-os-baseline" },
+  { id: "03", name: "Container engine", dir: "03-container-engine" },
+  { id: "04", name: "Storage — Ceph", dir: "04-storage-ceph" },
+  { id: "05", name: "Kubernetes", dir: "05-kubernetes" },
+  { id: "06", name: "Management cluster", dir: "06-management-cluster" },
+  { id: "07", name: "Application cluster", dir: "07-application-cluster" },
+  { id: "08", name: "Traffic edge", dir: "08-traffic-edge" },
+  { id: "09", name: "Platform services", dir: "09-platform-services" },
+  { id: "10", name: "Backup & upgrade", dir: "10-backup-upgrade" }
+];
+
+function buildNav() {
+  var html = '<span class="nav-title">Steps</span>';
+  var i;
+  for (i = 0; i < STEPS.length; i++) {
+    var s = STEPS[i];
+    var cls = (s.id === STEP) ? ' class="current"' : '';
+    html += '<a href="' + s.dir + '/index.html"' + cls + '>' + s.id + '. ' + s.name + '</a>';
+  }
+  html += '<a href="../../index.html" class="nav-main">Main site</a>';
+  return html;
+}
+
+function el(tag, attrs, children) {
+  var e = document.createElement(tag);
+  var k;
+  for (k in attrs) {
+    if (attrs.hasOwnProperty(k)) {
+      if (attrs[k] === false) { continue; }
+      e.setAttribute(k, String(attrs[k]));
+    }
+  }
+  if (children) { e.innerHTML = children; }
+  return e;
+}
+
+function msg(text, type) {
+  var box = document.getElementById("validation");
+  box.innerHTML = '';
+  box.className = 'msg-box ' + type;
+  if (Array.isArray(text)) {
+    var ul = document.createElement('ul');
+    var i;
+    for (i = 0; i < text.length; i++) {
+      var li = document.createElement('li');
+      li.textContent = text[i];
+      ul.appendChild(li);
+    }
+    box.appendChild(ul);
+  } else {
+    box.textContent = text;
+  }
+}
+
+function readForm() {
+  var form = document.getElementById("config-form");
+  var data = {};
+  var els = form.elements;
+  var i;
+  for (i = 0; i < els.length; i++) {
+    var f = els[i];
+    if (!f.name) { continue; }
+    if (f.type === "radio") {
+      if (f.checked) { data[f.name] = f.value; }
+    } else if (f.type === "checkbox") {
+      data[f.name] = f.checked;
+    } else {
+      data[f.name] = f.value;
+    }
+  }
+  return data;
+}
+
+function validate(data) {
+  var errors = [];
+  if (!data.veleroSchedule) {
+    errors.push("Velero schedule is required.");
+  }
+  if (!data.backupRepo) {
+    errors.push("Backup repository is required.");
+  }
+  if (!data.targetRelease) {
+    errors.push("Target Kubespray release is required.");
+  }
+  return errors;
+}
+
+function renderConfig(data) {
+  var out = '{';
+  out += '\n  "step": "10",';
+  out += '\n  "backup": {';
+  out += '\n    "schedule": "' + data.veleroSchedule + '",';
+  out += '\n    "repository": "' + data.backupRepo + '",';
+  out += '\n    "testRestore": ' + (data.testRestore === "true" || data.testRestore === true) + '';
+  out += '\n  },';
+  out += '\n  "cephRecovery": {';
+  out += '\n    "monmapBackup": ' + (data.monmapBackup === "true" || data.monmapBackup === true) + ',';
+  out += '\n    "osdDataDoc": ' + (data.osdDataDoc === "true" || data.osdDataDoc === true) + '';
+  out += '\n  },';
+  out += '\n  "upgrade": {';
+  out += '\n    "targetRelease": "' + data.targetRelease + '",';
+  out += '\n    "tested": ' + (data.upgradeTested === "true" || data.upgradeTested === true) + '';
+  out += '\n  }';
+  out += '\n}';
+  return out;
+}
+
+function downloadConfig(data) {
+  var blob = new Blob([renderConfig(data)], { type: "application/json" });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = "step10-backup-upgrade-config.json";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+window.onload = function() {
+  document.getElementById("step-nav").innerHTML = buildNav();
+  document.getElementById("validate").onclick = function() {
+    var data = readForm();
+    var errors = validate(data);
+    if (errors.length) {
+      msg(errors, "error");
+    } else {
+      msg(["Configuration valid. Backup, Ceph recovery and upgrade plan ready."], "ok");
+      document.getElementById("config-output").textContent = renderConfig(data);
+    }
+  };
+  document.getElementById("download").onclick = function() {
+    var data = readForm();
+    var errors = validate(data);
+    if (errors.length) {
+      msg(errors, "error");
+      return;
+    }
+    downloadConfig(data);
+  };
+};

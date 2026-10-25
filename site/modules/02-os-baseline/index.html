@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Step 02 — OS baseline · Cloud-Native Configurator</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="module-header">
+  <div class="step-nav" id="step-nav"></div>
+  <h1>Step 02 — OS baseline</h1>
+  <p class="purpose">Harden the OS: kernel modules, users, disks/filesystems, security baseline, per-role overrides.</p>
+</header>
+<main>
+  <form id="config-form" novalidate>
+    <fieldset>
+      <legend>OS selection</legend>
+      <label>
+        <input type="radio" name="os" value="oracle-linux-9" checked> Oracle Linux 9
+      </label>
+      <label>
+        <input type="radio" name="os" value="ubuntu-2404"> Ubuntu Server 24.04 LTS
+      </label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Kernel modules</legend>
+      <label>
+        <input type="checkbox" name="modBrNetfilter" checked> br_netfilter
+      </label>
+      <label>
+        <input type="checkbox" name="modNfConntrack" checked> nf_conntrack
+      </label>
+      <label>
+        <input type="checkbox" name="modRbd" checked> rbd
+      </label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Disks / filesystems</legend>
+      <label>
+        <input type="checkbox" name="xfsFtype" checked> XFS ftype=1 (required for BlueStore)
+      </label>
+      <label>
+        <input type="checkbox" name="swapDisabled" checked> Swap disabled
+      </label>
+      <label>
+        <input type="checkbox" name="oneOsdPerDisk" checked> One OSD per dedicated data disk
+      </label>
+      <p class="hint">cephadm formats OSD disks via BlueStore; do not pre-format.</p>
+    </fieldset>
+
+    <fieldset>
+      <legend>Security</legend>
+      <label>
+        <input type="checkbox" name="selinux" checked> SELinux/AppArmor enforcing
+      </label>
+      <label>
+        <input type="checkbox" name="sshNoPassword" checked> SSH password auth off
+      </label>
+      <label>
+        <input type="checkbox" name="noAdJoin" checked> Not joined to AD/LDAP (ADR-0015)
+      </label>
+    </fieldset>
+  </form>
+
+  <div id="validation" class="msg-box"></div>
+
+  <div class="actions">
+    <button type="button" id="validate">Validate</button>
+    <button type="button" id="download">Download config (JSON)</button>
+    <a class="btn-link" href="../../index.html">← Main site</a>
+  </div>
+
+  <pre id="config-output"></pre>
+</main>
+<script src="app.js"></script>
+</body>
+</html>

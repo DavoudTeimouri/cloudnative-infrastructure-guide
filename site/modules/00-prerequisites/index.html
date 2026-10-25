@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Step 00 — Prerequisites · Cloud-Native Configurator</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="module-header">
+  <div class="step-nav" id="step-nav"></div>
+  <h1>Step 00 — Prerequisites</h1>
+  <p class="purpose">Size the site, choose VM vs bare metal, define network segments and the air-gap boundary.</p>
+</header>
+<main>
+  <form id="config-form" novalidate>
+    <fieldset>
+      <legend>Deployment model</legend>
+      <label>
+        <input type="radio" name="deploymentModel" value="baremetal" checked> Bare metal
+      </label>
+      <label>
+        <input type="radio" name="deploymentModel" value="vm"> Virtual machine
+      </label>
+      <p class="hint">Ceph OSD hosts need direct disk access. VMs require raw/SCSI-passthrough data disks.</p>
+    </fieldset>
+
+    <fieldset>
+      <legend>Host sizing (reference counts)</legend>
+      <div class="field-row">
+        <label>Automation management server</label>
+        <input type="number" name="automationHosts" value="1" min="1">
+      </div>
+      <div class="field-row">
+        <label>Management control-plane hosts</label>
+        <input type="number" name="mgmtCpHosts" value="3" min="1">
+      </div>
+      <div class="field-row">
+        <label>Application control-plane hosts (per cluster)</label>
+        <input type="number" name="appCpHosts" value="3" min="1">
+      </div>
+      <div class="field-row">
+        <label>Application workers (general)</label>
+        <input type="number" name="appWorkers" value="2" min="1">
+      </div>
+      <div class="field-row">
+        <label>Ceph OSD hosts</label>
+        <input type="number" name="cephOsdHosts" value="3" min="1">
+      </div>
+      <div class="field-row">
+        <label>Artifact services (Harbor + Nexus)</label>
+        <input type="number" name="artifactHosts" value="2" min="1">
+      </div>
+      <div class="field-row">
+        <label>Edge load balancer hosts</label>
+        <input type="number" name="edgeHosts" value="2" min="2">
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Network segments (CIDR)</legend>
+      <div class="field-row">
+        <label>Management</label>
+        <input type="text" name="cidrMgmt" value="10.10.0.0/24">
+      </div>
+      <div class="field-row">
+        <label>Control plane</label>
+        <input type="text" name="cidrCp" value="10.20.0.0/24">
+      </div>
+      <div class="field-row">
+        <label>Storage public</label>
+        <input type="text" name="cidrStoragePublic" value="10.40.0.0/24">
+      </div>
+      <div class="field-row">
+        <label>Storage cluster</label>
+        <input type="text" name="cidrStorageCluster" value="10.41.0.0/24">
+      </div>
+      <div class="field-row">
+        <label>DMZ / edge</label>
+        <input type="text" name="cidrDmz" value="10.60.0.0/24">
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Air-gap</legend>
+      <label>
+        <input type="checkbox" name="airGap" checked> Air-gapped site (no internet at deploy time)
+      </label>
+      <p class="hint">All images/packages must be mirrored to internal registries before deploy.</p>
+    </fieldset>
+  </form>
+
+  <div id="validation" class="msg-box"></div>
+
+  <div class="actions">
+    <button type="button" id="validate">Validate</button>
+    <button type="button" id="download">Download config (JSON)</button>
+    <a class="btn-link" href="../../index.html">← Main site</a>
+  </div>
+
+  <pre id="config-output"></pre>
+</main>
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Step 01 — Infrastructure prep · Cloud-Native Configurator</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="module-header">
+  <div class="step-nav" id="step-nav"></div>
+  <h1>Step 01 — Infrastructure prep</h1>
+  <p class="purpose">Provision hosts, set up SSH access, break-glass key, time sync (chrony) and name resolution.</p>
+</header>
+<main>
+  <form id="config-form" novalidate>
+    <fieldset>
+      <legend>Hosts</legend>
+      <div class="field-row">
+        <label>Management server IP</label>
+        <input type="text" name="mgmtIp" value="10.10.0.10">
+      </div>
+      <div class="field-row">
+        <label>Deploy user (non-root)</label>
+        <input type="text" name="deployUser" value="deploy">
+      </div>
+      <div class="field-row">
+        <label>Break-glass key installed on all hosts</label>
+        <input type="checkbox" name="breakGlass" checked>
+      </div>
+      <p class="hint">Hosts keep local accounts. Do not join to Active Directory/LDAP (ADR-0015).</p>
+    </fieldset>
+
+    <fieldset>
+      <legend>Time (chrony)</legend>
+      <div class="field-row">
+        <label>NTP source 1</label>
+        <input type="text" name="ntp1" value="10.10.0.20">
+      </div>
+      <div class="field-row">
+        <label>NTP source 2</label>
+        <input type="text" name="ntp2" value="10.10.0.21">
+      </div>
+      <div class="field-row">
+        <label>NTP source 3</label>
+        <input type="text" name="ntp3" value="10.10.0.22">
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Name resolution</legend>
+      <label>
+        <input type="radio" name="dnsMode" value="dns" checked> Internal DNS
+      </label>
+      <label>
+        <input type="radio" name="dnsMode" value="hosts"> /etc/hosts fallback (no DNS)
+      </label>
+      <p class="hint">Every host must resolve every other host by name.</p>
+    </fieldset>
+  </form>
+
+  <div id="validation" class="msg-box"></div>
+
+  <div class="actions">
+    <button type="button" id="validate">Validate</button>
+    <button type="button" id="download">Download config (JSON)</button>
+    <a class="btn-link" href="../../index.html">← Main site</a>
+  </div>
+
+  <pre id="config-output"></pre>
+</main>
+<script src="app.js"></script>
+</body>
+</html>

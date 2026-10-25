@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Step 10 — Backup & upgrade · Cloud-Native Configurator</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="module-header">
+  <div class="step-nav" id="step-nav"></div>
+  <h1>Step 10 — Backup & upgrade</h1>
+  <p class="purpose">Make the platform recoverable and updatable: Velero, Ceph disaster recovery, Kubespray upgrades.</p>
+</header>
+<main>
+  <form id="config-form" novalidate>
+    <fieldset>
+      <legend>Backup</legend>
+      <div class="field-row">
+        <label>Velero schedule</label>
+        <input type="text" name="veleroSchedule" value="0 2 * * *">
+      </div>
+      <div class="field-row">
+        <label>Backup repository (Ceph)</label>
+        <input type="text" name="backupRepo" value="ceph-rbd-repo">
+      </div>
+      <label>
+        <input type="checkbox" name="testRestore" checked> Regular restore tests
+      </label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Ceph disaster recovery</legend>
+      <label>
+        <input type="checkbox" name="monmapBackup" checked> Monmap + OSD map backed up
+      </label>
+      <label>
+        <input type="checkbox" name="osdDataDoc" checked> OSD data location documented
+      </label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Kubespray upgrade</legend>
+      <div class="field-row">
+        <label>Target Kubespray release</label>
+        <input type="text" name="targetRelease" value="v2.26">
+      </div>
+      <label>
+        <input type="checkbox" name="upgradeTested" checked> Upgrade tested on non-production cluster
+      </label>
+      <p class="hint">Kubespray supports ≥ 5 releases in parallel. Upgrade one cluster at a time, control plane first.</p>
+    </fieldset>
+  </form>
+
+  <div id="validation" class="msg-box"></div>
+
+  <div class="actions">
+    <button type="button" id="validate">Validate</button>
+    <button type="button" id="download">Download config (JSON)</button>
+    <a class="btn-link" href="../../index.html">← Main site</a>
+  </div>
+
+  <pre id="config-output"></pre>
+</main>
+<script src="app.js"></script>
+</body>
+</html>

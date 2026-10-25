@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Step 06 — Management cluster · Cloud-Native Configurator</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="module-header">
+  <div class="step-nav" id="step-nav"></div>
+  <h1>Step 06 — Management cluster</h1>
+  <p class="purpose">Deploy the platform control plane: Rancher, Argo CD, Keycloak, Vault. Control plane only — no application workloads.</p>
+</header>
+<main>
+  <form id="config-form" novalidate>
+    <fieldset>
+      <legend>Components</legend>
+      <label>
+        <input type="checkbox" name="rancher" checked> Rancher (cluster lifecycle)
+      </label>
+      <label>
+        <input type="checkbox" name="argocd" checked> Argo CD (GitOps)
+      </label>
+      <label>
+        <input type="checkbox" name="keycloak" checked> Keycloak (identity, application-layer only)
+      </label>
+      <label>
+        <input type="checkbox" name="vault" checked> Vault (secrets, offline unseal key)
+      </label>
+      <p class="hint">Identity is application-layer only. Hosts are NOT joined to AD/LDAP (ADR-0015).</p>
+    </fieldset>
+
+    <fieldset>
+      <legend>High availability</legend>
+      <div class="field-row">
+        <label>Rancher replicas</label>
+        <input type="number" name="rancherReplicas" value="3" min="1">
+      </div>
+      <div class="field-row">
+        <label>Vault nodes (Raft)</label>
+        <input type="number" name="vaultNodes" value="3" min="1">
+      </div>
+      <div class="field-row">
+        <label>Keycloak replicas</label>
+        <input type="number" name="keycloakReplicas" value="2" min="1">
+      </div>
+      <label>
+        <input type="checkbox" name="unsealKeyOffline" checked> Vault unseal key stored offline (break-glass)
+      </label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Identity (Keycloak)</legend>
+      <div class="field-row">
+        <label>Realm</label>
+        <input type="text" name="keycloakRealm" value="platform">
+      </div>
+      <div class="field-row">
+        <label>User federation</label>
+        <input type="text" name="userFederation" value="local">
+      </div>
+    </fieldset>
+  </form>
+
+  <div id="validation" class="msg-box"></div>
+
+  <div class="actions">
+    <button type="button" id="validate">Validate</button>
+    <button type="button" id="download">Download config (JSON)</button>
+    <a class="btn-link" href="../../index.html">← Main site</a>
+  </div>
+
+  <pre id="config-output"></pre>
+</main>
+<script src="app.js"></script>
+</body>
+</html>
