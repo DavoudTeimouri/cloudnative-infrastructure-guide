@@ -1,0 +1,54 @@
+.node-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 6px 0;
+  padding: 8px;
+  border: 1px solid var(--border, #ccc);
+  border-radius: 4px;
+  background: var(--card, #fff);
+}
+.node-row input[type="text"] {
+  flex: 1;
+  min-width: 140px;
+}
+.node-row .roles {
+  flex: 1;
+}
+.node-row button.remove-node {
+  background: transparent;
+  border: 1px solid var(--border, #ccc);
+  color: var(--foreground, #000);
+  cursor: pointer;
+  font-size: 18px;
+  padding: 2px 8px;
+  line-height: 1;
+}
+.actions {
+  margin: 10px 0;
+  display: flex;
+  gap: 8px;
+}
+.msg-box {
+  margin: 10px 0;
+  padding: 8px;
+  border-radius: 4px;
+}
+.msg-box ul {
+  margin: 4px 0 0 20px;
+  padding: 0;
+}
+.msg-box .ok {
+  color: green;
+  margin: 0;
+}
+#config-output {
+  width: 100%;
+  font-family: monospace;
+  font-size: 12px;
+  background: #f6f8fa;
+  border: 1px solid var(--border, #ccc);
+  border-radius: 4px;
+  padding: 8px;
+  box-sizing: border-box;
+}

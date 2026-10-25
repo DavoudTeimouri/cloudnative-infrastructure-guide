@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Ceph Cluster Configurator — Cloud-Native Guide</title>
+<link rel="stylesheet" href="../styles.css">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header>
+  <h1>Ceph Cluster Configurator</h1>
+  <p class="subtitle">Define Ceph nodes, assign roles per node, and validate before deploy.</p>
+  <nav>
+    <a href="../index.html">← Back to main guide</a>
+    <span>|</span>
+    <a href="../../docs/guide/04-storage-ceph.html">Step-by-step doc</a>
+  </nav>
+</header>
+
+<main>
+
+<section id="node-editor">
+  <h2>1. Nodes and roles</h2>
+  <p class="hint">Add one row per Ceph host. Assign one or more roles to each host.</p>
+
+  <div id="node-list"></div>
+
+  <div class="actions">
+    <button type="button" id="add-node">+ Add node</button>
+    <button type="button" id="remove-node" disabled="disabled">− Remove last</button>
+  </div>
+
+  <div id="validation" class="msg-box"></div>
+</section>
+
+<section id="pool-config">
+  <h2>2. Pools</h2>
+  <p class="hint">Define storage pools. Replicated pools need ≥3 OSD hosts.</p>
+
+  <table>
+    <thead>
+      <tr><th>Pool name</th><th>Type</th><th>Replicas / EC</th><th>PG count</th><th>Application</th></tr>
+    </thead>
+    <tbody id="pool-list">
+      <tr>
+        <td><input type="text" value="kube-rbd"></td>
+        <td><select><option>replicated</option><option>erasure</option></select></td>
+        <td><input type="number" value="3" min="1"></td>
+        <td><input type="number" value="512" min="1"></td>
+        <td><input type="text" value="rbd"></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="actions">
+    <button type="button" id="add-pool">+ Add pool</button>
+    <button type="button" id="remove-pool" disabled="disabled">− Remove last</button>
+  </div>
+
+  <div id="pool-validation" class="msg-box"></div>
+</section>
+
+<section id="output">
+  <h2>3. Generated configuration</h2>
+  <p class="hint">Review and download. Invalid configurations are shown in red above and block download.</p>
+  <textarea id="config-output" readonly="readonly" rows="14"></textarea>
+  <div class="actions">
+    <button type="button" id="download-config" disabled="disabled">Download ceph-config.json</button>
+    <button type="button" id="copy-config">Copy to clipboard</button>
+  </div>
+</section>
+
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Enterprise Cloud-Native Infrastructure Guide</title>
 <meta name="description" content="Step-by-step configurator and upgrade walkthrough for an on-premises, air-gapped cloud-native platform: Kubernetes with Kubespray, Ceph (Rook or cephadm on Podman/Docker), Rancher, Argo CD, Vault, Prometheus, Istio and GPU inference.">
-<link rel="stylesheet" href="styles.css?v=3.2.5">
+<link rel="stylesheet" href="styles.css?v=3.3.0">
 </head>
 <body>
 <header class="top">
@@ -136,6 +136,17 @@
           <li>A renderer test boots this page's script in a JS engine and asserts the output.</li>
         </ul>
       </div>
+      <div class="card plain">
+        <h3>Configuration modules</h3>
+        <p>
+          Each configuration step is also available as a self-contained module site with
+          client-side validation and downloadable config:
+        </p>
+        <ul>
+          <li><a href="modules/ceph/index.html">Ceph cluster</a> — nodes, roles per node, pools, validation</li>
+          <li><em>More modules coming: Kubernetes, traffic, OS baseline</em></li>
+        </ul>
+      </div>
     </div>
   </section>
 
@@ -150,6 +161,6 @@
 
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
-<script src="app.js?v=3.2.5"></script>
+<script src="app.js?v=3.3.0"></script>
 </body>
 </html>
