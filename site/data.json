@@ -107,7 +107,8 @@
         "kubernetesVersion",
         "cephRelease",
         "cephImage"
-      ]
+      ],
+      "doc": "kubespray/kubespray-deployment.md"
     },
     {
       "id": "p2",
@@ -128,7 +129,8 @@
         "evictionHardMem",
         "evictionHardNodefs",
         "appClusters"
-      ]
+      ],
+      "doc": "kubernetes/multiple-clusters.md"
     },
     {
       "id": "p3",
@@ -148,7 +150,8 @@
         "mgmtDiskGb",
         "directoryHost",
         "directoryBaseDn"
-      ]
+      ],
+      "doc": "management-cluster/alternatives.md"
     },
     {
       "id": "p4",
@@ -168,7 +171,8 @@
         "auditRetentionDays",
         "unattendedSecurityUpdates",
         "caBundle"
-      ]
+      ],
+      "doc": "operating-systems/host-configuration.md"
     },
     {
       "id": "p5",
@@ -183,7 +187,8 @@
         "rookBlockClass",
         "rookFsClass",
         "sdsClusters"
-      ]
+      ],
+      "doc": "storage/ceph/cephadm-deployment.md"
     },
     {
       "id": "p6",
@@ -201,7 +206,8 @@
         "loadBalancerPool",
         "dmzCidr",
         "vrrpAuthPass"
-      ]
+      ],
+      "doc": "network-matrix/external-load-balancer.md"
     },
     {
       "id": "p7",
@@ -227,7 +233,8 @@
         "corednsForwarders",
         "corednsForwardPolicy",
         "corednsCacheTtl"
-      ]
+      ],
+      "doc": "offline-artifacts/artifact-matrix.md"
     },
     {
       "id": "p8",
@@ -255,7 +262,8 @@
         "gpuCpu",
         "gpuMemGb",
         "gpuDiskGb"
-      ]
+      ],
+      "doc": "network-matrix/network-communication-matrix.md"
     },
     {
       "id": "p9",
@@ -275,14 +283,16 @@
         "externalDnsServer",
         "trivySeverity",
         "otelEndpoint"
-      ]
+      ],
+      "doc": "addons/platform-addons.md"
     },
     {
       "id": "p10",
       "title": "Port requirements",
       "subtitle": "Server-to-server access request: the firewall flows this configuration needs before any node is handed to Kubespray.",
       "components": [],
-      "fields": []
+      "fields": [],
+      "doc": "network-matrix/port-requirements.md"
     }
   ],
   "components": [
