@@ -1,0 +1,22 @@
+name: Adoption metrics
+
+on:
+  schedule:
+    - cron: '0 0 1 * *'  # monthly
+  workflow_dispatch:
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate adoption report
+        run: |
+          python3 scripts/report_adoption.py > site/adoption.md || true
+      - name: Commit report
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add site/adoption.md
+          git commit -m "Update adoption metrics" || true
+          git push || true

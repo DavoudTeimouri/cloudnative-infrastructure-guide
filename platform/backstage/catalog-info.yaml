@@ -1,0 +1,15 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: cloud-native-guide
+  description: Enterprise on-premises, air-gapped cloud-native infrastructure guide
+  annotations:
+    platform.io/golden-path: cloudnative-service
+    platform.io/owner: platform-team
+    github.com/project-slug: DavoudTeimouri/cloudnative-infrastructure-guide
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-team
+  system: cloud-native-infrastructure
+  dependsOn: []

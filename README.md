@@ -295,3 +295,29 @@ python3 scripts/compare_tree.py DavoudTeimouri cloudnative-infrastructure-guide 
 ## Implementation phases
 
 Dependency-aware 15-phase plan with acceptance criteria per phase: `requirements/implementation-roadmap.md`.
+
+## Paved-road map
+
+Paved (self-serve, validated by the site configurator):
+| Module | Step | Status | Notes |
+|---|---|---|---|
+| `site/modules/00-prerequisites/` | 00 · Prerequisites | paved | site size, VM vs bare metal, network segments |
+| `site/modules/01-infrastructure-prep/` | 01 · Infrastructure prep | paved | SSH, break-glass, chrony, DNS |
+| `site/modules/02-os-baseline/` | 02 · OS baseline | paved | kernel modules, disks, security |
+| `site/modules/03-container-engine/` | 03 · Container engine | paved | Docker/Podman, air-gap registry |
+| `site/modules/04-storage-ceph/` | 04 · Storage — Ceph | paved | nodes, roles per node, pools, PGs |
+| `site/modules/05-kubernetes/` | 05 · Kubernetes | paved | Kubespray, control plane, workers, CNI |
+| `site/modules/06-management-cluster/` | 06 · Management cluster | paved | Rancher, Argo CD, Keycloak, Vault |
+| `site/modules/07-application-cluster/` | 07 · Application cluster | paved | node pools, sizing |
+| `site/modules/08-traffic-edge/` | 08 · Traffic edge | paved | LB, VIP, ingress, MetalLB |
+| `site/modules/09-platform-services/` | 09 · Platform services | paved | monitoring, logging, add-ons |
+| `site/modules/10-backup-upgrade/` | 10 · Backup & upgrade | paved | Velero, Ceph recovery, Kubespray upgrades |
+
+Dirt (manual, not yet self-serve):
+| Area | Path | Notes |
+|---|---|---|
+| Automation playbooks | `automation/` | Ansible, AWX, GitLab CI — not invoked by the site |
+| Golden path | `platform/golden-paths/cloudnative-service.yaml` | NEW — single source of truth for service creation |
+| CLI scaffolding | `platform-cli/cmd/create_service.go` | NEW — `create service <name>` workflow |
+
+Golden path emits into `site/data.json` via `scripts/emit_golden_bundle.py`; site and CLI share one source of truth.
