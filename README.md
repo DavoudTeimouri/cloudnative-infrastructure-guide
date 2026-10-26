@@ -1,6 +1,8 @@
 # Enterprise Cloud-Native Deployment & Operations Guide
 
-Personal cloud-native knowledge base: on-premises, air-gapped, production-oriented. Documentation as code. Every version pinned, every URL sourced, every claim traceable.
+A documentation-as-code guide for on-premises, air-gapped, production-oriented cloud-native deployment. Step-by-step configurator generates ordered deployment bundles from pinned versions and verified compatibility matrices.
+
+`python3 scripts/build_site.py python3 scripts/validate_catalog.py python3 -m http.server 8080 --directory site` Every version pinned, every URL sourced, every claim traceable.
 
 ## Scope
 
