@@ -30,7 +30,9 @@ def check(name, fn):
 def test_adrs_exist_and_have_all_sections():
     d = os.path.join(BASE, "decisions")
     files = sorted(f for f in os.listdir(d) if f.startswith("ADR-") and f.endswith(".md"))
-    assert len(files) == 28, f"expected 28 ADRs, found {len(files)}"
+    gen = open(os.path.join(BASE, "scripts", "gen_adrs.py")).read()
+    expected = len(re.findall(r'^\s*\(\d+, "', gen, re.M))
+    assert len(files) == expected, f"expected {expected} ADRs, found {len(files)}"
     required = [
         "## Context",
         "## Requirements",
