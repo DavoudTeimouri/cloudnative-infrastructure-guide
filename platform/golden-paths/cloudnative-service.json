@@ -1,0 +1,51 @@
+{
+  "apiVersion": "platform.io/v1",
+  "kind": "GoldenPath",
+  "metadata": {
+    "name": "cloudnative-service",
+    "version": "1.0.0"
+  },
+  "spec": {
+    "description": "Scaffold a new cloud-native service module from the documented golden path",
+    "parameters": [
+      {"name": "service_name", "type": "string", "validation": "^[a-z][a-z0-9-]{2,40}$", "required": true},
+      {"name": "owner_team", "type": "string", "validation": "^[a-z][a-z0-9-]{2,40}$", "required": true},
+      {"name": "environment", "type": "enum", "values": ["dev", "staging", "prod"], "default": "dev"},
+      {"name": "data_tier", "type": "enum", "values": ["none", "postgres", "postgres+redis"], "default": "none"},
+      {"name": "criticality", "type": "enum", "values": ["tier3", "tier2", "tier1", "tier0"], "default": "tier2"},
+      {"name": "os", "type": "enum", "values": ["oracle-linux-9", "ubuntu-2404"], "default": "oracle-linux-9"},
+      {"name": "storage_mode", "type": "enum", "values": ["none", "cephadm-docker", "cephadm-podman", "rook"], "default": "none"},
+      {"name": "ingress_controller", "type": "enum", "values": ["nginx", "cilium", "f5-nic"], "default": "nginx"}
+    ],
+    "defaults": {
+      "language": "go",
+      "framework": "chi",
+      "database": "postgres",
+      "deployment": "kubernetes",
+      "observability": "opentelemetry",
+      "ci": "github-actions",
+      "oncall_rotation": "yes"
+    },
+    "outputs": [
+      "git_repo",
+      "ci_pipeline",
+      "k8s_namespace",
+      "grafana_dashboard",
+      "pagerduty_service",
+      "datadog_monitor_set"
+    ],
+    "steps": [
+      {"step": "00-prerequisites", "doc": "architecture/00-overview.md"},
+      {"step": "01-infrastructure-prep", "doc": "architecture/02-deployment-topology.md"},
+      {"step": "02-os-baseline", "doc": "operating-systems/host-configuration.md"},
+      {"step": "03-container-engine", "doc": "storage/ceph/cephadm-deployment.md"},
+      {"step": "04-storage-ceph", "doc": "storage/ceph/cephadm-deployment.md"},
+      {"step": "05-kubernetes", "doc": "kubespray/kubespray-deployment.md"},
+      {"step": "06-management-cluster", "doc": "management-cluster/rancher/rancher.md"},
+      {"step": "07-application-cluster", "doc": "kubespray/kubespray-deployment.md"},
+      {"step": "08-traffic-edge", "doc": "network-matrix/external-load-balancer.md"},
+      {"step": "09-platform-services", "doc": "management-cluster/platform-services/index.md"},
+      {"step": "10-backup-upgrade", "doc": "lifecycle/backup/backup-and-dr.md"}
+    ]
+  }
+}

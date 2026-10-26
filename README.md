@@ -317,7 +317,7 @@ Dirt (manual, not yet self-serve):
 | Area | Path | Notes |
 |---|---|---|
 | Automation playbooks | `automation/` | Ansible, AWX, GitLab CI — not invoked by the site |
-| Golden path | `platform/golden-paths/cloudnative-service.yaml` | NEW — single source of truth for service creation |
-| CLI scaffolding | `platform-cli/cmd/create_service.go` | NEW — `create service <name>` workflow |
+| Golden path | `platform/golden-paths/cloudnative-service.json` | single source of truth for service creation |
+| Scaffolding CLI | `scripts/golden_path.py` | `python3 scripts/golden_path.py create <name> --team <team>` |
 
-Golden path emits into `site/data.json` via `scripts/emit_golden_bundle.py`; site and CLI share one source of truth.
+`scripts/build_site.py` embeds the golden-path spec in `site/data.json`; the site and `scripts/golden_path.py` read the same file.

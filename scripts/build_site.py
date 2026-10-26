@@ -21,6 +21,7 @@ CATALOG = os.path.join(BASE, "catalog", "catalog.json")
 EXPORTS = os.path.join(BASE, "catalog", "exports.json")
 UPGRADES = os.path.join(BASE, "catalog", "upgrades.json")
 MATRIX = os.path.join(BASE, "compatibility", "version-matrix.md")
+GOLDEN = os.path.join(BASE, "platform", "golden-paths", "cloudnative-service.json")
 OUT = os.path.join(BASE, "site", "data.json")
 INDEX = os.path.join(BASE, "site", "index.html")
 
@@ -188,6 +189,7 @@ def main():
         "exports": exports,
         "portRequirements": catalog.get("portRequirements", []),
         "versions": versions,
+        "goldenPath": json.load(open(GOLDEN, encoding="utf-8")) if os.path.exists(GOLDEN) else None,
     }
 
     payload = json.dumps(data, indent=2, sort_keys=False) + "\n"
