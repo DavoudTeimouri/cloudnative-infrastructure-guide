@@ -872,11 +872,22 @@
 
     if (page.fields && page.fields.length && page.id !== "p4") {
       var grid = el("div", { class: "values" });
+      var tableFields = [];
       page.fields.forEach(function (id) {
         var v = DATA.values.filter(function (x) { return x.id === id; })[0];
-        if (v) grid.appendChild(fieldNode(v));
+        if (!v) return;
+        if (v.type === "table") {
+          tableFields.push(v);
+        } else {
+          grid.appendChild(fieldNode(v));
+        }
       });
       box.appendChild(el("div", { class: "card" }, [el("h3", { text: "Values" }), grid]));
+      tableFields.forEach(function (v) {
+        box.appendChild(el("div", { class: "card" }, [
+          el("h3", { text: v.label }), fieldNode(v)
+        ]));
+      });
     }
 
     if (page.id === "p2") {
