@@ -23,8 +23,8 @@ INDEX = """<!DOCTYPE html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>__NAME__ · Cloud-Native Configurator</title>
-<link rel="stylesheet" href="../../styles.css?v=3.4.0">
-<link rel="stylesheet" href="../module.css?v=3.4.0">
+<link rel="stylesheet" href="../../styles.css?v=3.4.1">
+<link rel="stylesheet" href="../module.css?v=3.4.1">
 </head>
 <body>
 <header>

@@ -492,10 +492,14 @@
   function tableNode(v) {
     var rows = asArray(state.values[v.id]) ? state.values[v.id] : [];
     var cols = v.columns || [];
-    function cellInput(row, c) {
+
+    function cellInput(row, c, onChange) {
       var input;
       if (c.type === "select") {
-        input = el("select", { oninput: function () { row[c.id] = input.value; } });
+        input = el("select", { onchange: function () {
+          row[c.id] = input.value;
+          if (onChange) onChange(input.value);
+        } });
         (c.options || []).forEach(function (o) {
           input.appendChild(el("option", { value: o, text: o, selected: o === row[c.id] ? "selected" : null }));
         });
@@ -504,30 +508,25 @@
         input = el("input", {
           type: c.type === "number" ? "number" : "text",
           value: row[c.id] === undefined ? "" : String(row[c.id]),
-          oninput: function () { row[c.id] = input.value; }
+          oninput: function () {
+            row[c.id] = input.value;
+            if (onChange) onChange(input.value);
+          }
         });
       }
       return input;
     }
-    var thead = el("thead", [el("tr", cols.map(function (c) { return el("th", { text: c.label }); }))]);
-    var tbody = el("tbody");
-    rows.forEach(function (row, i) {
-      var tr = el("tr");
-      cols.forEach(function (c) { tr.appendChild(el("td", {}, [cellInput(row, c)])); });
-      tr.appendChild(el("td", {}, [el("button", { type: "button", onclick: function () { rows.splice(i, 1); renderPage(); } }, ["Remove"])]));
-      tbody.appendChild(tr);
-    });
-    var addLabel = v.label.indexOf("clusters") !== -1 ? "Add application cluster" : "Add row";
-    var add = el("button", { type: "button", class: "btn primary", onclick: function () {
-      rows.push(newRow()); renderPage();
-    } }, ["+ " + addLabel]);
 
     function newRow() {
       var blank = {};
+      var taken = {};
+      rows.forEach(function (r) { if (r && r.name) taken[r.name] = true; });
       var n = rows.length + 1;
+      var prefix = (/(ceph|sds)/i.test(v.id || "") || /(ceph|sds)/i.test(v.label || "")) ? "ceph-" : "site-";
+      while (taken[prefix + n]) n += 1;
       cols.forEach(function (c) {
         var key = c.id;
-        if (key === "name") blank[key] = (/(ceph|sds)/i.test(v.label || "") ? "ceph-" : "site-") + n;
+        if (key === "name") blank[key] = prefix + n;
         else if (key === "pod") blank[key] = "10." + (30 + 2 * n) + ".0.0/16";
         else if (key === "svc") blank[key] = "10." + (30 + 2 * n + 1) + ".0.0/16";
         else if (c.type === "select") blank[key] = (c.options && c.options.length) ? c.options[0] : "";
@@ -535,8 +534,44 @@
       });
       return blank;
     }
-    var scroll = el("div", { class: "table-scroll" }, [el("table", { class: "data-table" }, [thead, tbody])]);
-    return el("div", { class: "field" }, [el("label", { text: v.label }), scroll, add]);
+
+    var list = el("div", { class: "row-cards" });
+    rows.forEach(function (row, i) {
+      var title = el("strong", { text: row.name || ("Cluster " + (i + 1)) });
+      var head = el("div", { class: "row-card-head" }, [
+        el("span", { class: "row-title" }, [title, el("span", { class: "row-count", text: "#" + (i + 1) })]),
+        el("button", { type: "button", class: "btn row-remove", onclick: function () {
+          rows.splice(i, 1);
+          renderPage();
+        } }, ["Remove"])
+      ]);
+      var grid = el("div", { class: "row-grid" });
+      cols.forEach(function (c) {
+        var onChange = c.id === "name" ? function (val) {
+          title.textContent = val || ("Cluster " + (i + 1));
+        } : null;
+        grid.appendChild(el("div", { class: "field" }, [
+          el("label", { text: c.label }),
+          cellInput(row, c, onChange)
+        ]));
+      });
+      list.appendChild(el("div", { class: "row-card" }, [head, grid]));
+    });
+    if (!rows.length) list.appendChild(el("p", { class: "row-cards-empty", text: "No entries yet. Use the button below to add one." }));
+
+    var addLabel = /ceph|sds/i.test(v.id || "") || /ceph|sds/i.test(v.label || "")
+      ? "Add SDS cluster"
+      : (/application/i.test(v.label || "") ? "Add application cluster" : "Add row");
+    var add = el("button", { type: "button", class: "btn primary", onclick: function () {
+      rows.push(newRow());
+      renderPage();
+    } }, ["+ " + addLabel]);
+
+    return el("div", { class: "field table-field" }, [
+      el("label", { text: v.label + " — " + rows.length + " configured" }),
+      list,
+      add
+    ]);
   }
 
   function fieldNode(v) {

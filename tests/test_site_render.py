@@ -213,9 +213,20 @@ var addBtn = findAll(__byId["page"], function (n) {
   return (n.tagName === "button" || n.tagName === "BUTTON") &&
     n.textContent.indexOf("Add application cluster") !== -1;
 })[0];
-var plus = { found: !!addBtn, count: 0, name: "", pod: "", svc: "", afterRemove: -1 };
+function countClass(root, cls) {
+  return findAll(root, function (n) { return n.className === cls; }).length;
+}
+var plus = { found: !!addBtn, count: 0, name: "", pod: "", svc: "", afterRemove: -1,
+             cardsBefore: countClass(__byId["page"], "row-card"), cardsAfter: 0, fieldsInNewCard: 0 };
 if (addBtn) {
   addBtn.onclick();
+  plus.cardsAfter = countClass(__byId["page"], "row-card");
+  var cards = findAll(__byId["page"], function (n) { return n.className === "row-card"; });
+  if (cards.length) {
+    plus.fieldsInNewCard = findAll(cards[cards.length - 1], function (n) {
+      return n.tagName === "input" || n.tagName === "select";
+    }).length;
+  }
   var ac = __g.state.values.appClusters || [];
   plus.count = ac.length;
   plus.name = ac[ac.length - 1].name;
@@ -243,6 +254,8 @@ var p2 = __byId["page"].textContent;
 __g.renderReview();
 __g.gotoPage(3);
 var p4 = __byId["page"].textContent;
+__g.gotoPage(4);
+var p5 = __byId["page"].textContent;
 __g.renderReview();
 var v31 = {
   files: filenames(),
@@ -310,6 +323,8 @@ JSON.stringify({
           p4HasMaster: v31.p4HasMaster,
           p4HasOsd: v31.p4HasOsd,
           p4HasOps: v31.p4HasOps,
+  p5HasSdsAdd: p5.indexOf("Add SDS cluster") !== -1,
+  p5HasMislabel: p5.indexOf("Add application cluster") !== -1,
           p4Json: JSON.stringify(v31.p4Json || "") },
   upgrade: { firstSteps: upFirst.split("gate").length - 1,
              k8sHasCommand: upK8s.indexOf("ansible-playbook") !== -1,
@@ -414,6 +429,10 @@ def main():
         failures.append("new cluster pod and service CIDRs are identical")
     elif v31["plus"]["afterRemove"] != 1:
         failures.append("Remove button did not delete the cluster")
+    elif v31["plus"]["cardsBefore"] != 1 or v31["plus"]["cardsAfter"] != 2:
+        failures.append(f"cluster cards not rendered per cluster: {v31['plus']}")
+    elif v31["plus"]["fieldsInNewCard"] < 15:
+        failures.append(f"new cluster card exposes only {v31['plus']['fieldsInNewCard']} inputs")
     if not v31["p2HasAddCluster"]:
         failures.append("page 2 has no + Add application cluster button")
     if not v31["p2HasWindows"]:
@@ -434,6 +453,10 @@ def main():
         failures.append("ceph-osd tab missing")
     if not v31["p4HasOps"]:
         failures.append("operation-server tab missing")
+    if not v31["p5HasSdsAdd"]:
+        failures.append("storage page has no '+ Add SDS cluster' button")
+    if v31["p5HasMislabel"]:
+        failures.append("storage page mislabels its add button as 'Add application cluster'")
     if not v31["hostRolesYaml"]:
         failures.append("host-config export missing roles yaml")
     elif "master:" not in v31["hostRolesYaml"] or "pidMax: 4194304" not in v31["hostRolesYaml"]:
