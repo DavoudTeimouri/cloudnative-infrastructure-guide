@@ -1057,13 +1057,15 @@
         "Generated files are starting points: review every path, image tag and address.";
     }
     if ($("plan-versions")) {
+      var cm = DATA.clusterMethods.filter(function (m) { return m.id === state.cluster; })[0] || {};
+      var f = cm.versionField || "kubesprayRelease";
+      var rel = state.values[f] || "—";
       var kv = releaseVersion("kubernetes");
       var et = releaseVersion("etcd");
       var cv = releaseVersion("containerd");
       var ci = releaseVersion("cilium");
-      var rel = state.values.kubesprayRelease || "—";
       $("plan-versions").textContent =
-        "Kubespray " + rel + " → Kubernetes " + kv + ", etcd " + et + ", containerd " + cv + ", Cilium " + ci + ".";
+        cm.title + " " + rel + " → Kubernetes " + kv + ", etcd " + et + ", containerd " + cv + ", Cilium " + ci + ".";
     }
 
     var sbody = $("sizing") ? $("sizing").querySelector("tbody") : null;
