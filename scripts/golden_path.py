@@ -23,7 +23,8 @@ INDEX = """<!DOCTYPE html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>__NAME__ · Cloud-Native Configurator</title>
-<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="../../styles.css?v=3.4.0">
+<link rel="stylesheet" href="../module.css?v=3.4.0">
 </head>
 <body>
 <header>
@@ -50,11 +51,6 @@ function render() {
 window.onload = render;
 """
 
-CSS = """header { margin-bottom: 16px; }
-.meta { color: var(--muted-foreground); }
-nav a { color: var(--accent); }
-"""
-
 
 def main():
     ap = argparse.ArgumentParser(description="Scaffold a service module from the golden path")
@@ -77,7 +73,6 @@ def main():
     files = {
         "index.html": INDEX.replace("__NAME__", args.name).replace("__TEAM__", args.team),
         "app.js": APP.replace("__NAME__", args.name).replace("__TEAM__", args.team),
-        "styles.css": CSS,
     }
 
     if args.dry_run:

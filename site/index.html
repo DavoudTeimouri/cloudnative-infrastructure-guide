@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Enterprise Cloud-Native Infrastructure Guide</title>
 <meta name="description" content="Step-by-step configurator and upgrade walkthrough for an on-premises, air-gapped cloud-native platform: Kubernetes with Kubespray, Ceph (Rook or cephadm on Podman/Docker), Rancher, Argo CD, Vault, Prometheus, Istio and GPU inference.">
-<link rel="stylesheet" href="styles.css?v=3.3.0">
+<link rel="stylesheet" href="styles.css?v=3.4.0">
 </head>
 <body>
 <header class="top">
@@ -21,6 +21,7 @@
       <a href="#/configure" data-view="wizard">Configure</a>
       <a href="#/review" data-view="review">Review</a>
       <a href="#/upgrade" data-view="upgrade">Upgrade</a>
+      <a href="#modules">Modules</a>
       <a href="https://github.com/DavoudTeimouri/cloudnative-infrastructure-guide" rel="noopener">Repository</a>
     </nav>
   </div>
@@ -29,12 +30,18 @@
 <main class="wrap" id="top">
 
   <section class="hero" id="hero">
+    <p class="eyebrow">Documentation as code</p>
     <h1>Build a cloud-native platform, one page at a time.</h1>
     <p>
       Choose the deployment method, then walk the pages: application cluster, management cluster,
       operating system, storage, traffic, network and offline artifacts, platform services.
       Node names and addresses are generated from the counts you enter. The last page reviews the
       plan and gives you the configuration files.
+    </p>
+    <p class="hero-cta">
+      <a class="btn primary" href="#/configure" data-view="wizard">Start configuring</a>
+      <a class="btn" href="#/review" data-view="review">Review the plan</a>
+      <a class="btn" href="#modules">Step modules</a>
     </p>
     <p class="hero-meta">
       <span id="catalog-version">catalog —</span>
@@ -73,10 +80,10 @@
     </div>
 
     <h3>Sizing</h3>
-    <table class="versions" id="sizing"><tbody></tbody></table>
+    <div class="table-scroll"><table class="versions" id="sizing"><tbody></tbody></table></div>
 
     <h3>Resolved versions</h3>
-    <table class="versions" id="versions"><tbody></tbody></table>
+    <div class="table-scroll"><table class="versions" id="versions"><tbody></tbody></table></div>
 
     <h3>Implementation steps</h3>
     <ol class="steps" id="steps"></ol>
@@ -137,25 +144,35 @@
         </ul>
       </div>
       <div class="card plain">
-        <h3>Configuration modules</h3>
-        <p>
-          Each configuration step is a self-contained module site with client-side validation and
-          downloadable config. Modules link to each other and back to the main site:
-        </p>
-        <ul>
-          <li><a href="modules/00-prerequisites/index.html">00 · Prerequisites</a> — site size, VM vs bare metal, network segments</li>
-          <li><a href="modules/01-infrastructure-prep/index.html">01 · Infrastructure prep</a> — SSH, break-glass, chrony, DNS</li>
-          <li><a href="modules/02-os-baseline/index.html">02 · OS baseline</a> — kernel modules, disks, security</li>
-          <li><a href="modules/03-container-engine/index.html">03 · Container engine</a> — Docker/Podman, air-gap registry</li>
-          <li><a href="modules/04-storage-ceph/index.html">04 · Storage — Ceph</a> — nodes, roles per node, pools, PGs</li>
-          <li><a href="modules/05-kubernetes/index.html">05 · Kubernetes</a> — Kubespray, control plane, workers, CNI</li>
-          <li><a href="modules/06-management-cluster/index.html">06 · Management cluster</a> — Rancher, Argo CD, Keycloak, Vault</li>
-          <li><a href="modules/07-application-cluster/index.html">07 · Application cluster</a> — node pools, sizing</li>
-          <li><a href="modules/08-traffic-edge/index.html">08 · Traffic edge</a> — LB, VIP, ingress, MetalLB</li>
-          <li><a href="modules/09-platform-services/index.html">09 · Platform services</a> — monitoring, logging, add-ons</li>
-          <li><a href="modules/10-backup-upgrade/index.html">10 · Backup & upgrade</a> — Velero, Ceph recovery, Kubespray upgrades</li>
-        </ul>
+        <h3>How to use this site</h3>
+        <ol>
+          <li>Enter counts and choices in <a href="#/configure">Configure</a>.</li>
+          <li>Check the generated plan and download the bundles in <a href="#/review">Review</a>.</li>
+          <li>Follow the per-step module for the long form of each procedure.</li>
+        </ol>
       </div>
+    </div>
+  </section>
+
+
+  <section id="modules">
+    <h2>Step modules</h2>
+    <p class="section-note">
+      Each step is a self-contained module site with client-side validation, a downloadable
+      configuration file and a link to the authoritative document in the repository.
+    </p>
+    <div class="modules">
+      <a class="module-card" href="modules/00-prerequisites/index.html"><span class="n">00</span><span><span class="t">Prerequisites</span><span class="d">Site size, VM vs bare metal, network segments</span></span><span class="arrow">→</span></a>
+      <a class="module-card" href="modules/01-infrastructure-prep/index.html"><span class="n">01</span><span><span class="t">Infrastructure prep</span><span class="d">SSH, break-glass, chrony, DNS</span></span><span class="arrow">→</span></a>
+      <a class="module-card" href="modules/02-os-baseline/index.html"><span class="n">02</span><span><span class="t">OS baseline</span><span class="d">Kernel modules, disks, security</span></span><span class="arrow">→</span></a>
+      <a class="module-card" href="modules/03-container-engine/index.html"><span class="n">03</span><span><span class="t">Container engine</span><span class="d">Docker or Podman, air-gap registry</span></span><span class="arrow">→</span></a>
+      <a class="module-card" href="modules/04-storage-ceph/index.html"><span class="n">04</span><span><span class="t">Storage — Ceph</span><span class="d">Nodes, roles per node, pools, PGs</span></span><span class="arrow">→</span></a>
+      <a class="module-card" href="modules/05-kubernetes/index.html"><span class="n">05</span><span><span class="t">Kubernetes</span><span class="d">Kubespray, control plane, workers, CNI</span></span><span class="arrow">→</span></a>
+      <a class="module-card" href="modules/06-management-cluster/index.html"><span class="n">06</span><span><span class="t">Management cluster</span><span class="d">Rancher, Argo CD, Keycloak, Vault</span></span><span class="arrow">→</span></a>
+      <a class="module-card" href="modules/07-application-cluster/index.html"><span class="n">07</span><span><span class="t">Application cluster</span><span class="d">Node pools and sizing</span></span><span class="arrow">→</span></a>
+      <a class="module-card" href="modules/08-traffic-edge/index.html"><span class="n">08</span><span><span class="t">Traffic edge</span><span class="d">Load balancer, VIP, ingress, MetalLB</span></span><span class="arrow">→</span></a>
+      <a class="module-card" href="modules/09-platform-services/index.html"><span class="n">09</span><span><span class="t">Platform services</span><span class="d">Monitoring, logging, add-ons</span></span><span class="arrow">→</span></a>
+      <a class="module-card" href="modules/10-backup-upgrade/index.html"><span class="n">10</span><span><span class="t">Backup &amp; upgrade</span><span class="d">Velero, Ceph recovery, Kubespray upgrades</span></span><span class="arrow">→</span></a>
     </div>
   </section>
 
@@ -170,6 +187,6 @@
 
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
-<script src="app.js?v=3.3.0"></script>
+<script src="app.js?v=3.4.0"></script>
 </body>
 </html>

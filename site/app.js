@@ -535,7 +535,8 @@
       });
       return blank;
     }
-    return el("div", { class: "field" }, [el("label", { text: v.label }), el("table", {}, [thead, tbody]), add]);
+    var scroll = el("div", { class: "table-scroll" }, [el("table", { class: "data-table" }, [thead, tbody])]);
+    return el("div", { class: "field" }, [el("label", { text: v.label }), scroll, add]);
   }
 
   function fieldNode(v) {
@@ -735,7 +736,7 @@
   function portReqsTable() {
     var rows = DATA.portRequirements || [];
     var headers = [ "Source IP/Subnet", "Source Role/Roles", "Source Port", "Destination IP/Subnet", "Destination Rule", "Destination Port", "Protocols" ];
-    var table = el("table", {});
+    var table = el("table", { class: "data-table" });
     var thead = el("thead", {});
     var tr = el("tr", {});
     headers.forEach(function (h) {
@@ -755,7 +756,7 @@
     var card = el("div", { class: "card" });
     card.appendChild(el("h3", { text: "Port requirements — access request" }));
     card.appendChild(el("p", { class: "hint", text: "Open exactly these flows per role; everything else is denied by default. See network-matrix/port-requirements.md for the full matrix." }));
-    card.appendChild(table);
+    card.appendChild(el("div", { class: "table-scroll" }, [table]));
     return card;
   }
 
@@ -1365,7 +1366,12 @@
   }
 
   function route() {
-    var h = String(window.location.hash || "").replace("#/", "");
+    var raw = String(window.location.hash || "");
+    if (raw && raw.indexOf("#/") !== 0) {
+      var anchor = document.getElementById(raw.slice(1));
+      if (anchor && anchor.scrollIntoView) { anchor.scrollIntoView(); return; }
+    }
+    var h = raw.replace("#/", "");
     if (h === "review") return show("review");
     if (h === "upgrade") return show("upgrade");
     var m = h.match(/^page\/([0-9]+)$/);
