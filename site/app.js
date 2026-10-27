@@ -1079,12 +1079,112 @@
             }),
             el("button", {
               class: "btn", text: "Copy",
-              onclick: function () { copyText(body); toast("Copied " + exp.filename); }
+              onclick: function () { copyText(body); toast("Copied " + body); }
             })
           ])
         ]));
       });
     }
+    renderPreflight();
+  }
+
+  function powerOf2Ceil(n) {
+    var p = 1;
+    while (p < n) { p *= 2; }
+    return p;
+  }
+
+  function preflight() {
+    var issues = [];
+    var info = [];
+    var app = asArray(state.values.appClusters) ? state.values.appClusters : [];
+    app.forEach(function (c, i) {
+      var cp = rowNum(c, "cp");
+      var wk = rowNum(c, "workers");
+      var name = c.name || ("cluster " + (i + 1));
+      if (cp < 1 || cp % 2 === 0) {
+        issues.push({ sev: "critical", cluster: name, check: "Control-plane nodes",
+          msg: cp + " is not odd (1/3/5). Even members can lose quorum.",
+          fix: "Set CP nodes to 3 or 5." });
+      }
+      if (wk < 1) {
+        issues.push({ sev: "warning", cluster: name, check: "Worker nodes",
+          msg: "No workers; nothing can run on this cluster.",
+          fix: "Set worker nodes to at least 1." });
+      }
+    });
+    var sds = asArray(state.values.sdsClusters) ? state.values.sdsClusters : [];
+    sds.forEach(function (c, i) {
+      var mon = rowNum(c, "mon"), mgr = rowNum(c, "mgr"), osd = rowNum(c, "osd");
+      var name = c.name || ("ceph-" + (i + 1));
+      if (mon < 3 || mon % 2 === 0) {
+        issues.push({ sev: "critical", cluster: name, check: "MON nodes",
+          msg: mon + " MONs is not odd ≥ 3. Quorum is at risk.",
+          fix: "Set MON nodes to 3 or 5." });
+      }
+      if (mgr < 1) {
+        issues.push({ sev: "warning", cluster: name, check: "MGR nodes",
+          msg: "No MGR; cephadm cannot manage the cluster.",
+          fix: "Set MGR nodes to at least 1." });
+      }
+      if (osd < 1) {
+        issues.push({ sev: "critical", cluster: name, check: "OSD hosts",
+          msg: "No OSD hosts; no storage can be created.",
+          fix: "Set OSD hosts to at least 3." });
+      } else if (osd < 3) {
+        issues.push({ sev: "warning", cluster: name, check: "OSD hosts",
+          msg: osd + " OSD hosts below 3; 3-replica pools degrade.",
+          fix: "Set OSD hosts to at least 3." });
+      }
+      info.push({ cluster: name, check: "Suggested PGs",
+        msg: powerOf2Ceil(Math.ceil((osd * 100) / 3)) + " PGs per replicated pool (" + osd + " OSDs ÷ 3 replica)." });
+    });
+    var edge = num("edgeCount");
+    if (edge !== undefined && edge < 2) {
+      issues.push({ sev: "critical", cluster: "Edge", check: "Edge load balancer hosts",
+        msg: edge + " edge host cannot fail over a VIP.",
+        fix: "Set edge hosts to at least 2." });
+    }
+    return { issues: issues, info: info };
+  }
+
+  function renderPreflight() {
+    var old = $("preflight-card");
+    if (old && old.parentNode) old.parentNode.removeChild(old);
+    var pf = preflight();
+    var card = el("div", { class: "card", id: "preflight-card" });
+    card.appendChild(el("h3", { text: "Pre-flight check" }));
+    var crit = 0, warn = 0;
+    for (var i = 0; i < pf.issues.length; i++) {
+      if (pf.issues[i].sev === "critical") crit += 1; else warn += 1;
+    }
+    var sum = el("p");
+    if (crit) { sum.className = "preflight-bad"; sum.textContent = crit + " critical" + (warn ? ", " + warn + " warning" : "") + " — fix before deploying. "; }
+    else if (warn) { sum.className = "preflight-warn"; sum.textContent = warn + " warning(s) — review before deploying. "; }
+    else { sum.className = "preflight-ok"; sum.textContent = "All checks pass — topology is consistent. "; }
+    card.appendChild(sum);
+    var list = el("div");
+    pf.issues.forEach(function (it) {
+      var row = el("div", { class: "preflight-item " + it.sev });
+      row.appendChild(el("span", { class: "sev", text: it.sev.toUpperCase() }));
+      var txt = el("div", { class: "text" });
+      txt.appendChild(el("strong", { text: it.cluster + " · " + it.check }));
+      txt.appendChild(el("div", { text: it.msg }));
+      txt.appendChild(el("div", { class: "fix", text: "Fix: " + it.fix }));
+      row.appendChild(txt);
+      list.appendChild(row);
+    });
+    pf.info.forEach(function (it) {
+      var row = el("div", { class: "preflight-item info" });
+      row.appendChild(el("span", { class: "sev", text: "INFO" }));
+      var txt = el("div", { class: "text" });
+      txt.appendChild(el("strong", { text: it.cluster + " · " + it.check }));
+      txt.appendChild(el("div", { text: it.msg }));
+      row.appendChild(txt);
+      list.appendChild(row);
+    });
+    card.appendChild(list);
+    $("page").appendChild(card);
   }
 
   function topologyTotals() {
@@ -1535,6 +1635,7 @@
     renderUpgrade: renderUpgrade,
     buildRunbook: buildRunbook,
     buildUpgradeRunbook: buildUpgradeRunbook,
-    gotoPage: gotoPage
+    gotoPage: gotoPage,
+    preflight: preflight
   };
 })();

@@ -164,8 +164,9 @@ var base = {
   files: filenames(),
   sizingRows: __byId["sizing"].querySelector("tbody").children.length,
   versions: __byId["versions"].querySelector("tbody").children.length,
-  runbook: __g.buildRunbook()
-};
+  runbook: __g.buildRunbook(),
+  preflightBase: __g.preflight()
+  };
 
 // Flip the interesting selections and re-render.
 __g.state.choices.gpu = "mig";
@@ -174,8 +175,15 @@ __g.state.choices.serviceMesh = "istio-ambient";
 __g.state.choices.idpIntegration = ["keycloak-federation", "harbor-oidc"];
 __g.renderReview();
 
+__g.state.values.appClusters[0].cp = "2";
+__g.state.values.sdsClusters[0].mon = "2";
+__g.state.values.edgeCount = "1";
+__g.renderReview();
+var pfFlipped = __g.preflight();
+
 var flipped = {
   files: filenames(),
+  preflightFlipped: pfFlipped,
   reviewSteps: __byId["steps"].children.length,
   bodiesJoined: exportBodies().join("\n"),
   derived: __g.derived()
@@ -285,13 +293,16 @@ JSON.stringify({
           reviewSteps: base.reviewSteps, reviewExports: base.reviewExports, files: base.files,
           sizingRows: base.sizingRows, versions: base.versions,
           runbookLeftovers: (base.runbook.match(/\{\{/g) || []).length,
-          runbookHasSizing: base.runbook.indexOf("## Sizing") !== -1 },
+          runbookHasSizing: base.runbook.indexOf("## Sizing") !== -1,
+          preflightBaseCritical: base.preflightBase.issues.filter(function (i) { return i.sev === "critical"; }).length,
+          preflightBaseWarn: base.preflightBase.issues.filter(function (i) { return i.sev === "warning"; }).length },
   flipped: { files: flipped.files, reviewSteps: flipped.reviewSteps,
              hasCephDocker: flipped.bodiesJoined.indexOf("--docker") !== -1,
              hasCephHost: flipped.bodiesJoined.indexOf("ceph-mon-1") !== -1,
              hasIstio: flipped.bodiesJoined.indexOf("PeerAuthentication") !== -1,
              hasIdp: flipped.bodiesJoined.indexOf("Keycloak — LDAP/AD user federation") !== -1,
              engine: flipped.derived.cephEngine,
+             preflightFlippedCritical: flipped.preflightFlipped.issues.filter(function (i) { return i.sev === "critical"; }).length,
              gpuNodes: flipped.derived.gpuHostList },
   addons: { files: addons.files, steps: addons.steps, pageHasAddons: addons.pageHasAddons,
             pageCount: addons.pageCount,
@@ -421,6 +432,10 @@ def main():
         failures.append(f"windows nodes: expected 2, got {v31['windowsCount']}")
     if not v31["runbookHasWindows"]:
         failures.append("runbook has no windows rows")
+    if base["preflightBaseCritical"] != 0:
+        failures.append("base topology has pre-flight issues: critical=" + str(base["preflightBaseCritical"]) + " warn=" + str(base["preflightBaseWarn"]))
+    if flipped["preflightFlippedCritical"] < 3:
+        failures.append("pre-flight did not flag broken topology (cp=2, mon=2, edge=1): critical=" + str(flipped["preflightFlippedCritical"]))
     if not v31["plus"]["found"]:
         failures.append("+ Add application cluster button not found")
     elif v31["plus"]["count"] != 2 or not v31["plus"]["name"]:
