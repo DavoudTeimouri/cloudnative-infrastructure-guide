@@ -870,6 +870,12 @@
         box.appendChild(el("div", { class: "card plain" }, [
           el("h3", { text: "Supported releases" }), rel
         ]));
+        if (cm.doc) {
+          box.appendChild(el("div", { class: "card plain" }, [
+            el("p", { class: "doc-link" }, [el("a", { href: "../" + cm.doc, text: "Authoritative document: " + cm.doc })]),
+            el("p", { class: "hint", text: "Five Kubespray releases supported in parallel; pin one per cluster in the version matrix below." })
+          ]));
+        }
       }
 
       var findValue = function (id) {
