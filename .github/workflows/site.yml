@@ -51,6 +51,9 @@ jobs:
       - name: Catalog validation
         run: python3 scripts/validate_catalog.py
 
+      - name: Cluster method deprecation check
+        run: python3 scripts/cluster_methods.py --check
+
       - name: Documentation link check
         run: python3 scripts/check_links.py
 
