@@ -178,11 +178,10 @@ def test_docs_are_structurally_sane():
     assert not offenders, "; ".join(offenders[:10])
 
 
-def test_acceptance_criteria_all_not_run():
-    """A test must never be marked passed without evidence."""
+def test_acceptance_signoff_is_backed_by_evidence():
+    """A test may leave NOT RUN, but PASSED/FAILED needs stored evidence."""
     path = os.path.join(BASE, "requirements", "acceptance-criteria.md")
     text = open(path).read()
-    # The status table has the columns: ID | Test | Phase | Owner | Status | ...
     header = "| ID | Test | Phase | Owner | Status | Evidence | Date | Tester |"
     assert header in text, "acceptance criteria status table header not found"
     body = text.split(header, 1)[1].split("\n\n", 1)[0]
@@ -190,8 +189,16 @@ def test_acceptance_criteria_all_not_run():
     assert rows, "acceptance criteria status table is empty"
     for row in rows:
         cells = [c.strip() for c in row.strip("|").split("|")]
-        status = cells[4] if len(cells) > 4 else ""
-        assert status == "NOT RUN", f"acceptance test not marked NOT RUN: {row[:120]}"
+        test_id, status = cells[0], cells[4] if len(cells) > 4 else ""
+        if status == "NOT RUN":
+            continue
+        assert status in ("PASSED", "FAILED", "BLOCKED"), f"{test_id}: unknown status {status!r}"
+        evidence = cells[5] if len(cells) > 5 else ""
+        assert evidence, f"{test_id}: {status} without an evidence path"
+        assert os.path.exists(os.path.join(BASE, evidence.strip("`"))), \
+            f"{test_id}: evidence path missing on disk: {evidence}"
+        if status == "PASSED":
+            assert cells[6] and cells[7], f"{test_id}: PASSED without date and tester"
 
 
 def main():
@@ -204,7 +211,7 @@ def main():
         ("no plaintext secret patterns in the repo", test_no_plaintext_secret_patterns),
         ("docs are structurally sane", test_docs_are_structurally_sane),
         ("roadmap has all 15 phases", test_roadmap_phases_present),
-        ("acceptance tests are not pre-marked as passed", test_acceptance_criteria_all_not_run),
+        ("acceptance sign-off is backed by evidence", test_acceptance_signoff_is_backed_by_evidence),
     ]
     for name, fn in tests:
         check(name, fn)

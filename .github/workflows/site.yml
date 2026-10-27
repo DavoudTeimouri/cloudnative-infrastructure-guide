@@ -54,6 +54,9 @@ jobs:
       - name: Documentation link check
         run: python3 scripts/check_links.py
 
+      - name: Acceptance gate summary
+        run: python3 scripts/acceptance_status.py
+
       - name: Renderer check (runs the real app.js in a JS engine)
         run: |
           python3 -m pip install --quiet dukpy

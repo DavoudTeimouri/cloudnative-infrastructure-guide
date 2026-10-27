@@ -284,6 +284,9 @@ python3 scripts/validate_catalog.py
 python3 tests/test_repo_tools.py
 python3 scripts/check_links.py
 
+# Acceptance gate: phase table, gate count, rejects unsupported sign-off
+python3 scripts/acceptance_status.py
+
 # Publish the local tree to GitHub (Git Data API, no force-push needed)
 python3 scripts/sync_github.py DavoudTeimouri cloudnative-infrastructure-guide \
   . main "Update guide content" --orphan
