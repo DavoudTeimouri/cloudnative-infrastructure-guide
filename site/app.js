@@ -800,7 +800,6 @@
     var box = $("page");
     if (!page || !box) return;
     clear(box);
-
     box.appendChild(el("h2", { text: page.title }));
     box.appendChild(el("p", { class: "hint", text: page.subtitle }));
     if (page.doc) {
@@ -828,11 +827,15 @@
 
       var method = DATA.methods.filter(function (m) { return m.id === state.method; })[0];
       if (method) {
-        box.appendChild(el("div", { class: "card plain" }, [
+        var reqCard = el("div", { class: "card plain" }, [
           el("h3", { text: "Requirements" }),
           el("p", { class: "hint", text: "Best for: " + method.bestFor }),
           el("ul", {}, method.requirements.map(function (r) { return el("li", { text: r }); }))
-        ]));
+        ]);
+        if (method.doc) {
+          reqCard.appendChild(el("p", { class: "doc-link" }, [el("a", { href: "../" + method.doc, text: "Authoritative document: " + method.doc })]));
+        }
+        box.appendChild(reqCard);
       }
 
       var cbox = el("div", { class: "options" });
@@ -868,9 +871,48 @@
           el("h3", { text: "Supported releases" }), rel
         ]));
       }
+
+      var findValue = function (id) {
+        return DATA.values.filter(function (x) { return x.id === id; })[0];
+      };
+
+      box.appendChild(el("div", { class: "card" }, [
+        el("h3", { text: "Versions" }),
+        el("p", { class: "hint", text: "Source of truth: compatibility/version-matrix.md. Versions are baked into the generated manifests." }),
+        el("div", { class: "values" }, [
+          fieldNode(findValue("kubesprayRelease")),
+          fieldNode(findValue("kubernetesVersion")),
+          fieldNode(findValue("cephRelease")),
+          fieldNode(findValue("cephImage"))
+        ])
+      ]));
+
+      if (cm && cm.versions && state.values.kubesprayRelease) {
+        var r = cm.versions[state.values.kubesprayRelease];
+        if (r) {
+          box.appendChild(el("div", { class: "card plain" }, [
+            el("h4", { text: "Resolved versions" }),
+            el("p", { text: "Kubespray " + state.values.kubesprayRelease + " → Kubernetes " + r.kubernetes + ", etcd " + r.etcd + ", containerd " + r.containerd + ", Cilium " + r.cilium + ", Ansible " + r.ansible + ", Python " + r.python + "." })
+          ]));
+        } else {
+          box.appendChild(el("div", { class: "card plain warn" }, [
+            el("h4", { text: "Resolved versions" }),
+            el("p", { class: "hint", text: "Kubespray release \"" + state.values.kubesprayRelease + "\" is not in the version matrix; manifests will use the release as-is." })
+          ]));
+        }
+      }
+
+      box.appendChild(el("div", { class: "card" }, [
+        el("h3", { text: "Basics" }),
+        el("div", { class: "values" }, [
+          fieldNode(findValue("clusterName")),
+          fieldNode(findValue("env")),
+          fieldNode(findValue("domain"))
+        ])
+      ]));
     }
 
-    if (page.fields && page.fields.length && page.id !== "p4") {
+    if (page.fields && page.fields.length && page.id !== "p4" && page.id !== "p1") {
       var grid = el("div", { class: "values" });
       var tableFields = [];
       page.fields.forEach(function (id) {
@@ -935,6 +977,7 @@
     if ($("next")) {
       $("next").textContent = state.page === DATA.pages.length - 1 ? "Review" : "Next";
     }
+    if (window.scrollTo) window.scrollTo(0, 0);
   }
 
   function gotoPage(i) {
@@ -1086,6 +1129,7 @@
       });
     }
     renderPreflight();
+    if (window.scrollTo) window.scrollTo(0, 0);
   }
 
   function powerOf2Ceil(n) {

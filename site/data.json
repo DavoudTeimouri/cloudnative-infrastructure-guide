@@ -1,5 +1,5 @@
 {
-  "catalogVersion": "3.4.4",
+  "catalogVersion": "3.4.5",
   "updated": "2026-10-23",
   "source": {
     "docs": "The repository is the source of truth. This catalog points at it; it never duplicates a procedure.",
@@ -29,6 +29,54 @@
         "GPU needs passthrough; MIG is not virtualizable, so pass the whole card",
         "The hypervisor joins the failure domain and must be in the DR plan"
       ]
+    },
+    {
+      "id": "cloud-init",
+      "title": "Cloud-init",
+      "summary": "User-data provisioning via cloud-init; OS and host baseline applied from an internal mirror.",
+      "bestFor": "Nodes booted from an internal image repository where cloud-init is available.",
+      "requirements": [
+        "cloud-init enabled image in the internal mirror",
+        "User-data reachable from an internal web server",
+        "Host baseline applied before cluster bootstrap"
+      ],
+      "doc": "automation/ansible/index.md"
+    },
+    {
+      "id": "pxe",
+      "title": "PXE network boot",
+      "summary": "PXE boot from an internal TFTP/HTTP server; unattended OS install with kickstart/preseed equivalent.",
+      "bestFor": "Large fleets of bare-metal nodes provisioned from a single internal PXE server.",
+      "requirements": [
+        "Internal DHCP + TFTP + HTTP PXE server",
+        "PXE-enabled NIC on every node",
+        "Boot image and kickstart/preseed file on the internal mirror"
+      ],
+      "doc": "kubespray/kubespray-deployment.md"
+    },
+    {
+      "id": "kickstart",
+      "title": "Kickstart",
+      "summary": "Red Hat Kickstart automated installation from an internal HTTP repository.",
+      "bestFor": "RHEL/AlmaLinux/Rocky node fleets installed from an internal mirror.",
+      "requirements": [
+        "Internal HTTP repository with Kickstart tree",
+        "Kickstart file referencing internal packages",
+        "Boot media or PXE chainloading the Kickstart config"
+      ],
+      "doc": "kubespray/kubespray-deployment.md"
+    },
+    {
+      "id": "automation",
+      "title": "Ansible automation",
+      "summary": "Existing nodes prepared and bootstrapped with Ansible playbooks from the automation directory.",
+      "bestFor": "Sites that already run Ansible and want host baseline + kubespray inventory from playbooks.",
+      "requirements": [
+        "Ansible control node reachable from all targets",
+        "SSH key or break-glass account on every node",
+        "automation/ansible playbooks committed to the repo"
+      ],
+      "doc": "automation/ansible/index.md"
     }
   ],
   "clusterMethods": [
