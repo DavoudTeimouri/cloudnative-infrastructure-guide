@@ -377,7 +377,7 @@ code { font-family: var(--mono); font-size: .92em; }
 
 .page > h2 { margin-top: 0; }
 .page > .hint { margin-top: -4px; margin-bottom: 18px; }
-.page { min-width: 0; }
+.page { min-width: 0; overflow-x: auto; }
 
 pre.mini {
   margin: 0; padding: 11px; background: var(--bg); border: 1px solid var(--line-soft);

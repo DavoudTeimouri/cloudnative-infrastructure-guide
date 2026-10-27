@@ -995,7 +995,6 @@
     if ($("next")) {
       $("next").textContent = state.page === DATA.pages.length - 1 ? "Review" : "Next";
     }
-    if (window.scrollTo) window.scrollTo(0, 0);
   }
 
   function gotoPage(i) {
@@ -1054,6 +1053,15 @@
       $("plan-note").textContent =
         "Steps are filtered by your selection and link to the documents that are the authority. " +
         "Generated files are starting points: review every path, image tag and address.";
+    }
+    if ($("plan-versions")) {
+      var kv = releaseVersion("kubernetes");
+      var et = releaseVersion("etcd");
+      var cv = releaseVersion("containerd");
+      var ci = releaseVersion("cilium");
+      var rel = state.values.kubesprayRelease || "—";
+      $("plan-versions").textContent =
+        "Kubespray " + rel + " → Kubernetes " + kv + ", etcd " + et + ", containerd " + cv + ", Cilium " + ci + ".";
     }
 
     var sbody = $("sizing") ? $("sizing").querySelector("tbody") : null;
