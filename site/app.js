@@ -215,8 +215,9 @@
   }
 
   function releaseVersion(key) {
-    var cm = DATA.clusterMethods[0] || {};
-    var rel = (cm.versions || {})[state.values.kubesprayRelease || state.choices.kubespray] || {};
+    var cm = DATA.clusterMethods.filter(function (m) { return m.id === state.cluster; })[0] || {};
+    var f = cm.versionField || "kubesprayRelease";
+    var rel = (cm.versions || {})[state.values[f] || state.choices[f]] || {};
     return rel[key] || DATA.versions[key] || "UNVERIFIED";
   }
 
@@ -898,24 +899,25 @@
         el("h3", { text: "Versions" }),
         el("p", { class: "hint", text: "Source of truth: compatibility/version-matrix.md. Versions are baked into the generated manifests." }),
         el("div", { class: "values" }, [
-          fieldNode(findValue("kubesprayRelease")),
+          fieldNode(findValue(cm.versionField)),
           fieldNode(findValue("kubernetesVersion")),
           fieldNode(findValue("cephRelease")),
           fieldNode(findValue("cephImage"))
         ])
       ]));
 
-      if (cm && cm.versions && state.values.kubesprayRelease) {
-        var r = cm.versions[state.values.kubesprayRelease];
-        if (r) {
+      if (cm && cm.versions) {
+        var f = cm.versionField || "kubesprayRelease";
+        var rel = cm.versions[state.values[f]];
+        if (rel) {
           box.appendChild(el("div", { class: "card plain" }, [
             el("h4", { text: "Resolved versions" }),
-            el("p", { text: "Kubespray " + state.values.kubesprayRelease + " → Kubernetes " + r.kubernetes + ", etcd " + r.etcd + ", containerd " + r.containerd + ", Cilium " + r.cilium + ", Ansible " + r.ansible + ", Python " + r.python + "." })
+            el("p", { text: cm.title + " " + state.values[f] + " → Kubernetes " + rel.kubernetes + ", etcd " + rel.etcd + ", containerd " + rel.containerd + ", Cilium " + rel.cilium + ", Ansible " + rel.ansible + ", Python " + rel.python + "." })
           ]));
         } else {
           box.appendChild(el("div", { class: "card plain warn" }, [
             el("h4", { text: "Resolved versions" }),
-            el("p", { class: "hint", text: "Kubespray release \"" + state.values.kubesprayRelease + "\" is not in the version matrix; manifests will use the release as-is." })
+            el("p", { class: "hint", text: cm.title + " version \"" + state.values[f] + "\" is not in the version matrix; manifests will use the release as-is." })
           ]));
         }
       }
