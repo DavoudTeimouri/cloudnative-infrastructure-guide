@@ -159,6 +159,10 @@ h4 { letter-spacing: .01em; }
 .opt-title { font-weight: 600; font-size: 14px; }
 .opt-note { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
 .opt-warn { color: var(--warn); font-size: 12.5px; margin-top: 3px; }
+.badge { display: inline-block; font-size: 11px; font-weight: 700; border-radius: 3px; padding: 1px 6px; margin-left: 8px; vertical-align: middle; text-transform: uppercase; letter-spacing: .05em; }
+.badge-warn { background: rgba(243, 180, 74, .15); color: var(--warn); border: 1px solid var(--warn); }
+.card.plain.critical { border-left: 3px solid var(--danger); }
+.card.plain.warn { border-left: 3px solid var(--warn); }
 .detail { color: var(--muted); font-size: 13.5px; margin-top: 12px; }
 .detail ul { margin: 6px 0 0; padding-left: 18px; }
 

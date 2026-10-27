@@ -848,6 +848,7 @@
           }),
           el("div", { class: "opt-body" }, [
             el("div", { class: "opt-title", text: m.title }),
+            m.lifecycle && m.lifecycle !== "Supported" ? el("span", { class: "badge badge-warn", text: m.lifecycle }) : null,
             el("div", { class: "opt-note", text: m.summary })
           ])
         ]));
@@ -874,6 +875,17 @@
           box.appendChild(el("div", { class: "card plain" }, [
             el("p", { class: "doc-link" }, [el("a", { href: "../" + cm.doc, text: "Authoritative document: " + cm.doc })]),
             el("p", { class: "hint", text: "Five Kubespray releases supported in parallel; pin one per cluster in the version matrix below." })
+          ]));
+        }
+        if (cm.deprecated) {
+          box.appendChild(el("div", { class: "card plain critical" }, [
+            el("h4", { text: "Deprecated cluster method" }),
+            el("p", { text: cm.title + " is deprecated." + (cm.replacement ? " Use " + cm.replacement + " instead." : "") + (cm.removalDate ? " Planned removal: " + cm.removalDate : "") })
+          ]));
+        } else if (cm.lifecycle === "Candidate") {
+          box.appendChild(el("div", { class: "card plain warn" }, [
+            el("h4", { text: "Candidate cluster method" }),
+            el("p", { text: cm.title + " is a candidate: no authoritative document in this repo yet. Follow the kubespray deployment pattern as the reference." })
           ]));
         }
       }

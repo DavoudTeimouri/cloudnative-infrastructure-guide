@@ -1,5 +1,5 @@
 {
-  "catalogVersion": "3.4.6",
+  "catalogVersion": "3.4.7",
   "updated": "2026-10-23",
   "source": {
     "docs": "The repository is the source of truth. This catalog points at it; it never duplicates a procedure.",
@@ -139,6 +139,84 @@
       },
       "doc": "kubespray/kubespray-deployment.md",
       "multiVersionDoc": "kubespray/multi-version-support.md"
+    },
+    {
+      "id": "kubeadm",
+      "title": "kubeadm",
+      "summary": "Kubernetes native bootstrap tool; version-pinned control plane and node join, air-gap capable with internal registry mirrors.",
+      "bestFor": "Conformance-focused clusters and teams that want the upstream K8s bootstrap tool.",
+      "requirements": [
+        "kubeadm, kubelet, kubectl pinned to one Kubernetes version on every node",
+        "Containerd configured with the internal registry mirror",
+        "Control-plane endpoint (VIP or LB) reachable before kubeadm init"
+      ],
+      "lifecycle": "Supported",
+      "deprecated": false
+    },
+    {
+      "id": "rke2",
+      "title": "RKE2",
+      "summary": "Rancher's enterprise Kubernetes distribution; single-binary, CNCF-certified, built for air-gapped and offline installs.",
+      "bestFor": "Rancher-managed sites and air-gapped production clusters wanting a single-binary distro.",
+      "requirements": [
+        "RKE2 install script reachable from an internal mirror",
+        "SELinux/AppArmor tuned for RKE2",
+        "ETCD and control-plane nodes sized per Rancher sizing"
+      ],
+      "lifecycle": "Supported",
+      "deprecated": false
+    },
+    {
+      "id": "talos",
+      "title": "Talos",
+      "summary": "API-managed, immutable Linux for Kubernetes; no SSH, OS and K8s upgraded together via talosctl.",
+      "bestFor": "Teams wanting an immutable, API-driven OS with minimal attack surface.",
+      "requirements": [
+        "talosctl on the management machine",
+        "PXE or iPXE boot or an installer image per node",
+        "Control-plane endpoints defined in the Talos machine config"
+      ],
+      "lifecycle": "Candidate",
+      "deprecated": false
+    },
+    {
+      "id": "kind",
+      "title": "kind",
+      "summary": "Kubernetes IN Docker; runs K8s nodes as Docker containers. Local/dev only, not for production.",
+      "bestFor": "Local development, CI, and conformance testing on a single machine.",
+      "requirements": [
+        "Docker running on the host",
+        "kind binary installed",
+        "Local loopback networking sufficient"
+      ],
+      "lifecycle": "Candidate",
+      "deprecated": false
+    },
+    {
+      "id": "microk8s",
+      "title": "MicroK8s",
+      "summary": "Snap-packaged, single-node-to-cluster Kubernetes; small footprint for edge and CI.",
+      "bestFor": "Edge nodes, CI runners, and small air-gapped footprints.",
+      "requirements": [
+        "snapd available on every node",
+        "MicroK8s snap from an internal mirror or snap proxy",
+        "Cluster mesh or single-node"
+      ],
+      "lifecycle": "Candidate",
+      "deprecated": false
+    },
+    {
+      "id": "openshift",
+      "title": "OpenShift",
+      "summary": "Red Hat enterprise Kubernetes platform; operator-centric, licensed.",
+      "bestFor": "Enterprises with Red Hat subscriptions wanting an integrated platform.",
+      "requirements": [
+        "Red Hat subscription and pull secret",
+        "Installer-provisioned infrastructure (IPI) or user-provisioned",
+        "OpenShift installer and ignition configs"
+      ],
+      "lifecycle": "Candidate",
+      "deprecated": false
     }
   ],
   "pages": [
