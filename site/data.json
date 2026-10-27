@@ -3740,7 +3740,7 @@
     "cilium": "1.20.3",
     "calico": "3.31.7",
     "rook": "v1.21.0",
-    "ceph": "v21.2.0",
+    "ceph": "20.2.4",
     "haproxy": "3.2.26 (3.2 branch)",
     "nginx": "1.31.8",
     "nic": "5.7.0 (chart nginx-ingress 2.8.0)",
