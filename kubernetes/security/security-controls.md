@@ -199,7 +199,7 @@ rules:
     verbs: ["get"]
   - level: RequestResponse
     resources:
-      - group: "" 
+      - group: ""
         resources: ["secrets"]
   - level: Metadata
     resources:

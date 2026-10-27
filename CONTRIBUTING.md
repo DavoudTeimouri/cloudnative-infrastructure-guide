@@ -50,6 +50,7 @@ Steps:
 ```bash
 python3 scripts/build_site.py        # regenerate site/data.json
 python3 scripts/validate_catalog.py  # missing docs, bad placeholders, stale data
+python3 scripts/check_links.py       # relative paths and in-page anchors
 python3 -m http.server 8080 --directory site   # preview at http://localhost:8080
 ```
 
@@ -125,7 +126,7 @@ Each ADR follows the standard format:
 This repository treats documentation with the same rigor as software:
 - **Versioned:** Every claim has a version, source URL, and check date
 - **Reviewed:** Changes go through the standard PR process
-- **CI-tested:** `tests/test_repo_tools.py` runs 8 checks; `validate_catalog.py` and `build_site.py` enforce data consistency
+- **CI-tested:** `tests/test_repo_tools.py` runs 9 checks; `validate_catalog.py` and `build_site.py` enforce data consistency
 - **Traceable:** All facts trace back to source documents
 
 ### Guide Site Workflow
@@ -159,7 +160,7 @@ Build checks fail when generated data no longer matches the sources, preventing 
 1. Discuss the proposed change in a new issue (or directly if it's a small fix)
 2. Create a topic branch off `main`
 3. Make changes with the smallest possible diff
-4. Run all local checks: `test_repo_tools.py`, `validate_catalog.py`, `build_site.py`
+4. Run all local checks: `test_repo_tools.py`, `validate_catalog.py`, `build_site.py`, `check_links.py`
 5. Submit a PR with a clear title and description
 6. Address review feedback
 7. Once approved, the PR will be merged
@@ -168,4 +169,4 @@ Build checks fail when generated data no longer matches the sources, preventing 
 
 - Version bumps are recorded in `compatibility/version-matrix.md` with a check date
 - Each release must update the version matrix, artifact matrix, and component guide in the same change
-- A version bump MR must pass all 8 checks in `test_repo_tools.py`
+- A version bump MR must pass all 9 checks in `test_repo_tools.py`

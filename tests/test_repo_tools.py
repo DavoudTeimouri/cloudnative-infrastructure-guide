@@ -160,6 +160,24 @@ def test_roadmap_phases_present():
         assert f"## Phase {i} " in text, f"roadmap missing phase {i}"
 
 
+def test_docs_are_structurally_sane():
+    """Fenced blocks balance and no trailing whitespace drifts into docs."""
+    offenders = []
+    for root, dirs, files in os.walk(BASE):
+        dirs[:] = [d for d in dirs if d not in {".git", "node_modules", "__pycache__"}]
+        for name in files:
+            if not name.endswith(".md"):
+                continue
+            path = os.path.join(root, name)
+            text = open(path, encoding="utf-8", errors="replace").read()
+            if text.count("```") % 2:
+                offenders.append(f"{os.path.relpath(path, BASE)}: unbalanced code fence")
+            for i, line in enumerate(text.splitlines(), 1):
+                if line != line.rstrip():
+                    offenders.append(f"{os.path.relpath(path, BASE)}:{i}: trailing whitespace")
+    assert not offenders, "; ".join(offenders[:10])
+
+
 def test_acceptance_criteria_all_not_run():
     """A test must never be marked passed without evidence."""
     path = os.path.join(BASE, "requirements", "acceptance-criteria.md")
@@ -184,6 +202,7 @@ def main():
         ("artifact matrix has all mandatory columns", test_artifact_matrix_has_all_mandatory_columns),
         ("network matrix has required fields and contiguous rows", test_network_matrix_has_required_fields),
         ("no plaintext secret patterns in the repo", test_no_plaintext_secret_patterns),
+        ("docs are structurally sane", test_docs_are_structurally_sane),
         ("roadmap has all 15 phases", test_roadmap_phases_present),
         ("acceptance tests are not pre-marked as passed", test_acceptance_criteria_all_not_run),
     ]
