@@ -95,12 +95,12 @@ buttons sit at the bottom of every page, below the content, with the page counte
 
 1. **Deployment** — bare metal or virtual machines, cluster name, environment, domain. Read the
    requirements: the VM option lists what changes in the failure domain.
-2. **Application cluster** — control-plane count, worker count, GPU nodes, and vCPU/RAM/disk per
-   role. Node names and addresses are generated from the prefix and the first address; the page
-   shows the result.
-3. **Management cluster** — its own worker count and sizes, because Rancher, Keycloak, Argo CD,
+2. **Management cluster** — its own worker count and sizes, because Rancher, Keycloak, Argo CD,
    Harbor and Vault do not share the workload cluster's capacity. Includes the directory
    integrations (multi-select) and the directory endpoint.
+3. **Application cluster** — control-plane count, worker count, GPU nodes, and vCPU/RAM/disk per
+   role. Node names and addresses are generated from the prefix and the first address; the page
+   shows the result.
 4. **Operating system** — Oracle Linux 9/8 or Ubuntu 24.04/22.04, plus the host baseline: admin
    user, SSH port and password policy, sudo, timezone and locale, NTP and DNS servers, search
    domain, kernel arguments, swap, transparent huge pages, max pods, file descriptors, SELinux,

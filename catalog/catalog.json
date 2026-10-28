@@ -1,5 +1,5 @@
 {
-  "catalogVersion": "3.4.12",
+  "catalogVersion": "3.4.13",
   "updated": "2026-10-23",
   "source": {
     "docs": "The repository is the source of truth. This catalog points at it; it never duplicates a procedure.",
@@ -333,6 +333,27 @@
     },
     {
       "id": "p2",
+      "title": "Management cluster",
+      "subtitle": "Rancher or an alternative management UI, optional in-cluster storage, Keycloak and the directory integrations, sized separately from the workload clusters.",
+      "components": [
+        "management",
+        "mgmtStorage",
+        "identity",
+        "idpIntegration"
+      ],
+      "fields": [
+        "mgmtWorkerCount",
+        "mgmtIpStart",
+        "mgmtCpu",
+        "mgmtMemGb",
+        "mgmtDiskGb",
+        "directoryHost",
+        "directoryBaseDn"
+      ],
+      "doc": "management-cluster/alternatives.md"
+    },
+    {
+      "id": "p3",
       "title": "Application cluster",
       "subtitle": "Control plane, Linux and Windows workers, and the resources kept for the OS and the agents. Additional application clusters are added one at a time, each with its own CIDRs and sizing.",
       "components": [
@@ -352,27 +373,6 @@
         "appClusters"
       ],
       "doc": "kubernetes/multiple-clusters.md"
-    },
-    {
-      "id": "p3",
-      "title": "Management cluster",
-      "subtitle": "Rancher or an alternative management UI, optional in-cluster storage, Keycloak and the directory integrations, sized separately from the workload clusters.",
-      "components": [
-        "management",
-        "mgmtStorage",
-        "identity",
-        "idpIntegration"
-      ],
-      "fields": [
-        "mgmtWorkerCount",
-        "mgmtIpStart",
-        "mgmtCpu",
-        "mgmtMemGb",
-        "mgmtDiskGb",
-        "directoryHost",
-        "directoryBaseDn"
-      ],
-      "doc": "management-cluster/alternatives.md"
     },
     {
       "id": "p4",

@@ -952,9 +952,6 @@
       });
     }
 
-    if (page.id === "p2") {
-    }
-
     if (page.components && page.components.length) {
       var comps = el("div", { class: "components" });
       page.components.forEach(function (id) {
@@ -968,10 +965,10 @@
 
     var t = topology();
     if (page.id === "p2") {
-      box.appendChild(nodeListCard("Nodes generated", t.cp.concat(t.w, t.gpu, t.win)));
+      box.appendChild(nodeListCard("Management nodes generated", t.mgmt));
     }
     if (page.id === "p3") {
-      box.appendChild(nodeListCard("Management nodes generated", t.mgmt));
+      box.appendChild(nodeListCard("Nodes generated", t.cp.concat(t.w, t.gpu, t.win)));
     }
     if (page.id === "p5" && t.ceph.length) {
       var roles = t.cephRoles;

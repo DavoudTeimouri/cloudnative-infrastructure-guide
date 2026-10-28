@@ -150,7 +150,7 @@ function exportBodies() {
 }
 
 var page1 = __byId["page"].textContent;
-__g.gotoPage(1);
+__g.gotoPage(2);
 var page2 = __byId["page"].textContent;
 __g.gotoPage(7);
 __g.renderReview();
@@ -216,7 +216,7 @@ function findAll(root, pred, out) {
   }
   return out;
 }
-__g.gotoPage(1);
+__g.gotoPage(2);
 var addBtn = findAll(__byId["page"], function (n) {
   return (n.tagName === "button" || n.tagName === "BUTTON") &&
     n.textContent.indexOf("Add application cluster") !== -1;
@@ -257,7 +257,7 @@ __g.state.values.appClusters = [primary, { name: "site-b", cp: "3", cpCpu: "8", 
                         windows: "0", windowsCpu: "8", windowsMemGb: "32", windowsDiskGb: "120",
                         pod: "10.130.0.0/16", svc: "10.132.0.0/16" }];
 __g.state.values.kubesprayRelease = "release-2.29";
-__g.gotoPage(1);
+__g.gotoPage(2);
 var p2 = __byId["page"].textContent;
 __g.renderReview();
 __g.gotoPage(3);
